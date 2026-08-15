@@ -1,0 +1,36 @@
+name: vibe-proxy
+
+services:
+  cli-proxy-api:
+    build:
+      context: ./CLIProxyAPI
+    image: vibe-proxy/cli-proxy-api:local
+    restart: always
+    expose:
+      - "8317"
+    volumes:
+      - ./data/config.yaml:/CLIProxyAPI/config.yaml
+      - ./data/auths:/root/.cli-proxy-api
+      - ./data/logs:/CLIProxyAPI/logs
+    networks:
+      - vibe-proxy
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/edge.Dockerfile
+      args:
+        VITE_API_BASE: /api
+    image: vibe-proxy/nginx:local
+    restart: always
+    depends_on:
+      - cli-proxy-api
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8954}:80"
+    networks:
+      - vibe-proxy
+
+networks:
+  vibe-proxy:
+    name: vibe-proxy-network
+    driver: bridge

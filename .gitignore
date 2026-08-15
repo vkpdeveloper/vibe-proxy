@@ -1,0 +1,31 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+secrets.env
+secrets.env.*
+!secrets.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime configuration, OAuth credentials, databases, and logs
+data/
+
+# Dependencies and generated builds
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.log
+
+# Local tooling and editor state
+.DS_Store
+.idea/
+.vscode/
+.codex/
+.claude/
+.gemini/
+.agents/
+*.local

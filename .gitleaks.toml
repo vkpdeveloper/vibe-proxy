@@ -1,0 +1,29 @@
+[extend]
+useDefault = true
+
+# These are public installed-application OAuth constants inherited unchanged
+# from router-for-me/CLIProxyAPI. Keep each exception constrained to one rule,
+# one source path, and one assignment name so unrelated findings still fail.
+[[allowlists]]
+description = "Public Antigravity OAuth client secret constant"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''^CLIProxyAPI/internal/auth/antigravity/constants\.go$''']
+regexes = ['''^\s*ClientSecret\s*=''']
+
+[[allowlists]]
+description = "Public Antigravity management OAuth client secret constant"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''^CLIProxyAPI/internal/api/handlers/management/api_tools\.go$''']
+regexes = ['''^\s*antigravityOAuthClientSecret\s*=''']
+
+[[allowlists]]
+description = "Public Antigravity executor OAuth client secret constant"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''^CLIProxyAPI/internal/runtime/executor/antigravity_executor\.go$''']
+regexes = ['''^\s*antigravityClientSecret\s*=''']
