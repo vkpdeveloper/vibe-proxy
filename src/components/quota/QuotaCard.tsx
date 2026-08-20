@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
-import { IconRefreshCw } from '@/components/ui/icons';
+import { IconNetwork, IconRefreshCw } from '@/components/ui/icons';
 import type {
   AuthFileItem,
   QuotaCapacityState,
@@ -142,6 +142,18 @@ export function QuotaCard<TState extends QuotaStatusState>({
     quota?.error || t('common.unknown_error')
   );
   const idleMessageKey = `${i18nPrefix}.idle`;
+  const routingSelection = item.routing_selection ?? item.routingSelection;
+  const isRoutingSelected = routingSelection?.selected === true;
+  const routingSelectionTitle = isRoutingSelected
+    ? routingSelection.model
+      ? t('auth_files.routing_selected_hint', {
+          model: routingSelection.model,
+          time: formatQuotaResetTime(routingSelection.expires_at),
+        })
+      : t('auth_files.routing_selected_hint_no_model', {
+          time: formatQuotaResetTime(routingSelection.expires_at),
+        })
+    : undefined;
 
   const getTypeLabel = (type: string): string => {
     const key = `auth_files.filter_${type}`;
@@ -152,7 +164,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
   };
 
   return (
-    <div className={`${styles.fileCard} ${cardClassName}`}>
+    <div
+      className={`${styles.fileCard} ${cardClassName} ${isRoutingSelected ? styles.fileCardRoutingSelected : ''}`}
+    >
       <div className={styles.cardHeader}>
         <span
           className={styles.typeBadge}
@@ -164,6 +178,12 @@ export function QuotaCard<TState extends QuotaStatusState>({
         >
           {getTypeLabel(displayType)}
         </span>
+        {isRoutingSelected && (
+          <span className={styles.routingSelectionBadge} title={routingSelectionTitle}>
+            <IconNetwork className={styles.routingSelectionIcon} size={12} />
+            {t('auth_files.routing_selected')}
+          </span>
+        )}
         <span className={styles.fileName}>{item.name}</span>
       </div>
 
