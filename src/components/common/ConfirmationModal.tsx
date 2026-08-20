@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { useNotificationStore } from '@/stores';
 
 export function ConfirmationModal() {
@@ -50,9 +51,16 @@ export function ConfirmationModal() {
   };
 
   return (
-    <Modal open={isOpen} onClose={handleCancel} title={title} closeDisabled={isLoading}>
+    <Modal
+      open={isOpen}
+      onClose={handleCancel}
+      title={typeof title === 'string' ? <EmailPrivacyText text={title} /> : title}
+      closeDisabled={isLoading}
+    >
       {typeof message === 'string' ? (
-        <p style={{ margin: '1rem 0' }}>{message}</p>
+        <p style={{ margin: '1rem 0' }}>
+          <EmailPrivacyText text={message} />
+        </p>
       ) : (
         <div style={{ margin: '1rem 0' }}>{message}</div>
       )}

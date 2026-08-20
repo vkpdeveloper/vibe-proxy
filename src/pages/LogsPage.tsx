@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { lockScroll, unlockScroll } from '@/components/ui/scrollLock';
 import {
@@ -1178,7 +1179,7 @@ export function LogsPage() {
                     {errorLogs.map((item) => (
                       <div key={item.name} className="item-row">
                         <div className="item-meta">
-                          <div className="item-title">{item.name}</div>
+                          <EmailPrivacyText className="item-title" text={item.name} />
                           <div className="item-subtitle">
                             {item.size ? `${(item.size / 1024).toFixed(1)} KB` : ''}{' '}
                             {item.modified ? formatUnixTimestamp(item.modified) : ''}

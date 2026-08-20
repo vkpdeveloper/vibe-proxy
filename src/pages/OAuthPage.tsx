@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconPlug } from '@/components/ui/icons';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
 import { oauthApi, pluginsApi, type BuiltInOAuthProvider } from '@/services/api';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
@@ -727,13 +728,13 @@ export function OAuthPage() {
                 <Button variant="secondary" size="sm" onClick={handleVertexFilePick}>
                   {t('vertex_import.choose_file')}
                 </Button>
-                <div
+                <EmailPrivacyText
                   className={`${styles.fileName} ${
                     vertexState.fileName ? '' : styles.fileNamePlaceholder
                   }`.trim()}
-                >
-                  {vertexState.fileName || t('vertex_import.file_placeholder')}
-                </div>
+                  text={vertexState.fileName}
+                  fallback={t('vertex_import.file_placeholder')}
+                />
               </div>
               <div className={styles.cardHintSecondary}>{t('vertex_import.file_hint')}</div>
               <input
@@ -760,7 +761,10 @@ export function OAuthPage() {
                   {vertexState.result.email && (
                     <div className={styles.keyValueItem}>
                       <span className={styles.keyValueKey}>{t('vertex_import.result_email')}</span>
-                      <span className={styles.keyValueValue}>{vertexState.result.email}</span>
+                      <EmailPrivacyText
+                        className={styles.keyValueValue}
+                        text={vertexState.result.email}
+                      />
                     </div>
                   )}
                   {vertexState.result.location && (

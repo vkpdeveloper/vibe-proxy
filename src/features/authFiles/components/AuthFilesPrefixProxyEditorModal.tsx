@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Input } from '@/components/ui/Input';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type {
   PrefixProxyEditorField,
   PrefixProxyEditorFieldValue,
@@ -45,9 +46,13 @@ export function AuthFilesPrefixProxyEditorModal(props: AuthFilesPrefixProxyEdito
       closeDisabled={editor?.saving === true}
       width={720}
       title={
-        editor?.fileName
-          ? t('auth_files.auth_field_editor_title', { name: editor.fileName })
-          : t('auth_files.prefix_proxy_button')
+        <EmailPrivacyText
+          text={
+            editor?.fileName
+              ? t('auth_files.auth_field_editor_title', { name: editor.fileName })
+              : t('auth_files.prefix_proxy_button')
+          }
+        />
       }
       footer={
         <>

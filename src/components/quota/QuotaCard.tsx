@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { IconNetwork, IconRefreshCw } from '@/components/ui/icons';
 import type {
   AuthFileItem,
@@ -184,7 +185,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
             {t('auth_files.routing_selected')}
           </span>
         )}
-        <span className={styles.fileName}>{item.name}</span>
+        <EmailPrivacyText className={styles.fileName} text={item.name} />
       </div>
 
       <div className={styles.quotaSection}>

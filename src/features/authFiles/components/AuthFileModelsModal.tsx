@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import { isModelExcluded } from '@/features/authFiles/constants';
 import styles from '@/pages/AuthFilesPage.module.scss';
@@ -26,7 +27,11 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title={t('auth_files.models_title', { defaultValue: '支持的模型' }) + ` - ${fileName}`}
+      title={
+        <EmailPrivacyText
+          text={t('auth_files.models_title', { defaultValue: '支持的模型' }) + ` - ${fileName}`}
+        />
+      }
       footer={
         <Button variant="secondary" onClick={onClose}>
           {t('common.close')}

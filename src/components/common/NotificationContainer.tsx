@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '@/stores';
 import { IconX } from '@/components/ui/icons';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { Notification } from '@/types';
 
 interface AnimatedNotification extends Notification {
@@ -69,7 +70,7 @@ export function NotificationContainer() {
           key={notification.id}
           className={`notification ${notification.type} ${notification.isExiting ? 'exiting' : 'entering'}`}
         >
-          <div className="message">{notification.message}</div>
+          <EmailPrivacyText className="message" text={notification.message} />
           <button
             type="button"
             className="close-btn"

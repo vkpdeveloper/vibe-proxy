@@ -43,6 +43,7 @@
     "copy": "Copy",
     "expand": "Expand",
     "collapse": "Collapse",
+    "reveal_email": "Reveal email address",
     "status": "Status",
     "action": "Action",
     "custom_headers_label": "Custom Headers",

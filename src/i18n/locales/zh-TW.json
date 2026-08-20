@@ -43,6 +43,7 @@
     "copy": "複製",
     "expand": "展開",
     "collapse": "收起",
+    "reveal_email": "顯示電子郵件地址",
     "status": "狀態",
     "action": "操作",
     "custom_headers_label": "自訂請求標頭",

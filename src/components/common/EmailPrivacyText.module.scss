@@ -1,0 +1,67 @@
+.email {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  vertical-align: baseline;
+  transform-origin: center;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -4px;
+    left: -4px;
+    height: 40px;
+    transform: translateY(-50%);
+  }
+}
+
+.concealed {
+  cursor: pointer;
+  filter: blur(4px);
+  opacity: 0.68;
+  transform: scale(0.98);
+  user-select: none;
+
+  &:hover {
+    color: var(--accent-color);
+    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 45%, transparent);
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+.revealed {
+  cursor: text;
+  filter: blur(0);
+  opacity: 1;
+  transform: scale(1);
+  user-select: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .email {
+    transition-duration: 0ms;
+  }
+}

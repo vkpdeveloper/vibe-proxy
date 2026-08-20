@@ -12,6 +12,7 @@ import {
   IconTrash2,
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { AuthFileItem, QuotaCapacityState, QuotaCapacityWindow } from '@/types';
 import { resolveAuthProvider } from '@/utils/quota';
 import {
@@ -299,9 +300,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   </span>
                 )}
               </div>
-              <span className={styles.fileName} title={file.name}>
-                {file.name}
-              </span>
+              <EmailPrivacyText className={styles.fileName} text={file.name} />
               {!compact && noteValue && (
                 <div className={styles.noteText} title={noteValue}>
                   <span className={styles.noteLabel}>{t('auth_files.note_display')}</span>
