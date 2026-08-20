@@ -19,6 +19,35 @@ export type AuthFileType =
   | 'empty'
   | 'unknown';
 
+export interface QuotaCapacityWindow {
+  id: string;
+  label: string;
+  scope_model?: string;
+  used_percent: number;
+  remaining_percent: number;
+  reset_at?: string;
+  known: boolean;
+  hard_exhausted?: boolean;
+  routing: boolean;
+}
+
+export interface QuotaCapacityState {
+  provider: string;
+  supported: boolean;
+  fetched_at?: string;
+  stale_at?: string;
+  last_attempt_at?: string;
+  last_error?: string;
+  windows?: QuotaCapacityWindow[];
+}
+
+export interface RoutingSelectionState {
+  selected: boolean;
+  model?: string;
+  selected_at: string;
+  expires_at: string;
+}
+
 export interface AuthFileItem {
   name: string;
   type?: AuthFileType | string;
@@ -36,6 +65,10 @@ export interface AuthFileItem {
   failed?: unknown;
   recent_requests?: RecentRequestBucket[];
   recentRequests?: RecentRequestBucket[];
+  quota_capacity?: QuotaCapacityState;
+  quotaCapacity?: QuotaCapacityState;
+  routing_selection?: RoutingSelectionState;
+  routingSelection?: RoutingSelectionState;
   [key: string]: unknown;
 }
 

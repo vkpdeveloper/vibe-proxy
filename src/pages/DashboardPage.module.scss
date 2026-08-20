@@ -499,6 +499,18 @@
   background: rgba($success-color, 0.12);
 }
 
+.configBadgeQuotaDrain {
+  color: #8a5b00;
+  border-color: rgba(217, 165, 22, 0.34);
+  background: rgba(217, 165, 22, 0.14);
+}
+
+:global([data-theme='dark']) .configBadgeQuotaDrain {
+  color: #ffd862;
+  border-color: rgba(226, 180, 50, 0.3);
+  background: rgba(226, 180, 50, 0.12);
+}
+
 .configBadgeUnknown {
   color: var(--text-secondary);
   background: var(--bg-primary);

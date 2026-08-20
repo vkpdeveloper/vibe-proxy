@@ -90,7 +90,7 @@ export interface CodexUsagePayload {
 // Claude API payload types
 export interface ClaudeUsageWindow {
   utilization: number;
-  resets_at: string;
+  resets_at: string | null;
 }
 
 export interface ClaudeExtraUsage {
@@ -98,6 +98,24 @@ export interface ClaudeExtraUsage {
   monthly_limit: number;
   used_credits: number;
   utilization: number | null;
+}
+
+export interface ClaudeUsageLimitScope {
+  model?: {
+    id?: string | null;
+    display_name?: string | null;
+  } | null;
+  surface?: string | null;
+}
+
+export interface ClaudeUsageLimit {
+  kind?: string | null;
+  group?: string | null;
+  percent?: number | null;
+  utilization?: number | null;
+  resets_at?: string | null;
+  scope?: ClaudeUsageLimitScope | null;
+  is_active?: boolean | null;
 }
 
 export interface ClaudeUsagePayload {
@@ -109,6 +127,7 @@ export interface ClaudeUsagePayload {
   seven_day_cowork?: ClaudeUsageWindow | null;
   iguana_necktie?: ClaudeUsageWindow | null;
   extra_usage?: ClaudeExtraUsage | null;
+  limits?: ClaudeUsageLimit[] | null;
 }
 
 export interface ClaudeProfileResponse {

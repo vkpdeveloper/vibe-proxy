@@ -352,10 +352,12 @@
 .quotaPercent {
   font-weight: 600;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .quotaReset {
   color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 
 .quotaAmount {
@@ -385,6 +387,22 @@
     opacity: 0.6;
     text-decoration: none;
   }
+}
+
+.quotaSnapshotMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-xs;
+  min-height: 20px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaSnapshotStale {
+  color: var(--warning-text);
+  font-weight: 600;
 }
 
 .quotaCardActions {

@@ -966,6 +966,17 @@
   }
 }
 
+.fileCardRoutingSelected {
+  border-color: color-mix(in srgb, var(--primary-color) 48%, var(--border-color));
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 82%, #22c55e),
+    0 8px 24px -18px color-mix(in srgb, var(--primary-color) 52%, transparent);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 62%, var(--border-color));
+  }
+}
+
 .fileCardDisabled {
   background-color: color-mix(in srgb, var(--bg-primary) 78%, var(--bg-secondary));
   border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
@@ -974,6 +985,7 @@
   .cardHeaderContent,
   .cardMeta,
   .healthStatusMessage,
+  .quotaDrainSummary,
   .subscriptionError,
   .cardInsights {
     opacity: 0.72;
@@ -1032,6 +1044,8 @@
 
   .typeBadge,
   .stateBadge,
+  .routingSelectionBadge,
+  .quotaDrainBadge,
   .subscriptionBadge,
   .subscriptionBadgePremium {
     padding: 3px 7px;
@@ -1203,6 +1217,69 @@
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
   border: 1px dashed color-mix(in srgb, var(--border-primary) 90%, transparent);
+}
+
+.routingSelectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 42%, transparent);
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-secondary));
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.routingSelectionIcon {
+  flex: 0 0 auto;
+  stroke-width: 2.4;
+}
+
+.quotaDrainBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaDrainBadgeActive {
+  color: #8a5b00;
+  background: rgba(217, 165, 22, 0.14);
+  border-color: rgba(217, 165, 22, 0.34);
+}
+
+.quotaDrainBadgeExhausted {
+  color: var(--danger-color);
+  background: rgba($error-color, 0.08);
+  border-color: color-mix(in srgb, var(--danger-color) 60%, transparent);
+}
+
+.quotaDrainBadgeStale {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+
+.quotaDrainBadgeUnavailable {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
+  border-color: var(--border-color);
+}
+
+:global([data-theme='dark']) .quotaDrainBadgeActive {
+  color: #ffd862;
+  background: rgba(226, 180, 50, 0.12);
+  border-color: rgba(226, 180, 50, 0.28);
 }
 
 .subscriptionBadge {
@@ -1395,6 +1472,47 @@
   border-radius: 8px;
   padding: 8px 10px;
   word-break: break-word;
+}
+
+.quotaDrainSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, var(--border-color));
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 5%, var(--bg-secondary));
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.quotaDrainSummaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quotaDrainSummaryLabel,
+.quotaDrainSummaryHint {
+  color: var(--text-tertiary);
+}
+
+.quotaDrainSummaryValue {
+  color: currentColor;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaDrainSummaryHint {
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaDrainSummaryError {
+  color: var(--warning-text);
+  overflow-wrap: anywhere;
 }
 
 .subscriptionError {

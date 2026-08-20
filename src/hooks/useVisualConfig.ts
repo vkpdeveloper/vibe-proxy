@@ -910,6 +910,8 @@ function getNextDirtyFields(
       'quotaSwitchPreviewModel',
       'quotaAntigravityCredits',
       'routingStrategy',
+      'routingQuotaDrainRefreshInterval',
+      'routingQuotaDrainStaleAfter',
       'routingSessionAffinity',
       'routingSessionAffinityTTL',
     ] as Array<keyof VisualConfigValues>
@@ -1063,6 +1065,9 @@ export function useVisualConfig() {
       const remoteManagement = asRecord(parsed['remote-management']);
       const quotaExceeded = asRecord(parsed['quota-exceeded']);
       const routing = asRecord(parsed.routing);
+      const routingQuotaDrain = asRecord(
+        routing?.['quota-drain'] ?? routing?.quotaDrain ?? routing?.quotadrain
+      );
       const payload = asRecord(parsed.payload);
       const streaming = asRecord(parsed.streaming);
       const plugins = asRecord(parsed.plugins);
@@ -1161,7 +1166,24 @@ export function useVisualConfig() {
         quotaSwitchPreviewModel: Boolean(quotaExceeded?.['switch-preview-model'] ?? true),
         quotaAntigravityCredits: Boolean(quotaExceeded?.['antigravity-credits'] ?? false),
 
-        routingStrategy: routing?.strategy === 'fill-first' ? 'fill-first' : 'round-robin',
+        routingStrategy:
+          routing?.strategy === 'fill-first'
+            ? 'fill-first'
+            : routing?.strategy === 'quota-drain'
+              ? 'quota-drain'
+              : 'round-robin',
+        routingQuotaDrainRefreshInterval:
+          typeof routingQuotaDrain?.['refresh-interval'] === 'string'
+            ? routingQuotaDrain['refresh-interval']
+            : typeof routingQuotaDrain?.refreshInterval === 'string'
+              ? routingQuotaDrain.refreshInterval
+              : '',
+        routingQuotaDrainStaleAfter:
+          typeof routingQuotaDrain?.['stale-after'] === 'string'
+            ? routingQuotaDrain['stale-after']
+            : typeof routingQuotaDrain?.staleAfter === 'string'
+              ? routingQuotaDrain.staleAfter
+              : '',
         routingSessionAffinity: Boolean(
           routing?.['session-affinity'] ?? routing?.sessionAffinity ?? routing?.['sessionAffinity']
         ),
@@ -1450,11 +1472,23 @@ export function useVisualConfig() {
         if (
           docHas(doc, ['routing']) ||
           values.routingStrategy !== 'round-robin' ||
+          values.routingQuotaDrainRefreshInterval.trim() ||
+          values.routingQuotaDrainStaleAfter.trim() ||
           values.routingSessionAffinity ||
           values.routingSessionAffinityTTL.trim()
         ) {
           ensureMapInDoc(doc, ['routing']);
           doc.setIn(['routing', 'strategy'], values.routingStrategy);
+          setStringInDoc(
+            doc,
+            ['routing', 'quota-drain', 'refresh-interval'],
+            values.routingQuotaDrainRefreshInterval
+          );
+          setStringInDoc(
+            doc,
+            ['routing', 'quota-drain', 'stale-after'],
+            values.routingQuotaDrainStaleAfter
+          );
           setBooleanInDoc(doc, ['routing', 'session-affinity'], values.routingSessionAffinity);
           setStringInDoc(
             doc,

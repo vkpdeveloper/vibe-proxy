@@ -1142,6 +1142,12 @@ export function VisualConfigEditor({
                               'config_management.visual.sections.network.strategy_fill_first'
                             ),
                           },
+                          {
+                            value: 'quota-drain',
+                            label: t(
+                              'config_management.visual.sections.network.strategy_quota_drain'
+                            ),
+                          },
                         ]}
                         id={`${routingStrategyLabelId}-select`}
                         disabled={disabled}
@@ -1155,6 +1161,42 @@ export function VisualConfigEditor({
                       />
                     </FieldShell>
                   </FieldAnchor>
+                  {values.routingStrategy === 'quota-drain' && (
+                    <>
+                      <FieldAnchor fieldId="routingQuotaDrainRefreshInterval">
+                        <Input
+                          label={t(
+                            'config_management.visual.sections.network.quota_drain_refresh_interval'
+                          )}
+                          placeholder="2m"
+                          value={values.routingQuotaDrainRefreshInterval}
+                          onChange={(e) =>
+                            onChange({ routingQuotaDrainRefreshInterval: e.target.value })
+                          }
+                          disabled={disabled}
+                          hint={t(
+                            'config_management.visual.sections.network.quota_drain_refresh_interval_hint'
+                          )}
+                        />
+                      </FieldAnchor>
+                      <FieldAnchor fieldId="routingQuotaDrainStaleAfter">
+                        <Input
+                          label={t(
+                            'config_management.visual.sections.network.quota_drain_stale_after'
+                          )}
+                          placeholder="10m"
+                          value={values.routingQuotaDrainStaleAfter}
+                          onChange={(e) =>
+                            onChange({ routingQuotaDrainStaleAfter: e.target.value })
+                          }
+                          disabled={disabled}
+                          hint={t(
+                            'config_management.visual.sections.network.quota_drain_stale_after_hint'
+                          )}
+                        />
+                      </FieldAnchor>
+                    </>
+                  )}
                   <FieldAnchor fieldId="disableImageGeneration">
                     <FieldShell
                       label={t(

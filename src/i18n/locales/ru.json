@@ -160,7 +160,8 @@
     "request_log_warning": "Оставьте выключенным, если подробная диагностика не нужна.",
     "ws_auth_enable": "Требовать аутентификацию для /ws/*",
     "routing_strategy_round_robin": "round-robin (цикл)",
-    "routing_strategy_fill_first": "fill-first (приоритет)"
+    "routing_strategy_fill_first": "fill-first (приоритет)",
+    "routing_strategy_quota_drain": "quota-drain (сначала остаток квоты)"
   },
   "auth_files": {
     "title": "Управление файлами авторизации",
@@ -222,6 +223,16 @@
     "sort_az": "A-Z Имя",
     "sort_priority": "Приоритет",
     "priority_display": "Приоритет",
+    "quota_drain_label": "Исчерпание квоты",
+    "quota_drain_remaining": "Осталось {{percent}}%",
+    "quota_drain_exhausted": "Исчерпано",
+    "quota_drain_stale": "Данные устарели",
+    "quota_drain_unavailable": "Квота неизвестна",
+    "quota_drain_resets": "Сброс {{time}}",
+    "quota_drain_refresh_error": "Последнее обновление не удалось: {{message}}",
+    "routing_selected": "Используется",
+    "routing_selected_hint": "Маршрутизация выбрала эту учётную запись для {{model}} до {{time}}",
+    "routing_selected_hint_no_model": "Маршрутизация выбрала эту учётную запись до {{time}}",
     "page_size_label": "На странице",
     "view_mode_paged": "Постранично",
     "view_mode_all": "Показать все",
@@ -341,6 +352,10 @@
     "refresh_button": "Обновить квоту",
     "fetch_all": "Получить все",
     "five_hour": "Лимит на 5 часов",
+    "session_limit": "Лимит сеанса",
+    "weekly_all_limit": "Недельный лимит",
+    "weekly_limit": "Недельный лимит",
+    "other_limit": "Лимит использования",
     "seven_day": "Лимит на 7 дней",
     "seven_day_oauth_apps": "7 дней OAuth приложения",
     "seven_day_opus": "7 дней Opus",
@@ -886,7 +901,7 @@
           "stabilize_device_desc": "Фиксировать OS/Arch и стабилизировать программный отпечаток для учётных данных/API-ключа",
           "beta_features": "Beta Features",
           "codex_identity_confuse": "Codex identity-confuse",
-          "codex_identity_confuse_desc": "При fill-first routing или session affinity переопределяет Codex prompt_cache_key и installation identity под выбранную auth-запись"
+          "codex_identity_confuse_desc": "При fill-first, quota-drain или session affinity переопределяет Codex prompt_cache_key и installation identity под выбранную auth-запись"
         },
         "network": {
           "title": "Сетевые настройки",
@@ -909,6 +924,11 @@
           "routing_strategy_hint": "Выберите стратегию подбора учётных данных",
           "strategy_round_robin": "По кругу",
           "strategy_fill_first": "Сначала заполнить",
+          "strategy_quota_drain": "Сначала исчерпать квоту",
+          "quota_drain_refresh_interval": "Интервал обновления квоты",
+          "quota_drain_refresh_interval_hint": "Как часто обновлять данные провайдера; по умолчанию 2m",
+          "quota_drain_stale_after": "Срок актуальности квоты",
+          "quota_drain_stale_after_hint": "После этого срока данные не влияют на маршрутизацию; по умолчанию 10m",
           "session_affinity_ttl": "TTL привязки сессии",
           "force_model_prefix": "Принудительный префикс модели",
           "force_model_prefix_desc": "Запросы к моделям без префикса используют только учётные данные без префикса",
@@ -1039,7 +1059,8 @@
   "quota_management": {
     "title": "Управление квотами",
     "description": "Следите за статусом квот OAuth для учётных данных Antigravity, Codex, Claude, Kimi и xAI.",
-    "refresh_all_credentials": "Обновить все учётные данные"
+    "refresh_all_credentials": "Обновить все учётные данные",
+    "snapshot_updated": "Автоматически обновлено {{time}}"
   },
   "plugin_management": {
     "title": "Управление плагинами",

@@ -161,7 +161,8 @@
     "request_log_warning": "Keep this off unless you need detailed troubleshooting.",
     "ws_auth_enable": "Require auth for /ws/*",
     "routing_strategy_round_robin": "round-robin (cycle)",
-    "routing_strategy_fill_first": "fill-first (prioritize)"
+    "routing_strategy_fill_first": "fill-first (prioritize)",
+    "routing_strategy_quota_drain": "quota-drain (use expiring quota first)"
   },
   "auth_files": {
     "title": "Auth Files Management",
@@ -223,6 +224,16 @@
     "sort_az": "A-Z Name",
     "sort_priority": "Priority",
     "priority_display": "Priority",
+    "quota_drain_label": "Quota drain",
+    "quota_drain_remaining": "{{percent}}% left",
+    "quota_drain_exhausted": "Exhausted",
+    "quota_drain_stale": "Quota stale",
+    "quota_drain_unavailable": "Quota unknown",
+    "quota_drain_resets": "Resets {{time}}",
+    "quota_drain_refresh_error": "Latest refresh failed: {{message}}",
+    "routing_selected": "In use",
+    "routing_selected_hint": "Routing selected this account for {{model}} until {{time}}",
+    "routing_selected_hint_no_model": "Routing selected this account until {{time}}",
     "page_size_label": "Per page",
     "view_mode_paged": "Paged",
     "view_mode_all": "Show all",
@@ -348,6 +359,10 @@
     "refresh_button": "Refresh Quota",
     "fetch_all": "Fetch All",
     "five_hour": "5-hour limit",
+    "session_limit": "Session limit",
+    "weekly_all_limit": "Weekly limit",
+    "weekly_limit": "Weekly limit",
+    "other_limit": "Usage limit",
     "seven_day": "7-day limit",
     "seven_day_oauth_apps": "7-day OAuth apps",
     "seven_day_opus": "7-day Opus",
@@ -899,7 +914,7 @@
           "stabilize_device_desc": "Pin OS/Arch and stabilize the software fingerprint per credential/API key",
           "beta_features": "Beta Features",
           "codex_identity_confuse": "Codex Identity Confuse",
-          "codex_identity_confuse_desc": "When fill-first routing or session affinity is used, remap Codex prompt_cache_key and installation identity for the selected auth"
+          "codex_identity_confuse_desc": "When fill-first, quota-drain, or session affinity routing is used, remap Codex prompt_cache_key and installation identity for the selected auth"
         },
         "network": {
           "title": "Network Configuration",
@@ -922,6 +937,11 @@
           "routing_strategy_hint": "Select credential selection strategy",
           "strategy_round_robin": "Round Robin",
           "strategy_fill_first": "Fill First",
+          "strategy_quota_drain": "Quota Drain",
+          "quota_drain_refresh_interval": "Quota Refresh Interval",
+          "quota_drain_refresh_interval_hint": "How often provider usage is refreshed; defaults to 2m",
+          "quota_drain_stale_after": "Quota Stale After",
+          "quota_drain_stale_after_hint": "After this age, quota data stops affecting routing; defaults to 10m",
           "session_affinity_ttl": "Session Affinity TTL",
           "force_model_prefix": "Force Model Prefix",
           "force_model_prefix_desc": "Unprefixed model requests only use credentials without prefix",
@@ -1052,7 +1072,8 @@
   "quota_management": {
     "title": "Quota Management",
     "description": "Monitor OAuth quota status for Antigravity, Codex, Claude, Kimi, and xAI credentials.",
-    "refresh_all_credentials": "Refresh all credentials"
+    "refresh_all_credentials": "Refresh all credentials",
+    "snapshot_updated": "Automatically updated {{time}}"
   },
   "plugin_management": {
     "title": "Plugin Management",

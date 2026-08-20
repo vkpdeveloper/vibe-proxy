@@ -7,11 +7,12 @@ import {
   IconDownload,
   IconInfo,
   IconModelCluster,
+  IconNetwork,
   IconSettings,
   IconTrash2,
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
-import type { AuthFileItem } from '@/types';
+import type { AuthFileItem, QuotaCapacityState, QuotaCapacityWindow } from '@/types';
 import { resolveAuthProvider } from '@/utils/quota';
 import {
   normalizeRecentRequestAuthIndex,
@@ -19,7 +20,7 @@ import {
   normalizeUsageTotal,
   statusBarDataFromRecentRequests,
 } from '@/utils/recentRequests';
-import { formatFileSize } from '@/utils/format';
+import { formatDateTimeValue, formatFileSize } from '@/utils/format';
 import {
   QUOTA_PROVIDER_TYPES,
   formatModified,
@@ -38,6 +39,59 @@ import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQu
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
+const MIN_MEANINGFUL_DATE_MS = Date.UTC(2000, 0, 1);
+
+const parseMeaningfulDate = (value?: string): number | null => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && timestamp >= MIN_MEANINGFUL_DATE_MS ? timestamp : null;
+};
+
+type QuotaDrainDisplay = {
+  state: QuotaCapacityState;
+  window: QuotaCapacityWindow | null;
+  status: 'active' | 'exhausted' | 'stale' | 'unavailable';
+  remainingPercent: number | null;
+};
+
+const resolveQuotaDrainDisplay = (file: AuthFileItem): QuotaDrainDisplay | null => {
+  const state = file.quota_capacity ?? file.quotaCapacity;
+  if (!state || typeof state !== 'object') return null;
+
+  const now = Date.now();
+  const windows = Array.isArray(state.windows) ? state.windows : [];
+  const knownWindows = windows.filter((window) => {
+    if (
+      !window ||
+      window.known !== true ||
+      typeof window.remaining_percent !== 'number' ||
+      !Number.isFinite(window.remaining_percent)
+    ) {
+      return false;
+    }
+    const resetAt = parseMeaningfulDate(window.reset_at);
+    return resetAt === null || resetAt > now;
+  });
+  const routingWindows = knownWindows.filter((window) => window.routing === true);
+  const window =
+    [...routingWindows].sort(
+      (left, right) => left.remaining_percent - right.remaining_percent
+    )[0] ?? null;
+
+  const fetchedAt = parseMeaningfulDate(state.fetched_at);
+  const staleAt = parseMeaningfulDate(state.stale_at);
+  const stale = fetchedAt !== null && staleAt !== null && staleAt <= now;
+  const remainingPercent = window ? Math.max(0, Math.min(100, window.remaining_percent)) : null;
+  const status = stale
+    ? 'stale'
+    : window?.hard_exhausted
+      ? 'exhausted'
+      : remainingPercent !== null
+        ? 'active'
+        : 'unavailable';
+
+  return { state, window, status, remainingPercent };
+};
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -64,7 +118,7 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
 };
 
 export function AuthFileCard(props: AuthFileCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     file,
     compact,
@@ -141,10 +195,51 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : hasStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
+  const quotaDrain = resolveQuotaDrainDisplay(file);
+  const quotaDrainLabel = quotaDrain
+    ? quotaDrain.status === 'exhausted'
+      ? t('auth_files.quota_drain_exhausted')
+      : quotaDrain.status === 'stale'
+        ? t('auth_files.quota_drain_stale')
+        : quotaDrain.remainingPercent !== null
+          ? t('auth_files.quota_drain_remaining', {
+              percent: Math.round(quotaDrain.remainingPercent),
+            })
+          : t('auth_files.quota_drain_unavailable')
+    : '';
+  const quotaDrainBadgeClass = quotaDrain
+    ? quotaDrain.status === 'active'
+      ? styles.quotaDrainBadgeActive
+      : quotaDrain.status === 'exhausted'
+        ? styles.quotaDrainBadgeExhausted
+        : quotaDrain.status === 'stale'
+          ? styles.quotaDrainBadgeStale
+          : styles.quotaDrainBadgeUnavailable
+    : '';
+  const quotaDrainResetAt =
+    quotaDrain?.window?.reset_at && parseMeaningfulDate(quotaDrain.window.reset_at) !== null
+      ? quotaDrain.window.reset_at
+      : null;
+  const routingSelection = file.routing_selection ?? file.routingSelection;
+  const routingSelectionExpiresAt = parseMeaningfulDate(routingSelection?.expires_at);
+  const isRoutingSelected =
+    routingSelection?.selected === true &&
+    routingSelectionExpiresAt !== null &&
+    routingSelectionExpiresAt > 0;
+  const routingSelectionTitle = isRoutingSelected
+    ? routingSelection.model
+      ? t('auth_files.routing_selected_hint', {
+          model: routingSelection.model,
+          time: formatDateTimeValue(routingSelection.expires_at, i18n.language),
+        })
+      : t('auth_files.routing_selected_hint_no_model', {
+          time: formatDateTimeValue(routingSelection.expires_at, i18n.language),
+        })
+    : undefined;
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${selected ? styles.fileCardSelected : ''} ${isRoutingSelected ? styles.fileCardRoutingSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>
@@ -189,6 +284,20 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {typeLabel}
                 </span>
                 <span className={`${styles.stateBadge} ${stateBadgeClass}`}>{stateLabel}</span>
+                {isRoutingSelected && (
+                  <span className={styles.routingSelectionBadge} title={routingSelectionTitle}>
+                    <IconNetwork className={styles.routingSelectionIcon} size={11} />
+                    {t('auth_files.routing_selected')}
+                  </span>
+                )}
+                {quotaDrain && (
+                  <span
+                    className={`${styles.quotaDrainBadge} ${quotaDrainBadgeClass}`}
+                    title={quotaDrain.state.last_error || quotaDrainLabel}
+                  >
+                    {quotaDrainLabel}
+                  </span>
+                )}
               </div>
               <span className={styles.fileName} title={file.name}>
                 {file.name}
@@ -227,6 +336,31 @@ export function AuthFileCard(props: AuthFileCardProps) {
             <div className={styles.healthStatusMessage} title={rawStatusMessage}>
               <IconInfo className={styles.messageIcon} size={14} />
               <span>{rawStatusMessage}</span>
+            </div>
+          )}
+
+          {quotaDrain && !compact && (
+            <div className={`${styles.quotaDrainSummary} ${quotaDrainBadgeClass}`}>
+              <div className={styles.quotaDrainSummaryRow}>
+                <span className={styles.quotaDrainSummaryLabel}>
+                  {t('auth_files.quota_drain_label')}
+                </span>
+                <span className={styles.quotaDrainSummaryValue}>{quotaDrainLabel}</span>
+              </div>
+              {quotaDrainResetAt && (
+                <span className={styles.quotaDrainSummaryHint}>
+                  {t('auth_files.quota_drain_resets', {
+                    time: formatDateTimeValue(quotaDrainResetAt, i18n.language),
+                  })}
+                </span>
+              )}
+              {quotaDrain.state.last_error && (
+                <span className={styles.quotaDrainSummaryError}>
+                  {t('auth_files.quota_drain_refresh_error', {
+                    message: quotaDrain.state.last_error,
+                  })}
+                </span>
+              )}
             </div>
           )}
 

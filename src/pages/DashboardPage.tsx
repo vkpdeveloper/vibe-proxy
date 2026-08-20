@@ -184,14 +184,18 @@ export function DashboardPage() {
       ? t('basic_settings.routing_strategy_round_robin')
       : routingStrategyRaw === 'fill-first'
         ? t('basic_settings.routing_strategy_fill_first')
-        : routingStrategyRaw;
+        : routingStrategyRaw === 'quota-drain'
+          ? t('basic_settings.routing_strategy_quota_drain')
+          : routingStrategyRaw;
   const routingStrategyBadgeClass = !routingStrategyRaw
     ? styles.configBadgeUnknown
     : routingStrategyRaw === 'round-robin'
       ? styles.configBadgeRoundRobin
       : routingStrategyRaw === 'fill-first'
         ? styles.configBadgeFillFirst
-        : styles.configBadgeUnknown;
+        : routingStrategyRaw === 'quota-drain'
+          ? styles.configBadgeQuotaDrain
+          : styles.configBadgeUnknown;
 
   // Derived time-based values
   const greetingKey = `dashboard.greeting_${timeOfDay}`;

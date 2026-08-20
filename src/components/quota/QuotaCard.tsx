@@ -7,8 +7,14 @@ import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
-import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
-import { TYPE_COLORS } from '@/utils/quota';
+import type {
+  AuthFileItem,
+  QuotaCapacityState,
+  QuotaCapacityWindow,
+  ResolvedTheme,
+  ThemeColors,
+} from '@/types';
+import { formatQuotaResetTime, TYPE_COLORS } from '@/utils/quota';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -24,6 +30,43 @@ export interface QuotaProgressBarProps {
   highThreshold: number;
   mediumThreshold: number;
 }
+
+interface StoredQuotaSnapshot {
+  state: QuotaCapacityState;
+  windows: QuotaCapacityWindow[];
+  fetchedAt: string | null;
+  stale: boolean;
+}
+
+const parseTimestamp = (value?: string): number | null => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const resolveStoredQuotaSnapshot = (item: AuthFileItem): StoredQuotaSnapshot | null => {
+  const state = item.quota_capacity ?? item.quotaCapacity;
+  if (!state || typeof state !== 'object' || state.supported !== true) return null;
+
+  const windows = (Array.isArray(state.windows) ? state.windows : []).filter(
+    (window): window is QuotaCapacityWindow =>
+      Boolean(window) &&
+      window.known === true &&
+      typeof window.remaining_percent === 'number' &&
+      Number.isFinite(window.remaining_percent)
+  );
+  const fetchedAt = parseTimestamp(state.fetched_at);
+  const staleAt = parseTimestamp(state.stale_at);
+
+  if (windows.length === 0 && !state.last_error) return null;
+
+  return {
+    state,
+    windows,
+    fetchedAt: fetchedAt === null ? null : state.fetched_at || null,
+    stale: staleAt !== null && staleAt <= Date.now(),
+  };
+};
 
 export function QuotaProgressBar({
   percent,
@@ -91,6 +134,8 @@ export function QuotaCard<TState extends QuotaStatusState>({
 
   const quotaStatus = quota?.status ?? 'idle';
   const quotaLoading = quotaStatus === 'loading';
+  const storedSnapshot = quotaStatus === 'idle' ? resolveStoredQuotaSnapshot(item) : null;
+  const hasStoredSnapshot = storedSnapshot !== null;
   const quotaErrorMessage = resolveQuotaErrorMessage(
     t,
     quota?.errorStatus,
@@ -126,7 +171,50 @@ export function QuotaCard<TState extends QuotaStatusState>({
         {quotaLoading ? (
           <div className={styles.quotaMessage}>{t(`${i18nPrefix}.loading`)}</div>
         ) : quotaStatus === 'idle' ? (
-          onRefresh ? (
+          storedSnapshot ? (
+            <>
+              {storedSnapshot.windows.map((window) => {
+                const remaining = Math.max(0, Math.min(100, window.remaining_percent));
+                const resetLabel = formatQuotaResetTime(window.reset_at);
+
+                return (
+                  <div key={window.id} className={styles.quotaRow}>
+                    <div className={styles.quotaRowHeader}>
+                      <span className={styles.quotaModel}>{window.label}</span>
+                      <div className={styles.quotaMeta}>
+                        <span className={styles.quotaPercent}>{Math.round(remaining)}%</span>
+                        {resetLabel !== '-' && (
+                          <span className={styles.quotaReset}>{resetLabel}</span>
+                        )}
+                      </div>
+                    </div>
+                    <QuotaProgressBar percent={remaining} highThreshold={70} mediumThreshold={30} />
+                  </div>
+                );
+              })}
+              <div className={styles.quotaSnapshotMeta}>
+                {storedSnapshot.fetchedAt && (
+                  <span>
+                    {t('quota_management.snapshot_updated', {
+                      time: formatQuotaResetTime(storedSnapshot.fetchedAt),
+                    })}
+                  </span>
+                )}
+                {storedSnapshot.stale && (
+                  <span className={styles.quotaSnapshotStale}>
+                    {t('auth_files.quota_drain_stale')}
+                  </span>
+                )}
+              </div>
+              {storedSnapshot.state.last_error && (
+                <div className={styles.quotaWarning}>
+                  {t('auth_files.quota_drain_refresh_error', {
+                    message: storedSnapshot.state.last_error,
+                  })}
+                </div>
+              )}
+            </>
+          ) : onRefresh ? (
             <button
               type="button"
               className={`${styles.quotaMessage} ${styles.quotaMessageAction}`}
@@ -151,10 +239,10 @@ export function QuotaCard<TState extends QuotaStatusState>({
         )}
       </div>
 
-      {(resetQuotaAction || (onRefresh && quotaStatus !== 'idle')) && (
+      {(resetQuotaAction || (onRefresh && (quotaStatus !== 'idle' || hasStoredSnapshot))) && (
         <div className={styles.quotaCardActions}>
           {resetQuotaAction}
-          {onRefresh && quotaStatus !== 'idle' && (
+          {onRefresh && (quotaStatus !== 'idle' || hasStoredSnapshot) && (
             <Button
               type="button"
               variant="secondary"

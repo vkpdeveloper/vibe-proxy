@@ -15,6 +15,7 @@ import type {
   ClaudeProfileResponse,
   ClaudeQuotaState,
   ClaudeQuotaWindow,
+  ClaudeUsageLimit,
   ClaudeUsagePayload,
   CodexRateLimitInfo,
   CodexRateLimitResetCredit,
@@ -1049,6 +1050,15 @@ const buildClaudeQuotaWindows = (
   payload: ClaudeUsagePayload,
   t: TFunction
 ): ClaudeQuotaWindow[] => {
+  const apiLimits = Array.isArray(payload.limits) ? payload.limits : [];
+  const dynamicWindows = apiLimits
+    .map((limit, index) => buildClaudeQuotaWindowFromLimit(limit, index, t))
+    .filter((window): window is ClaudeQuotaWindow => window !== null);
+
+  // Anthropic now returns the complete quota picture in limits[]. Keep the
+  // legacy top-level windows for OAuth responses that do not include it.
+  if (dynamicWindows.length > 0) return dynamicWindows;
+
   const windows: ClaudeQuotaWindow[] = [];
 
   for (const { key, id, labelKey } of CLAUDE_USAGE_WINDOW_KEYS) {
@@ -1067,6 +1077,55 @@ const buildClaudeQuotaWindows = (
   }
 
   return windows;
+};
+
+const buildClaudeQuotaWindowFromLimit = (
+  limit: ClaudeUsageLimit,
+  index: number,
+  t: TFunction
+): ClaudeQuotaWindow | null => {
+  if (!limit || typeof limit !== 'object') return null;
+
+  const usedPercent = normalizeNumberValue(limit.percent ?? limit.utilization);
+  if (usedPercent === null) return null;
+
+  const kind = normalizeStringValue(limit.kind)?.toLowerCase() ?? '';
+  const group = normalizeStringValue(limit.group)?.toLowerCase() ?? '';
+  const scopeParts = [
+    normalizeStringValue(limit.scope?.model?.display_name),
+    normalizeStringValue(limit.scope?.surface),
+  ].filter((value): value is string => Boolean(value));
+  const scopeLabel = Array.from(new Set(scopeParts)).join(' · ');
+
+  let label: string;
+  if (kind === 'session') {
+    label = t('claude_quota.session_limit');
+  } else if (kind === 'weekly_all') {
+    label = t('claude_quota.weekly_all_limit');
+  } else if (kind === 'weekly_scoped') {
+    label = t('claude_quota.weekly_limit');
+  } else if (group === 'weekly' || kind.startsWith('weekly')) {
+    label = humanizeClaudeLimitKind(kind || group, t('claude_quota.weekly_limit'));
+  } else {
+    label = humanizeClaudeLimitKind(kind || group, t('claude_quota.other_limit'));
+  }
+
+  return {
+    id: `claude-limit-${kind || group || 'unknown'}-${scopeLabel || index}-${index}`,
+    label: scopeLabel ? `${label} · ${scopeLabel}` : label,
+    usedPercent,
+    resetLabel: formatQuotaResetTime(limit.resets_at ?? undefined),
+  };
+};
+
+const humanizeClaudeLimitKind = (value: string, fallback: string): string => {
+  const normalized = value.trim();
+  if (!normalized) return fallback;
+  return normalized
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 };
 
 const normalizeFlagValue = (value: unknown): boolean | undefined => {
