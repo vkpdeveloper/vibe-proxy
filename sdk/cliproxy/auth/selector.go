@@ -34,6 +34,15 @@ type RoundRobinSelector struct {
 // rolling-window subscription caps (e.g. chat message limits).
 type FillFirstSelector struct{}
 
+// QuotaDrainSelector drains the lowest remaining fresh quota first. Provider
+// choice is kept independent: mixed-provider inputs rotate providers before
+// quota ranking is applied within the chosen provider.
+type QuotaDrainSelector struct {
+	mu      sync.Mutex
+	cursors map[string]int
+	maxKeys int
+}
+
 type blockReason int
 
 const (
@@ -302,6 +311,149 @@ func (s *FillFirstSelector) Pick(ctx context.Context, provider, model string, op
 	return available[0], nil
 }
 
+// Pick selects a credential using proactive quota snapshots within one provider.
+func (s *QuotaDrainSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
+	_ = opts
+	now := time.Now()
+	availableByPriority, cooldownCount, earliestCooldown := collectAvailableByPriority(auths, model, now)
+	if len(availableByPriority) == 0 {
+		if cooldownCount == len(auths) && !earliestCooldown.IsZero() {
+			providerForError := provider
+			if providerForError == "mixed" {
+				providerForError = ""
+			}
+			return nil, newModelCooldownError(model, providerForError, earliestCooldown.Sub(now))
+		}
+		return nil, &Error{Code: "auth_unavailable", Message: "no auth available"}
+	}
+
+	for _, priority := range quotaDrainPriorities(availableByPriority) {
+		available := availableByPriority[priority]
+		if strings.EqualFold(strings.TrimSpace(provider), "mixed") {
+			if selected := s.pickMixedProvider(ctx, model, available, now); selected != nil {
+				return selected, nil
+			}
+			continue
+		}
+		available = preferCodexWebsocketAuths(ctx, provider, available)
+		if selected := s.pickWithinProvider(provider, model, available, now); selected != nil {
+			return selected, nil
+		}
+	}
+
+	earliest := earliestCapacityReset(auths, model, now)
+	if !earliest.IsZero() {
+		providerForError := provider
+		if providerForError == "mixed" {
+			providerForError = ""
+		}
+		return nil, newModelCooldownError(model, providerForError, earliest.Sub(now))
+	}
+	return nil, &Error{Code: "auth_unavailable", Message: "no auth available"}
+}
+
+func (s *QuotaDrainSelector) pickMixedProvider(ctx context.Context, model string, auths []*Auth, now time.Time) *Auth {
+	groups := make(map[string][]*Auth)
+	providers := make([]string, 0)
+	for _, auth := range auths {
+		providerKey := executorKeyFromAuth(auth)
+		if providerKey == "" {
+			continue
+		}
+		if _, exists := groups[providerKey]; !exists {
+			providers = append(providers, providerKey)
+		}
+		groups[providerKey] = append(groups[providerKey], auth)
+	}
+	sort.Strings(providers)
+	if len(providers) == 0 {
+		return nil
+	}
+
+	key := "mixed:" + canonicalModelKey(model)
+	start := s.nextCursorIndex(key, len(providers))
+
+	for offset := 0; offset < len(providers); offset++ {
+		providerKey := providers[(start+offset)%len(providers)]
+		candidates := preferCodexWebsocketAuths(ctx, providerKey, groups[providerKey])
+		if selected := s.pickWithinProvider(providerKey, model, candidates, now); selected != nil {
+			return selected
+		}
+	}
+	return nil
+}
+
+func (s *QuotaDrainSelector) pickWithinProvider(provider, model string, auths []*Auth, now time.Time) *Auth {
+	if len(auths) == 0 {
+		return nil
+	}
+	type rankedAuth struct {
+		auth *Auth
+		rank capacityRank
+	}
+	ranked := make([]rankedAuth, 0, len(auths))
+	for _, auth := range auths {
+		rank := quotaCapacityRank(auth, model, now)
+		if rank.known && rank.exhausted {
+			continue
+		}
+		ranked = append(ranked, rankedAuth{auth: auth, rank: rank})
+	}
+	if len(ranked) == 0 {
+		return nil
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if quotaRanksEqual(ranked[i].rank, ranked[j].rank) {
+			return ranked[i].auth.ID < ranked[j].auth.ID
+		}
+		return quotaRankLess(ranked[i].rank, ranked[j].rank)
+	})
+	best := ranked[0].rank
+	tieCount := 1
+	for tieCount < len(ranked) && quotaRanksEqual(best, ranked[tieCount].rank) {
+		tieCount++
+	}
+
+	key := strings.ToLower(strings.TrimSpace(provider)) + ":" + canonicalModelKey(model)
+	index := s.nextCursorIndex(key, tieCount)
+	return ranked[index].auth
+}
+
+func (s *QuotaDrainSelector) nextCursorIndex(key string, modulo int) int {
+	if modulo <= 0 {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cursors == nil {
+		s.cursors = make(map[string]int)
+	}
+	limit := s.maxKeys
+	if limit <= 0 {
+		limit = 4096
+	}
+	if _, exists := s.cursors[key]; !exists && len(s.cursors) >= limit {
+		s.cursors = make(map[string]int)
+	}
+	index := s.cursors[key] % modulo
+	s.cursors[key] = index + 1
+	return index
+}
+
+func earliestCapacityReset(auths []*Auth, model string, now time.Time) time.Time {
+	earliest := time.Time{}
+	for _, auth := range auths {
+		rank := quotaCapacityRank(auth, model, now)
+		if !rank.known || !rank.exhausted || rank.resetAt.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || rank.resetAt.Before(earliest) {
+			earliest = rank.resetAt
+		}
+	}
+	return earliest
+}
+
 func isAuthBlockedForModel(auth *Auth, model string, now time.Time) (bool, blockReason, time.Time) {
 	if auth == nil {
 		return true, blockReasonOther, time.Time{}
@@ -432,7 +584,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 
 	if cachedAuthID, ok := s.cache.GetAndRefresh(cacheKey); ok {
 		for _, auth := range available {
-			if auth.ID == cachedAuthID {
+			if auth.ID == cachedAuthID && !quotaCapacityExhausted(auth, model, now) {
 				entry.Infof("session-affinity: cache hit | session=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), auth.ID, provider, model)
 				return auth, nil
 			}
@@ -451,7 +603,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 		fallbackKey := provider + "::" + fallbackID + "::" + model
 		if cachedAuthID, ok := s.cache.Get(fallbackKey); ok {
 			for _, auth := range available {
-				if auth.ID == cachedAuthID {
+				if auth.ID == cachedAuthID && !quotaCapacityExhausted(auth, model, now) {
 					s.cache.Set(cacheKey, auth.ID)
 					entry.Infof("session-affinity: fallback cache hit | session=%s fallback=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), truncateSessionID(fallbackID), auth.ID, provider, model)
 					return auth, nil

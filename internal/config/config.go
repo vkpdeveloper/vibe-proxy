@@ -334,8 +334,11 @@ type QuotaExceeded struct {
 // RoutingConfig configures how credentials are selected for requests.
 type RoutingConfig struct {
 	// Strategy selects the credential selection strategy.
-	// Supported values: "round-robin" (default), "fill-first".
+	// Supported values: "round-robin" (default), "fill-first", "quota-drain".
 	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+
+	// QuotaDrain configures proactive provider quota polling used by quota-drain.
+	QuotaDrain QuotaDrainRoutingConfig `yaml:"quota-drain,omitempty" json:"quota-drain,omitempty"`
 
 	// SessionAffinity enables universal session-sticky routing for all clients.
 	// Session IDs are extracted from multiple sources:
@@ -347,6 +350,17 @@ type RoutingConfig struct {
 	// SessionAffinityTTL specifies how long session-to-auth bindings are retained.
 	// Default: 1h. Accepts duration strings like "30m", "1h", "2h30m".
 	SessionAffinityTTL string `yaml:"session-affinity-ttl,omitempty" json:"session-affinity-ttl,omitempty"`
+}
+
+// QuotaDrainRoutingConfig configures proactive quota snapshots for credential routing.
+type QuotaDrainRoutingConfig struct {
+	// RefreshInterval controls how often supported OAuth providers are queried.
+	// Default: 2m.
+	RefreshInterval string `yaml:"refresh-interval,omitempty" json:"refresh-interval,omitempty"`
+
+	// StaleAfter controls how long a successful snapshot may affect routing.
+	// Default: 10m. Stale or unavailable snapshots fall back safely.
+	StaleAfter string `yaml:"stale-after,omitempty" json:"stale-after,omitempty"`
 }
 
 // OAuthModelAlias defines a model ID alias for a specific channel.

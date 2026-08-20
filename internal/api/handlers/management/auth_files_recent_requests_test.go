@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -28,6 +29,22 @@ func TestListAuthFiles_IncludesRecentRequestsBuckets(t *testing.T) {
 	}
 	if _, errRegister := manager.Register(context.Background(), record); errRegister != nil {
 		t.Fatalf("failed to register auth record: %v", errRegister)
+	}
+	manager.UpdateCapacity(record.ID, coreauth.CapacityState{
+		Provider:      "codex",
+		Supported:     true,
+		FetchedAt:     time.Now().UTC(),
+		LastAttemptAt: time.Now().UTC(),
+		Windows: []coreauth.CapacityWindow{{
+			ID:               "primary",
+			Label:            "Primary",
+			RemainingPercent: 12,
+			Known:            true,
+			Routing:          true,
+		}},
+	})
+	if !manager.RecordRoutingSelection(record.ID, "gpt-test") {
+		t.Fatal("RecordRoutingSelection() = false, want true")
 	}
 
 	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: t.TempDir()}, manager)
@@ -66,6 +83,31 @@ func TestListAuthFiles_IncludesRecentRequestsBuckets(t *testing.T) {
 	}
 	if _, ok := fileEntry["failed"].(float64); !ok {
 		t.Fatalf("expected failed number, got %#v", fileEntry["failed"])
+	}
+	selection, ok := fileEntry["routing_selection"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing_selection object, got %#v", fileEntry["routing_selection"])
+	}
+	if selection["selected"] != true || selection["model"] != "gpt-test" {
+		t.Fatalf("routing_selection = %#v, want selected gpt-test", selection)
+	}
+	capacity, ok := fileEntry["quota_capacity"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected quota_capacity object, got %#v", fileEntry["quota_capacity"])
+	}
+	if capacity["provider"] != "codex" || capacity["supported"] != true {
+		t.Fatalf("quota_capacity = %#v, want codex supported snapshot", capacity)
+	}
+	windows, ok := capacity["windows"].([]any)
+	if !ok || len(windows) != 1 {
+		t.Fatalf("quota_capacity windows = %#v, want one window", capacity["windows"])
+	}
+	window, ok := windows[0].(map[string]any)
+	if !ok {
+		t.Fatalf("quota_capacity window = %#v, want object", windows[0])
+	}
+	if _, exists := window["reset_at"]; exists {
+		t.Fatalf("zero reset_at should be omitted, got %#v", window["reset_at"])
 	}
 
 	recentRaw, ok := fileEntry["recent_requests"].([]any)

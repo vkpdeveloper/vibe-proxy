@@ -486,7 +486,14 @@ func (h *Handler) buildAuthFileEntry(auth *coreauth.Auth) gin.H {
 	}
 	entry["success"] = auth.Success
 	entry["failed"] = auth.Failed
-	entry["recent_requests"] = auth.RecentRequestsSnapshot(time.Now())
+	now := time.Now()
+	entry["recent_requests"] = auth.RecentRequestsSnapshot(now)
+	if auth.Capacity.Supported || !auth.Capacity.LastAttemptAt.IsZero() {
+		entry["quota_capacity"] = auth.Capacity
+	}
+	if auth.RoutingSelection.Active(now) {
+		entry["routing_selection"] = auth.RoutingSelection
+	}
 	if email := authEmail(auth); email != "" {
 		entry["email"] = email
 	}

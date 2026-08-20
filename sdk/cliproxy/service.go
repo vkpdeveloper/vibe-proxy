@@ -18,6 +18,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/homeplugins"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/quotadrain"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/runtime/executor"
@@ -95,6 +96,9 @@ type Service struct {
 
 	// coreManager handles core authentication and execution.
 	coreManager *coreauth.Manager
+
+	// quotaDrainCollector owns runtime-only proactive provider quota snapshots.
+	quotaDrainCollector *quotadrain.Collector
 
 	// pluginHost owns dynamic plugin lifecycle and runtime capability adapters.
 	pluginHost *pluginhost.Host
@@ -557,6 +561,9 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 	s.runModelRegistrationTasks(registrationCtx, tasks)
 	if needsPluginSync {
 		s.syncPluginRuntime(registrationCtx)
+	}
+	if s.quotaDrainCollector != nil {
+		s.quotaDrainCollector.Wake()
 	}
 }
 
@@ -1281,6 +1288,8 @@ func (s *Service) applyConfigUpdateWithAuthSynthesis(newCfg *config.Config, synt
 		switch strategy {
 		case "fill-first", "fillfirst", "ff":
 			return "fill-first"
+		case "quota-drain", "quotadrain", "qd":
+			return "quota-drain"
 		default:
 			return "round-robin"
 		}
@@ -1300,6 +1309,8 @@ func (s *Service) applyConfigUpdateWithAuthSynthesis(newCfg *config.Config, synt
 		switch nextStrategy {
 		case "fill-first":
 			selector = &coreauth.FillFirstSelector{}
+		case "quota-drain":
+			selector = &coreauth.QuotaDrainSelector{}
 		default:
 			selector = &coreauth.RoundRobinSelector{}
 		}
@@ -1332,6 +1343,9 @@ func (s *Service) applyConfigUpdateWithAuthSynthesis(newCfg *config.Config, synt
 	if s.coreManager != nil {
 		s.coreManager.SetConfig(newCfg)
 		s.coreManager.SetOAuthModelAlias(newCfg.OAuthModelAlias)
+	}
+	if s.quotaDrainCollector != nil {
+		s.quotaDrainCollector.Update(quotadrain.SettingsFromConfig(newCfg.Routing))
 	}
 	ctx := coreauth.WithSkipPersist(context.Background())
 	s.syncPluginRuntimeConfig(ctx)
@@ -1637,6 +1651,9 @@ func (s *Service) Run(ctx context.Context) error {
 
 	s.applyRetryConfig(s.cfg)
 	s.configureCooldownStateStore(s.cfg)
+	if s.coreManager != nil && !homeEnabled && s.quotaDrainCollector == nil {
+		s.quotaDrainCollector = quotadrain.NewCollector(s.coreManager)
+	}
 
 	s.registerPluginAuthParser()
 	if s.coreManager != nil && !homeEnabled {
@@ -1764,6 +1781,10 @@ func (s *Service) Run(ctx context.Context) error {
 
 	s.registerModelRefreshCallback()
 
+	if s.quotaDrainCollector != nil {
+		s.quotaDrainCollector.Start(context.Background(), quotadrain.SettingsFromConfig(s.cfg.Routing))
+	}
+
 	// Prefer core auth manager auto refresh if available.
 	if s.coreManager != nil && !homeEnabled {
 		interval := 15 * time.Minute
@@ -1814,6 +1835,9 @@ func (s *Service) Shutdown(ctx context.Context) error {
 		home.ClearCurrent()
 
 		// legacy refresh loop removed; only stopping core auth manager below
+		if s.quotaDrainCollector != nil {
+			s.quotaDrainCollector.Stop()
+		}
 
 		if s.watcherCancel != nil {
 			s.watcherCancel()

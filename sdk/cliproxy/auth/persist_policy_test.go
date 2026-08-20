@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type countingStore struct {
@@ -65,6 +66,31 @@ func TestWithSkipPersist_DisablesRegisterPersistence(t *testing.T) {
 	}
 	if got := store.saveCount.Load(); got != 0 {
 		t.Fatalf("expected 0 Save calls, got %d", got)
+	}
+}
+
+func TestUpdateCapacityNeverPersistsCredential(t *testing.T) {
+	store := &countingStore{}
+	mgr := NewManager(store, &QuotaDrainSelector{}, nil)
+	auth := &Auth{
+		ID:       "auth-1",
+		Provider: "claude",
+		Metadata: map[string]any{"type": "claude"},
+	}
+	if _, err := mgr.Register(WithSkipPersist(context.Background()), auth); err != nil {
+		t.Fatalf("Register(skipPersist) returned error: %v", err)
+	}
+
+	updated := mgr.UpdateCapacity(auth.ID, CapacityState{
+		Provider:  "claude",
+		Supported: true,
+		FetchedAt: time.Now(),
+	})
+	if !updated {
+		t.Fatal("UpdateCapacity() = false, want true")
+	}
+	if got := store.saveCount.Load(); got != 0 {
+		t.Fatalf("UpdateCapacity() persisted auth %d times, want 0", got)
 	}
 }
 

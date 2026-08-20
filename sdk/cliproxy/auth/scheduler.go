@@ -19,6 +19,7 @@ const (
 	schedulerStrategyCustom     schedulerStrategy = 0
 	schedulerStrategyRoundRobin schedulerStrategy = 1
 	schedulerStrategyFillFirst  schedulerStrategy = 2
+	schedulerStrategyQuotaDrain schedulerStrategy = 3
 )
 
 // scheduledState describes how an auth currently participates in a model shard.
@@ -136,6 +137,8 @@ func selectorStrategy(selector Selector) schedulerStrategy {
 	switch selector.(type) {
 	case *FillFirstSelector:
 		return schedulerStrategyFillFirst
+	case *QuotaDrainSelector:
+		return schedulerStrategyQuotaDrain
 	case nil, *RoundRobinSelector:
 		return schedulerStrategyRoundRobin
 	default:
@@ -238,6 +241,11 @@ func (s *authScheduler) pickSingleWithStrategy(ctx context.Context, provider, mo
 	if picked := shard.pickReadyLocked(preferWebsocket, strategy, predicate); picked != nil {
 		return picked, nil
 	}
+	if strategy == schedulerStrategyQuotaDrain {
+		if errCapacity := shard.quotaDrainUnavailableErrorLocked(provider, model, predicate); errCapacity != nil {
+			return nil, errCapacity
+		}
+	}
 	return nil, shard.unavailableErrorLocked(provider, model, predicate)
 }
 
@@ -307,6 +315,11 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 		if picked := shard.pickReadyLocked(false, strategy, predicate); picked != nil {
 			return picked, providerKey, nil
 		}
+		if strategy == schedulerStrategyQuotaDrain {
+			if errCapacity := shard.quotaDrainUnavailableErrorLocked("mixed", model, predicate); errCapacity != nil {
+				return nil, "", errCapacity
+			}
+		}
 		return nil, "", shard.unavailableErrorLocked("mixed", model, predicate)
 	}
 
@@ -325,7 +338,7 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 		if shard == nil {
 			continue
 		}
-		priorityReady, okPriority := shard.highestReadyPriorityLocked(false, predicate)
+		priorityReady, okPriority := shard.highestSelectablePriorityLocked(false, strategy, predicate)
 		if !okPriority {
 			continue
 		}
@@ -335,7 +348,7 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 		}
 	}
 	if !hasCandidate {
-		return nil, "", s.mixedUnavailableErrorLocked(normalized, model, tried)
+		return nil, "", s.mixedUnavailableForStrategyLocked(normalized, model, tried, strategy)
 	}
 
 	if strategy == schedulerStrategyFillFirst {
@@ -360,13 +373,13 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 	for providerIndex, shard := range candidateShards {
 		segmentStarts[providerIndex] = totalWeight
 		if shard != nil {
-			weights[providerIndex] = shard.readyCountAtPriorityLocked(false, bestPriority)
+			weights[providerIndex] = shard.selectableCountAtPriorityLocked(false, bestPriority, strategy, predicate)
 		}
 		totalWeight += weights[providerIndex]
 		segmentEnds[providerIndex] = totalWeight
 	}
 	if totalWeight == 0 {
-		return nil, "", s.mixedUnavailableErrorLocked(normalized, model, tried)
+		return nil, "", s.mixedUnavailableForStrategyLocked(normalized, model, tried, strategy)
 	}
 
 	startSlot := s.mixedCursors[cursorKey] % totalWeight
@@ -381,7 +394,7 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 		}
 	}
 	if startProviderIndex < 0 {
-		return nil, "", s.mixedUnavailableErrorLocked(normalized, model, tried)
+		return nil, "", s.mixedUnavailableForStrategyLocked(normalized, model, tried, strategy)
 	}
 
 	slot := startSlot
@@ -398,14 +411,55 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
 		if shard == nil {
 			continue
 		}
-		picked := shard.pickReadyAtPriorityLocked(false, bestPriority, schedulerStrategyRoundRobin, predicate)
+		credentialStrategy := schedulerStrategyRoundRobin
+		if strategy == schedulerStrategyQuotaDrain {
+			credentialStrategy = schedulerStrategyQuotaDrain
+		}
+		picked := shard.pickReadyAtPriorityLocked(false, bestPriority, credentialStrategy, predicate)
 		if picked == nil {
 			continue
 		}
 		s.mixedCursors[cursorKey] = slot + 1
 		return picked, providerKey, nil
 	}
-	return nil, "", s.mixedUnavailableErrorLocked(normalized, model, tried)
+	return nil, "", s.mixedUnavailableForStrategyLocked(normalized, model, tried, strategy)
+}
+
+func (s *authScheduler) mixedUnavailableForStrategyLocked(providers []string, model string, tried map[string]struct{}, strategy schedulerStrategy) error {
+	if strategy == schedulerStrategyQuotaDrain {
+		if errCapacity := s.mixedQuotaDrainUnavailableErrorLocked(providers, model, tried); errCapacity != nil {
+			return errCapacity
+		}
+	}
+	return s.mixedUnavailableErrorLocked(providers, model, tried)
+}
+
+func (s *authScheduler) mixedQuotaDrainUnavailableErrorLocked(providers []string, model string, tried map[string]struct{}) error {
+	now := time.Now()
+	total := 0
+	unavailableCount := 0
+	earliest := time.Time{}
+	predicate := triedPredicate(tried)
+	for _, providerKey := range providers {
+		providerState := s.providers[providerKey]
+		if providerState == nil {
+			continue
+		}
+		shard := providerState.ensureModelLocked(canonicalModelKey(model), now)
+		if shard == nil {
+			continue
+		}
+		localTotal, localUnavailableCount, localEarliest := shard.quotaDrainAvailabilitySummaryLocked(predicate, now)
+		total += localTotal
+		unavailableCount += localUnavailableCount
+		if !localEarliest.IsZero() && (earliest.IsZero() || localEarliest.Before(earliest)) {
+			earliest = localEarliest
+		}
+	}
+	if total == 0 || unavailableCount != total || earliest.IsZero() {
+		return nil
+	}
+	return newModelCooldownError(model, "", earliest.Sub(now))
 }
 
 // mixedUnavailableErrorLocked synthesizes the mixed-provider cooldown or unavailable error.
@@ -736,11 +790,35 @@ func (m *modelScheduler) pickReadyLocked(preferWebsocket bool, strategy schedule
 		return nil
 	}
 	m.promoteExpiredLocked(time.Now())
-	priorityReady, okPriority := m.highestReadyPriorityLocked(preferWebsocket, predicate)
+	priorityReady, okPriority := m.highestSelectablePriorityLocked(preferWebsocket, strategy, predicate)
 	if !okPriority {
 		return nil
 	}
 	return m.pickReadyAtPriorityLocked(preferWebsocket, priorityReady, strategy, predicate)
+}
+
+func (m *modelScheduler) highestSelectablePriorityLocked(preferWebsocket bool, strategy schedulerStrategy, predicate func(*scheduledAuth) bool) (int, bool) {
+	if strategy != schedulerStrategyQuotaDrain {
+		return m.highestReadyPriorityLocked(preferWebsocket, predicate)
+	}
+	if m == nil {
+		return 0, false
+	}
+	if preferWebsocket {
+		for _, priority := range m.priorityOrder {
+			bucket := m.readyByPriority[priority]
+			if bucket != nil && bucket.ws.hasQuotaDrainCandidate(m.modelKey, predicate) {
+				return priority, true
+			}
+		}
+	}
+	for _, priority := range m.priorityOrder {
+		bucket := m.readyByPriority[priority]
+		if bucket != nil && bucket.all.hasQuotaDrainCandidate(m.modelKey, predicate) {
+			return priority, true
+		}
+	}
+	return 0, false
 }
 
 // highestReadyPriorityLocked returns the highest priority bucket that still has a matching ready auth.
@@ -785,12 +863,15 @@ func (m *modelScheduler) pickReadyAtPriorityLocked(preferWebsocket bool, priorit
 		return nil
 	}
 	view := &bucket.all
-	if preferWebsocket && bucket.ws.pickFirst(predicate) != nil {
+	if preferWebsocket && ((strategy == schedulerStrategyQuotaDrain && bucket.ws.hasQuotaDrainCandidate(m.modelKey, predicate)) ||
+		(strategy != schedulerStrategyQuotaDrain && bucket.ws.pickFirst(predicate) != nil)) {
 		view = &bucket.ws
 	}
 	var picked *scheduledAuth
 	if strategy == schedulerStrategyFillFirst {
 		picked = view.pickFirst(predicate)
+	} else if strategy == schedulerStrategyQuotaDrain {
+		picked = view.pickQuotaDrain(m.modelKey, predicate)
 	} else {
 		picked = view.pickRoundRobin(predicate)
 	}
@@ -798,6 +879,86 @@ func (m *modelScheduler) pickReadyAtPriorityLocked(preferWebsocket bool, priorit
 		return nil
 	}
 	return picked.auth
+}
+
+func (m *modelScheduler) selectableCountAtPriorityLocked(preferWebsocket bool, priority int, strategy schedulerStrategy, predicate func(*scheduledAuth) bool) int {
+	if strategy != schedulerStrategyQuotaDrain {
+		return m.readyCountAtPriorityLocked(preferWebsocket, priority)
+	}
+	if m == nil {
+		return 0
+	}
+	bucket := m.readyByPriority[priority]
+	if bucket == nil {
+		return 0
+	}
+	view := &bucket.all
+	if preferWebsocket && bucket.ws.hasQuotaDrainCandidate(m.modelKey, predicate) {
+		view = &bucket.ws
+	}
+	count := 0
+	now := time.Now()
+	for _, entry := range view.flat {
+		if predicate != nil && !predicate(entry) {
+			continue
+		}
+		if entry == nil || entry.auth == nil || quotaCapacityExhausted(entry.auth, m.modelKey, now) {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func (m *modelScheduler) quotaDrainUnavailableErrorLocked(provider, model string, predicate func(*scheduledAuth) bool) error {
+	if m == nil {
+		return nil
+	}
+	now := time.Now()
+	total, unavailableCount, earliest := m.quotaDrainAvailabilitySummaryLocked(predicate, now)
+	if total == 0 || unavailableCount != total || earliest.IsZero() {
+		return nil
+	}
+	providerForError := provider
+	if providerForError == "mixed" {
+		providerForError = ""
+	}
+	return newModelCooldownError(model, providerForError, earliest.Sub(now))
+}
+
+func (m *modelScheduler) quotaDrainAvailabilitySummaryLocked(predicate func(*scheduledAuth) bool, now time.Time) (int, int, time.Time) {
+	if m == nil {
+		return 0, 0, time.Time{}
+	}
+	total := 0
+	unavailableCount := 0
+	earliest := time.Time{}
+	for _, entry := range m.entries {
+		if predicate != nil && !predicate(entry) {
+			continue
+		}
+		total++
+		if entry == nil || entry.auth == nil {
+			continue
+		}
+		var retryAt time.Time
+		switch entry.state {
+		case scheduledStateCooldown:
+			unavailableCount++
+			retryAt = entry.nextRetryAt
+		case scheduledStateReady:
+			rank := quotaCapacityRank(entry.auth, m.modelKey, now)
+			if !rank.known || !rank.exhausted {
+				continue
+			}
+			unavailableCount++
+			retryAt = rank.resetAt
+		}
+		if !retryAt.IsZero() && (earliest.IsZero() || retryAt.Before(earliest)) {
+			earliest = retryAt
+		}
+	}
+	return total, unavailableCount, earliest
 }
 
 func (m *modelScheduler) readyCountAtPriorityLocked(preferWebsocket bool, priority int) int {
@@ -973,4 +1134,63 @@ func (v *readyView) pickRoundRobin(predicate func(*scheduledAuth) bool) *schedul
 		return entry
 	}
 	return nil
+}
+
+func (v *readyView) pickQuotaDrain(model string, predicate func(*scheduledAuth) bool) *scheduledAuth {
+	if len(v.flat) == 0 {
+		return nil
+	}
+	now := time.Now()
+	bestRank := capacityRank{}
+	hasBest := false
+	eligible := make(map[int]struct{})
+	for index, entry := range v.flat {
+		if predicate != nil && !predicate(entry) {
+			continue
+		}
+		if entry == nil || entry.auth == nil {
+			continue
+		}
+		rank := quotaCapacityRank(entry.auth, model, now)
+		if rank.known && rank.exhausted {
+			continue
+		}
+		if !hasBest || quotaRankLess(rank, bestRank) {
+			bestRank = rank
+			hasBest = true
+			clear(eligible)
+			eligible[index] = struct{}{}
+			continue
+		}
+		if quotaRanksEqual(rank, bestRank) {
+			eligible[index] = struct{}{}
+		}
+	}
+	if !hasBest || len(eligible) == 0 {
+		return nil
+	}
+	start := normalizeCursor(v.cursor, len(v.flat))
+	for offset := 0; offset < len(v.flat); offset++ {
+		index := (start + offset) % len(v.flat)
+		if _, ok := eligible[index]; !ok {
+			continue
+		}
+		v.cursor = index + 1
+		return v.flat[index]
+	}
+	return nil
+}
+
+func (v *readyView) hasQuotaDrainCandidate(model string, predicate func(*scheduledAuth) bool) bool {
+	now := time.Now()
+	for _, entry := range v.flat {
+		if predicate != nil && !predicate(entry) {
+			continue
+		}
+		if entry == nil || entry.auth == nil || quotaCapacityExhausted(entry.auth, model, now) {
+			continue
+		}
+		return true
+	}
+	return false
 }

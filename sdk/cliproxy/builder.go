@@ -248,6 +248,8 @@ func (b *Builder) Build() (*Service, error) {
 		switch strategy {
 		case "fill-first", "fillfirst", "ff":
 			selector = &coreauth.FillFirstSelector{}
+		case "quota-drain", "quotadrain", "qd":
+			selector = &coreauth.QuotaDrainSelector{}
 		default:
 			selector = &coreauth.RoundRobinSelector{}
 		}

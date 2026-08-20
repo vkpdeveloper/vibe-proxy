@@ -87,6 +87,7 @@ const (
 	quotaBackoffBase          = time.Second
 	quotaBackoffMax           = 30 * time.Minute
 	transientErrorCooldown    = time.Minute
+	routingSelectionTTL       = 10 * time.Minute
 )
 
 var quotaCooldownDisabled atomic.Bool
@@ -317,8 +318,19 @@ func (m *Manager) hasPluginScheduler() bool {
 
 func isBuiltInSelector(selector Selector) bool {
 	switch selector.(type) {
-	case *RoundRobinSelector, *FillFirstSelector:
+	case *RoundRobinSelector, *FillFirstSelector, *QuotaDrainSelector:
 		return true
+	default:
+		return false
+	}
+}
+
+func selectorUsesQuotaDrain(selector Selector) bool {
+	switch typed := selector.(type) {
+	case *QuotaDrainSelector:
+		return true
+	case *SessionAffinitySelector:
+		return typed != nil && selectorUsesQuotaDrain(typed.fallback)
 	default:
 		return false
 	}
@@ -1417,7 +1429,22 @@ func (m *Manager) availableAuthsForRouteModel(auths []*Auth, provider, routeMode
 	return available, nil
 }
 
+func (m *Manager) routeReadyAuths(auths []*Auth, routeModel string, now time.Time) []*Auth {
+	ready := make([]*Auth, 0, len(auths))
+	for _, candidate := range auths {
+		checkModel := m.selectionModelForAuth(candidate, routeModel)
+		blocked, _, _ := isAuthBlockedForModel(candidate, checkModel, now)
+		if !blocked {
+			ready = append(ready, candidate)
+		}
+	}
+	return ready
+}
+
 func selectionArgForSelector(selector Selector, routeModel string) string {
+	if selectorUsesQuotaDrain(selector) {
+		return routeModel
+	}
 	if isBuiltInSelector(selector) {
 		return ""
 	}
@@ -2191,6 +2218,11 @@ func (m *Manager) Update(ctx context.Context, auth *Auth) (*Auth, error) {
 	auth.Success = existing.Success
 	auth.Failed = existing.Failed
 	auth.recentRequests = existing.recentRequests
+	auth.Capacity = existing.Capacity
+	if len(existing.Capacity.Windows) > 0 {
+		auth.Capacity.Windows = append([]CapacityWindow(nil), existing.Capacity.Windows...)
+	}
+	auth.RoutingSelection = existing.RoutingSelection
 	if !existing.Disabled && existing.Status != StatusDisabled && !auth.Disabled && auth.Status != StatusDisabled {
 		if len(auth.ModelStates) == 0 && len(existing.ModelStates) > 0 {
 			auth.ModelStates = existing.ModelStates
@@ -2218,6 +2250,65 @@ func (m *Manager) Update(ctx context.Context, auth *Auth) (*Auth, error) {
 		m.persistCooldownStates(ctx)
 	}
 	return auth.Clone(), nil
+}
+
+// UpdateCapacity replaces the runtime-only proactive quota snapshot for an auth.
+// It deliberately bypasses persistence and lifecycle hooks so credential files
+// are never rewritten by quota polling.
+func (m *Manager) UpdateCapacity(authID string, state CapacityState) bool {
+	if m == nil || strings.TrimSpace(authID) == "" {
+		return false
+	}
+	state.Provider = strings.ToLower(strings.TrimSpace(state.Provider))
+	if len(state.Windows) > 0 {
+		state.Windows = append([]CapacityWindow(nil), state.Windows...)
+	}
+
+	m.mu.Lock()
+	auth := m.auths[authID]
+	if auth == nil {
+		m.mu.Unlock()
+		return false
+	}
+	auth.Capacity = state
+	snapshot := auth.Clone()
+	m.mu.Unlock()
+
+	if m.scheduler != nil {
+		m.scheduler.upsertAuth(snapshot)
+	}
+	return true
+}
+
+// RecordRoutingSelection marks authID as the provider's current routing choice.
+// The marker is runtime-only and remains visible to management clients for ten
+// minutes after the most recent selection.
+func (m *Manager) RecordRoutingSelection(authID, model string) bool {
+	if m == nil || strings.TrimSpace(authID) == "" {
+		return false
+	}
+	now := time.Now().UTC()
+	m.mu.Lock()
+	selected := m.auths[authID]
+	if selected == nil {
+		m.mu.Unlock()
+		return false
+	}
+	provider := executorKeyFromAuth(selected)
+	for _, auth := range m.auths {
+		if auth == nil || auth.ID == authID || executorKeyFromAuth(auth) != provider {
+			continue
+		}
+		auth.RoutingSelection = RoutingSelectionState{}
+	}
+	selected.RoutingSelection = RoutingSelectionState{
+		Selected:   true,
+		Model:      strings.TrimSpace(model),
+		SelectedAt: now,
+		ExpiresAt:  now.Add(routingSelectionTTL),
+	}
+	m.mu.Unlock()
+	return true
 }
 
 // Remove deletes an auth from runtime state without persisting.
@@ -2550,6 +2641,7 @@ func (m *Manager) executeMixedOnce(ctx context.Context, providers []string, req 
 		entry := logEntryWithRequestID(ctx)
 		debugLogAuthSelection(entry, auth, provider, routeModel)
 		publishSelectedAuthMetadata(opts.Metadata, auth.ID)
+		m.RecordRoutingSelection(auth.ID, routeModel)
 
 		tried[auth.ID] = struct{}{}
 		execCtx := ctx
@@ -2669,6 +2761,7 @@ func (m *Manager) executeCountMixedOnce(ctx context.Context, providers []string,
 		entry := logEntryWithRequestID(ctx)
 		debugLogAuthSelection(entry, auth, provider, routeModel)
 		publishSelectedAuthMetadata(opts.Metadata, auth.ID)
+		m.RecordRoutingSelection(auth.ID, routeModel)
 
 		tried[auth.ID] = struct{}{}
 		execCtx := ctx
@@ -2788,6 +2881,7 @@ func (m *Manager) executeStreamMixedOnce(ctx context.Context, providers []string
 		entry := logEntryWithRequestID(ctx)
 		debugLogAuthSelection(entry, auth, provider, routeModel)
 		publishSelectedAuthMetadata(opts.Metadata, auth.ID)
+		m.RecordRoutingSelection(auth.ID, routeModel)
 
 		tried[auth.ID] = struct{}{}
 		execCtx := ctx
@@ -4567,6 +4661,10 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 		return nil, nil, errAvailable
 	}
 	available = cloneAuthSlice(available)
+	selectorCandidates := available
+	if selectorUsesQuotaDrain(selector) {
+		selectorCandidates = cloneAuthSlice(m.routeReadyAuths(candidates, model, time.Now()))
+	}
 	m.mu.RUnlock()
 
 	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, provider, []string{provider}, model, opts, tried, available)
@@ -4574,7 +4672,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 		return nil, nil, errPick
 	}
 	if !handled {
-		selected, errPick = selector.Pick(ctx, provider, selectionArgForSelector(selector, model), opts, available)
+		selected, errPick = selector.Pick(ctx, provider, selectionArgForSelector(selector, model), opts, selectorCandidates)
 		if errPick != nil {
 			return nil, nil, errPick
 		}
@@ -4727,6 +4825,10 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		return nil, nil, "", errAvailable
 	}
 	available = cloneAuthSlice(available)
+	selectorCandidates := available
+	if selectorUsesQuotaDrain(selector) {
+		selectorCandidates = cloneAuthSlice(m.routeReadyAuths(candidates, model, time.Now()))
+	}
 	m.mu.RUnlock()
 
 	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, "mixed", providers, model, opts, tried, available)
@@ -4734,7 +4836,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		return nil, nil, "", errPick
 	}
 	if !handled {
-		selected, errPick = selector.Pick(ctx, "mixed", selectionArgForSelector(selector, model), opts, available)
+		selected, errPick = selector.Pick(ctx, "mixed", selectionArgForSelector(selector, model), opts, selectorCandidates)
 		if errPick != nil {
 			return nil, nil, "", errPick
 		}
@@ -5356,6 +5458,7 @@ func (m *Manager) tryAntigravityCreditsExecute(ctx context.Context, req cliproxy
 		}
 		c.auth = preparedAuth
 		publishSelectedAuthMetadata(creditsOpts.Metadata, c.auth.ID)
+		m.RecordRoutingSelection(c.auth.ID, routeModel)
 		models, pooled, aliasResult := m.executionModelCandidatesWithAlias(c.auth, routeModel)
 		if len(models) == 0 {
 			continue
@@ -5407,6 +5510,7 @@ func (m *Manager) tryAntigravityCreditsExecuteStream(ctx context.Context, req cl
 		}
 		c.auth = preparedAuth
 		publishSelectedAuthMetadata(creditsOpts.Metadata, c.auth.ID)
+		m.RecordRoutingSelection(c.auth.ID, routeModel)
 		models, pooled, aliasResult := m.executionModelCandidatesWithAlias(c.auth, routeModel)
 		if len(models) == 0 {
 			continue

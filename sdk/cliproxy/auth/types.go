@@ -75,6 +75,12 @@ type Auth struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 	// Quota captures recent quota information for load balancers.
 	Quota QuotaState `json:"quota"`
+	// Capacity holds a proactive provider quota snapshot. It is runtime-only and
+	// must never be written back to an auth credential file.
+	Capacity CapacityState `json:"-"`
+	// RoutingSelection identifies this credential as the provider's most recent
+	// routing choice. It is runtime-only and expires automatically.
+	RoutingSelection RoutingSelectionState `json:"-"`
 	// LastError stores the last failure encountered while executing or refreshing.
 	LastError *Error `json:"last_error,omitempty"`
 	// CreatedAt is the creation timestamp in UTC.
@@ -174,6 +180,45 @@ type QuotaState struct {
 	NextRecoverAt time.Time `json:"next_recover_at"`
 	// BackoffLevel stores the progressive cooldown exponent used for rate limits.
 	BackoffLevel int `json:"backoff_level,omitempty"`
+}
+
+// CapacityState is a runtime-only snapshot collected from a provider usage API.
+// It is intentionally separate from QuotaState, which tracks reactive request
+// failures and cooldowns.
+type CapacityState struct {
+	Provider      string           `json:"provider"`
+	Supported     bool             `json:"supported"`
+	FetchedAt     time.Time        `json:"fetched_at,omitempty,omitzero"`
+	StaleAt       time.Time        `json:"stale_at,omitempty,omitzero"`
+	LastAttemptAt time.Time        `json:"last_attempt_at,omitempty,omitzero"`
+	LastError     string           `json:"last_error,omitempty"`
+	Windows       []CapacityWindow `json:"windows,omitempty"`
+}
+
+// CapacityWindow is one provider quota window normalized for display and routing.
+type CapacityWindow struct {
+	ID               string    `json:"id"`
+	Label            string    `json:"label"`
+	ScopeModel       string    `json:"scope_model,omitempty"`
+	UsedPercent      float64   `json:"used_percent"`
+	RemainingPercent float64   `json:"remaining_percent"`
+	ResetAt          time.Time `json:"reset_at,omitempty,omitzero"`
+	Known            bool      `json:"known"`
+	HardExhausted    bool      `json:"hard_exhausted,omitempty"`
+	Routing          bool      `json:"routing"`
+}
+
+// RoutingSelectionState describes a recent runtime routing choice.
+type RoutingSelectionState struct {
+	Selected   bool      `json:"selected"`
+	Model      string    `json:"model,omitempty"`
+	SelectedAt time.Time `json:"selected_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
+// Active reports whether the selection marker is still valid.
+func (s RoutingSelectionState) Active(now time.Time) bool {
+	return s.Selected && !s.SelectedAt.IsZero() && s.ExpiresAt.After(now)
 }
 
 // ModelState captures the execution state for a specific model under an auth entry.
@@ -281,6 +326,9 @@ func (a *Auth) Clone() *Auth {
 		for key, state := range a.ModelStates {
 			copyAuth.ModelStates[key] = state.Clone()
 		}
+	}
+	if len(a.Capacity.Windows) > 0 {
+		copyAuth.Capacity.Windows = append([]CapacityWindow(nil), a.Capacity.Windows...)
 	}
 	copyAuth.Runtime = a.Runtime
 	return &copyAuth

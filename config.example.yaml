@@ -167,7 +167,13 @@ quota-exceeded:
 
 # Routing strategy for selecting credentials when multiple match.
 routing:
-  strategy: "round-robin" # round-robin (default), fill-first
+  strategy: "round-robin" # round-robin (default), fill-first, quota-drain
+  # quota-drain ranks credentials only within the provider already selected for a request.
+  # It drains the account with the least remaining quota first, then advances to the next.
+  # Unknown or stale quota data remains eligible as a safe fallback.
+  quota-drain:
+    refresh-interval: "2m"
+    stale-after: "10m"
   # Enable universal session-sticky routing for all clients.
   # Session IDs are extracted from: metadata.user_id (Claude Code session format),
   # X-Session-ID, Session_id (Codex), X-Client-Request-Id (PI), conversation_id,
@@ -179,7 +185,7 @@ routing:
 
 # Codex provider behavior.
 codex:
-  # When true, and routing.strategy is fill-first or routing.session-affinity is true,
+  # When true, and routing.strategy is fill-first/quota-drain or routing.session-affinity is true,
   # remap Codex prompt_cache_key and installation identity per selected auth.
   # Some superstitious users believe request tracking identifiers can be used
   # as evidence for TOS enforcement bans; this option only satisfies those odd concerns.
