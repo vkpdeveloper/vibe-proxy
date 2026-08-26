@@ -207,6 +207,41 @@ func TestQuotaDrainSelector_ExhaustedWithoutResetFallsBack(t *testing.T) {
 	}
 }
 
+func TestSchedulerQuotaDrain_SkipsExhaustedSessionOrWeeklyWindow(t *testing.T) {
+	now := time.Now()
+	availableSession := quotaDrainTestWindow(50, now.Add(time.Hour))
+	availableSession.ID = "session"
+	availableWeekly := quotaDrainTestWindow(50, now.Add(7*24*time.Hour))
+	availableWeekly.ID = "weekly_all"
+
+	for _, exhaustedWindowID := range []string{"session", "weekly_all"} {
+		t.Run(exhaustedWindowID, func(t *testing.T) {
+			exhaustedSession := availableSession
+			exhaustedWeekly := availableWeekly
+			if exhaustedWindowID == "session" {
+				exhaustedSession = quotaDrainTestWindow(0, now.Add(time.Hour))
+				exhaustedSession.ID = "session"
+			} else {
+				exhaustedWeekly = quotaDrainTestWindow(0, now.Add(7*24*time.Hour))
+				exhaustedWeekly.ID = "weekly_all"
+			}
+			scheduler := newSchedulerForTest(
+				&QuotaDrainSelector{},
+				&Auth{ID: "exhausted", Provider: "claude", Capacity: quotaDrainTestCapacity(now, now.Add(time.Hour), exhaustedSession, exhaustedWeekly)},
+				&Auth{ID: "available", Provider: "claude", Capacity: quotaDrainTestCapacity(now, now.Add(time.Hour), availableSession, availableWeekly)},
+			)
+
+			got, err := scheduler.pickSingle(context.Background(), "claude", "", cliproxyexecutor.Options{}, nil)
+			if err != nil {
+				t.Fatalf("pickSingle() error = %v", err)
+			}
+			if got == nil || got.ID != "available" {
+				t.Fatalf("pickSingle() auth = %#v, want available", got)
+			}
+		})
+	}
+}
+
 func TestQuotaDrainSelector_UsesOnlyMatchingModelScope(t *testing.T) {
 	now := time.Now()
 	selector := &QuotaDrainSelector{}

@@ -86,6 +86,7 @@ const (
 	refreshIneffectiveBackoff = 30 * time.Second
 	quotaBackoffBase          = time.Second
 	quotaBackoffMax           = 30 * time.Minute
+	quotaRefreshFailureCount  = 4
 	transientErrorCooldown    = time.Minute
 	routingSelectionTTL       = 10 * time.Minute
 )
@@ -168,6 +169,9 @@ type Result struct {
 	Model string
 	// Success marks whether the execution succeeded.
 	Success bool
+	// CountTokens marks results from the lightweight token-count endpoint. A
+	// successful count does not prove that model generation quota recovered.
+	CountTokens bool
 	// RetryAfter carries a provider supplied retry hint (e.g. 429 retryDelay).
 	RetryAfter *time.Duration
 	// Error describes the failure when Success is false.
@@ -248,6 +252,11 @@ type Manager struct {
 
 	// modelPoolOffsets tracks per-auth alias pool rotation state.
 	modelPoolOffsets map[string]int
+	// quotaFailureCounts tracks quota failures since the last successful model
+	// execution. Token-count successes intentionally do not reset these counts.
+	quotaFailureCounts map[string]int
+	// quotaRefreshNotifier requests an out-of-band provider usage refresh.
+	quotaRefreshNotifier func()
 
 	// runtimeConfig stores the latest application config for request-time decisions.
 	// It is initialized in NewManager; never Load() before first Store().
@@ -275,20 +284,32 @@ func NewManager(store Store, selector Selector, hook Hook) *Manager {
 		hook = NoopHook{}
 	}
 	manager := &Manager{
-		store:            store,
-		executors:        make(map[string]ProviderExecutor),
-		selector:         selector,
-		hook:             hook,
-		auths:            make(map[string]*Auth),
-		homeRuntimeAuths: make(map[string]map[string]*Auth),
-		providerOffsets:  make(map[string]int),
-		modelPoolOffsets: make(map[string]int),
+		store:              store,
+		executors:          make(map[string]ProviderExecutor),
+		selector:           selector,
+		hook:               hook,
+		auths:              make(map[string]*Auth),
+		homeRuntimeAuths:   make(map[string]map[string]*Auth),
+		providerOffsets:    make(map[string]int),
+		modelPoolOffsets:   make(map[string]int),
+		quotaFailureCounts: make(map[string]int),
 	}
 	// atomic.Value requires non-nil initial value.
 	manager.runtimeConfig.Store(&internalconfig.Config{})
 	manager.apiKeyModelAlias.Store(apiKeyModelAliasTable(nil))
 	manager.scheduler = newAuthScheduler(selector)
 	return manager
+}
+
+// SetQuotaRefreshNotifier installs a non-blocking callback used to request a
+// provider usage refresh after repeated quota failures.
+func (m *Manager) SetQuotaRefreshNotifier(notifier func()) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.quotaRefreshNotifier = notifier
+	m.mu.Unlock()
 }
 
 func (m *Manager) SetPluginScheduler(scheduler PluginScheduler) {
@@ -2331,6 +2352,7 @@ func (m *Manager) Remove(ctx context.Context, id string) {
 	}
 	provider := strings.TrimSpace(existing.Provider)
 	delete(m.auths, id)
+	delete(m.quotaFailureCounts, id)
 	if m.modelPoolOffsets != nil {
 		delete(m.modelPoolOffsets, id)
 	}
@@ -2386,6 +2408,7 @@ func (m *Manager) Load(ctx context.Context) error {
 		return err
 	}
 	m.auths = make(map[string]*Auth, len(items))
+	m.quotaFailureCounts = make(map[string]int)
 	for _, auth := range items {
 		if auth == nil || auth.ID == "" {
 			continue
@@ -2779,7 +2802,7 @@ func (m *Manager) executeCountMixedOnce(ctx context.Context, providers []string,
 		var errPrepare error
 		auth, errPrepare = m.prepareRequestAuth(execCtx, executor, auth)
 		if errPrepare != nil {
-			result := Result{AuthID: auth.ID, Provider: provider, Model: routeModel, Success: false, Error: &Error{Message: errPrepare.Error()}}
+			result := Result{AuthID: auth.ID, Provider: provider, Model: routeModel, Success: false, CountTokens: true, Error: &Error{Message: errPrepare.Error()}}
 			if se, ok := errors.AsType[cliproxyexecutor.StatusError](errPrepare); ok && se != nil {
 				result.Error.HTTPStatus = se.StatusCode()
 			}
@@ -2814,7 +2837,7 @@ func (m *Manager) executeCountMixedOnce(ctx context.Context, providers []string,
 					}
 				}
 			}
-			result := Result{AuthID: auth.ID, Provider: provider, Model: resultModel, Success: errExec == nil}
+			result := Result{AuthID: auth.ID, Provider: provider, Model: resultModel, Success: errExec == nil, CountTokens: true}
 			if errExec != nil {
 				result.Error = &Error{Message: errExec.Error()}
 				if se, ok := errors.AsType[cliproxyexecutor.StatusError](errExec); ok && se != nil {
@@ -3763,6 +3786,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 	clearModelQuota := false
 	setModelQuota := false
 	var authSnapshot *Auth
+	var quotaRefreshNotifier func()
 	cooldownStateChanged := false
 
 	m.mu.Lock()
@@ -3779,8 +3803,21 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 		} else {
 			auth.Failed++
 		}
-
 		if result.Success {
+			if !result.CountTokens {
+				delete(m.quotaFailureCounts, result.AuthID)
+			}
+		} else if statusCodeFromResult(result.Error) == http.StatusTooManyRequests {
+			if m.quotaFailureCounts == nil {
+				m.quotaFailureCounts = make(map[string]int)
+			}
+			m.quotaFailureCounts[result.AuthID]++
+			if m.quotaFailureCounts[result.AuthID]%quotaRefreshFailureCount == 0 {
+				quotaRefreshNotifier = m.quotaRefreshNotifier
+			}
+		}
+
+		if result.Success && !result.CountTokens {
 			if result.Model != "" {
 				state := ensureModelState(auth, result.Model)
 				resetModelState(state, now)
@@ -3918,6 +3955,9 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 		}
 	}
 	m.mu.Unlock()
+	if quotaRefreshNotifier != nil {
+		quotaRefreshNotifier()
+	}
 	if m.scheduler != nil && authSnapshot != nil {
 		m.scheduler.upsertAuth(authSnapshot)
 	}

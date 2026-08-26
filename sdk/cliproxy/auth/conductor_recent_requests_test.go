@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -44,6 +45,64 @@ func TestManagerMarkResultRecordsRecentRequests(t *testing.T) {
 	}
 	if successTotal != 1 || failedTotal != 1 {
 		t.Fatalf("totals = success=%d failed=%d, want 1/1", successTotal, failedTotal)
+	}
+}
+
+func TestManagerMarkResultCountTokensDoesNotClearQuotaFailure(t *testing.T) {
+	mgr := NewManager(nil, nil, nil)
+	auth := &Auth{ID: "claude-1", Provider: "claude"}
+	if _, err := mgr.Register(WithSkipPersist(context.Background()), auth); err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+
+	refreshes := 0
+	mgr.SetQuotaRefreshNotifier(func() { refreshes++ })
+	quotaFailure := Result{
+		AuthID:   auth.ID,
+		Provider: auth.Provider,
+		Model:    "claude-opus",
+		Error:    &Error{HTTPStatus: http.StatusTooManyRequests, Message: "rate limited"},
+	}
+	mgr.MarkResult(context.Background(), quotaFailure)
+	mgr.MarkResult(context.Background(), Result{
+		AuthID:      auth.ID,
+		Provider:    auth.Provider,
+		Model:       quotaFailure.Model,
+		Success:     true,
+		CountTokens: true,
+	})
+
+	gotAuth, ok := mgr.GetByID(auth.ID)
+	if !ok || gotAuth == nil {
+		t.Fatal("GetByID did not return auth")
+	}
+	state := gotAuth.ModelStates[quotaFailure.Model]
+	if state == nil || !state.Unavailable || !state.Quota.Exceeded {
+		t.Fatalf("model state = %#v, want preserved quota cooldown", state)
+	}
+
+	for range quotaRefreshFailureCount - 1 {
+		mgr.MarkResult(context.Background(), quotaFailure)
+	}
+	if refreshes != 1 {
+		t.Fatalf("usage refreshes = %d, want 1 after %d quota failures", refreshes, quotaRefreshFailureCount)
+	}
+
+	mgr.MarkResult(context.Background(), Result{
+		AuthID:   auth.ID,
+		Provider: auth.Provider,
+		Model:    quotaFailure.Model,
+		Success:  true,
+	})
+	for range quotaRefreshFailureCount - 1 {
+		mgr.MarkResult(context.Background(), quotaFailure)
+	}
+	if refreshes != 1 {
+		t.Fatalf("usage refreshes = %d, want successful execution to reset the failure count", refreshes)
+	}
+	mgr.MarkResult(context.Background(), quotaFailure)
+	if refreshes != 2 {
+		t.Fatalf("usage refreshes = %d, want another refresh after the next %d failures", refreshes, quotaRefreshFailureCount)
 	}
 }
 

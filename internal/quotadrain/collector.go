@@ -60,7 +60,11 @@ type Collector struct {
 
 // NewCollector creates a quota collector backed by manager.
 func NewCollector(manager *coreauth.Manager) *Collector {
-	return &Collector{manager: manager, wake: make(chan struct{}, 1)}
+	collector := &Collector{manager: manager, wake: make(chan struct{}, 1)}
+	if manager != nil {
+		manager.SetQuotaRefreshNotifier(collector.Wake)
+	}
+	return collector
 }
 
 // Start launches the collector. Calling Start again updates settings and wakes

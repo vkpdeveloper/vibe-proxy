@@ -3,6 +3,7 @@ package quotadrain
 import (
 	"context"
 	"encoding/base64"
+	"net/http"
 	"testing"
 	"time"
 
@@ -163,5 +164,29 @@ func TestCollectorRefreshFailureKeepsLastGoodSnapshot(t *testing.T) {
 	}
 	if !updated.Capacity.FetchedAt.Equal(now) {
 		t.Fatalf("FetchedAt = %s, want preserved %s", updated.Capacity.FetchedAt, now)
+	}
+}
+
+func TestCollectorWakesAfterRepeatedQuotaFailures(t *testing.T) {
+	manager := coreauth.NewManager(nil, nil, nil)
+	auth := &coreauth.Auth{ID: "claude-1", Provider: "claude"}
+	if _, err := manager.Register(coreauth.WithSkipPersist(context.Background()), auth); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	collector := NewCollector(manager)
+	failure := coreauth.Result{
+		AuthID:   auth.ID,
+		Provider: auth.Provider,
+		Model:    "claude-opus",
+		Error:    &coreauth.Error{HTTPStatus: http.StatusTooManyRequests, Message: "rate limited"},
+	}
+	for range 4 {
+		manager.MarkResult(context.Background(), failure)
+	}
+
+	select {
+	case <-collector.wake:
+	default:
+		t.Fatal("collector was not woken after repeated quota failures")
 	}
 }
