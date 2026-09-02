@@ -17,6 +17,7 @@ services:
     volumes:
       - ./home:/root/.cli-proxy-api
       - ./logs:/CLIProxyAPI/logs
+      - ./usage:/CLIProxyAPI/usage
     command: >
       sh -eu -c '
         if [ -z "$$HOME_JWT" ]; then

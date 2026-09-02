@@ -9,6 +9,8 @@ config.yaml
 # Generated content
 bin/*
 logs/*
+usage/*
+!usage/.gitkeep
 conv/*
 temp/*
 refs/*
