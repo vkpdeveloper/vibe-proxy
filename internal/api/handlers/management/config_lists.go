@@ -107,15 +107,74 @@ func (h *Handler) deleteFromStringList(c *gin.Context, target *[]string, after f
 // api-keys
 func (h *Handler) GetAPIKeys(c *gin.Context) { c.JSON(200, gin.H{"api-keys": h.cfg.APIKeys}) }
 func (h *Handler) PutAPIKeys(c *gin.Context) {
+	oldKeys := append([]string(nil), h.cfg.APIKeys...)
 	h.putStringList(c, func(v []string) {
 		h.cfg.APIKeys = append([]string(nil), v...)
+		h.reconcileClientAPIKeyPolicies(oldKeys, h.cfg.APIKeys)
 	}, nil)
 }
 func (h *Handler) PatchAPIKeys(c *gin.Context) {
-	h.patchStringList(c, &h.cfg.APIKeys, func() {})
+	oldKeys := append([]string(nil), h.cfg.APIKeys...)
+	h.patchStringList(c, &h.cfg.APIKeys, func() { h.reconcileClientAPIKeyPolicies(oldKeys, h.cfg.APIKeys) })
 }
 func (h *Handler) DeleteAPIKeys(c *gin.Context) {
-	h.deleteFromStringList(c, &h.cfg.APIKeys, func() {})
+	oldKeys := append([]string(nil), h.cfg.APIKeys...)
+	h.deleteFromStringList(c, &h.cfg.APIKeys, func() { h.reconcileClientAPIKeyPolicies(oldKeys, h.cfg.APIKeys) })
+}
+
+func (h *Handler) reconcileClientAPIKeyPolicies(oldKeys, newKeys []string) {
+	if h == nil || h.cfg == nil {
+		return
+	}
+	policyByKey := make(map[string]config.ClientAPIKeyPolicy, len(h.cfg.ClientAPIKeyPolicies))
+	for _, policy := range h.cfg.ClientAPIKeyPolicies {
+		key := strings.TrimSpace(policy.APIKey)
+		if key != "" {
+			policyByKey[key] = policy
+		}
+	}
+	for index, oldKey := range oldKeys {
+		if index >= len(newKeys) {
+			break
+		}
+		oldKey = strings.TrimSpace(oldKey)
+		newKey := strings.TrimSpace(newKeys[index])
+		if oldKey == "" || newKey == "" || oldKey == newKey {
+			continue
+		}
+		if _, alreadyManaged := policyByKey[newKey]; alreadyManaged {
+			continue
+		}
+		if policy, exists := policyByKey[oldKey]; exists {
+			delete(policyByKey, oldKey)
+			policy.APIKey = newKey
+			policyByKey[newKey] = policy
+		}
+	}
+	valid := make(map[string]struct{}, len(newKeys))
+	for _, key := range newKeys {
+		if key = strings.TrimSpace(key); key != "" {
+			valid[key] = struct{}{}
+		}
+	}
+	policies := make([]config.ClientAPIKeyPolicy, 0, len(policyByKey))
+	for _, policy := range h.cfg.ClientAPIKeyPolicies {
+		key := strings.TrimSpace(policy.APIKey)
+		current, exists := policyByKey[key]
+		if !exists {
+			continue
+		}
+		if _, keep := valid[current.APIKey]; keep {
+			policies = append(policies, current)
+		}
+		delete(policyByKey, key)
+	}
+	for _, policy := range policyByKey {
+		if _, keep := valid[policy.APIKey]; keep {
+			policies = append(policies, policy)
+		}
+	}
+	h.cfg.ClientAPIKeyPolicies = policies
 }
 
 // gemini-api-key: []GeminiKey

@@ -41,6 +41,20 @@ api-keys:
   - "your-api-key-2"
   - "your-api-key-3"
 
+# Optional policies for client-facing API keys. Keys without an entry remain unrestricted.
+# Daily limits reset at 00:00 UTC. A zero limit means unlimited. An empty allowed-models
+# list permits every model available through the selected providers.
+# api-key-policies:
+#   - api-key: "your-api-key-1"
+#     name: "Production app"
+#     allowed-providers: ["codex", "claude"]
+#     allowed-models: ["gpt-5.6-codex", "claude-sonnet-4-6"]
+#     daily-limit-usd: 25
+#     daily-request-limit: 5000
+#     daily-token-limit: 10000000
+#     requests-per-minute: 120
+#     disabled: false
+
 # Enable debug logging
 debug: false
 

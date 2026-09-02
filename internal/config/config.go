@@ -73,6 +73,10 @@ type Config struct {
 	// UsageStatisticsEnabled toggles in-memory usage aggregation; when false, usage data is discarded.
 	UsageStatisticsEnabled bool `yaml:"usage-statistics-enabled" json:"usage-statistics-enabled"`
 
+	// ClientAPIKeyPolicies applies optional routing and usage limits to client-facing API keys.
+	// Keys without a matching policy retain the legacy unrestricted behavior.
+	ClientAPIKeyPolicies []ClientAPIKeyPolicy `yaml:"api-key-policies,omitempty" json:"api-key-policies,omitempty"`
+
 	// RedisUsageQueueRetentionSeconds controls how long usage queue items are retained
 	// in memory for Management API consumers.
 	// Default: 60. Max: 3600.
@@ -167,6 +171,20 @@ type Config struct {
 
 	// Payload defines default and override rules for provider payload parameters.
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
+}
+
+// ClientAPIKeyPolicy controls access and usage limits for one client-facing API key.
+type ClientAPIKeyPolicy struct {
+	ID                string   `yaml:"id,omitempty" json:"id,omitempty"`
+	APIKey            string   `yaml:"api-key" json:"api-key"`
+	Name              string   `yaml:"name,omitempty" json:"name,omitempty"`
+	AllowedProviders  []string `yaml:"allowed-providers,omitempty" json:"allowed-providers,omitempty"`
+	AllowedModels     []string `yaml:"allowed-models,omitempty" json:"allowed-models,omitempty"`
+	DailyLimitUSD     float64  `yaml:"daily-limit-usd,omitempty" json:"daily-limit-usd,omitempty"`
+	DailyRequestLimit int64    `yaml:"daily-request-limit,omitempty" json:"daily-request-limit,omitempty"`
+	DailyTokenLimit   int64    `yaml:"daily-token-limit,omitempty" json:"daily-token-limit,omitempty"`
+	RequestsPerMinute int64    `yaml:"requests-per-minute,omitempty" json:"requests-per-minute,omitempty"`
+	Disabled          bool     `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 }
 
 // PluginsConfig holds dynamic plugin system settings.

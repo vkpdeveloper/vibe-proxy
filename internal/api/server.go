@@ -27,6 +27,7 @@ import (
 	managementHandlers "github.com/router-for-me/CLIProxyAPI/v7/internal/api/handlers/management"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/api/middleware"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/cache"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/clientpolicy"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/home"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
@@ -61,6 +62,8 @@ var corsExposedResponseHeaders = []string{
 	"X-CPA-HOME-BUILD-DATE",
 	"X-SERVER-VERSION",
 	"X-SERVER-BUILD-DATE",
+	"Retry-After",
+	"X-Usage-Reset",
 }
 
 var corsExposedResponseHeadersJoined = strings.Join(corsExposedResponseHeaders, ", ")
@@ -240,7 +243,8 @@ type Server struct {
 	// pluginHost owns dynamic plugin Management API route dispatch.
 	pluginHost *pluginhost.Host
 
-	usageStore *usageledger.Store
+	usageStore          *usageledger.Store
+	clientPolicyManager *clientpolicy.Manager
 
 	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
 	managementRoutesRegistered atomic.Bool
@@ -365,7 +369,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 	logDir := logging.ResolveLogDirectory(cfg)
 	s.mgmt.SetLogDirectory(logDir)
-	usageStore, errUsageStore := usageledger.NewStore(usageledger.DefaultStoreDirectory(configFilePath), logDir, cfg.UsageStatisticsEnabled)
+	usageStore, errUsageStore := usageledger.NewStore(usageledger.DefaultStoreDirectory(configFilePath), logDir, usageAccountingRequired(cfg))
 	if errUsageStore != nil {
 		log.WithError(errUsageStore).Error("failed to initialize persistent usage accounting")
 	} else {
@@ -373,6 +377,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		s.mgmt.SetUsageStore(usageStore)
 		coreusage.RegisterNamedPlugin("persistent-usage-ledger", usageStore)
 	}
+	s.clientPolicyManager = clientpolicy.NewManager(usageStore)
+	s.updateClientPolicies(cfg)
 	if optionState.postAuthHook != nil {
 		s.mgmt.SetPostAuthHook(optionState.postAuthHook)
 	}
@@ -527,7 +533,7 @@ func (s *Server) setupRoutes() {
 
 	// OpenAI compatible API routes
 	v1 := s.engine.Group("/v1")
-	v1.Use(AuthMiddleware(s.accessManager))
+	v1.Use(AuthMiddleware(s.accessManager), s.clientAPIKeyPolicyMiddleware())
 	{
 		v1.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
@@ -547,7 +553,7 @@ func (s *Server) setupRoutes() {
 	}
 
 	openaiV1 := s.engine.Group("/openai/v1")
-	openaiV1.Use(AuthMiddleware(s.accessManager))
+	openaiV1.Use(AuthMiddleware(s.accessManager), s.clientAPIKeyPolicyMiddleware())
 	{
 		openaiV1.POST("/videos", openaiHandlers.VideosCreate)
 		openaiV1.GET("/videos/:video_id/content", openaiHandlers.VideosContent)
@@ -556,7 +562,7 @@ func (s *Server) setupRoutes() {
 
 	// Codex CLI direct route aliases (chatgpt_base_url compatible)
 	codexDirect := s.engine.Group("/backend-api/codex")
-	codexDirect.Use(AuthMiddleware(s.accessManager))
+	codexDirect.Use(AuthMiddleware(s.accessManager), s.clientAPIKeyPolicyMiddleware())
 	{
 		codexDirect.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		codexDirect.POST("/responses", openaiResponsesHandlers.Responses)
@@ -565,7 +571,7 @@ func (s *Server) setupRoutes() {
 
 	// Gemini compatible API routes
 	v1beta := s.engine.Group("/v1beta")
-	v1beta.Use(AuthMiddleware(s.accessManager))
+	v1beta.Use(AuthMiddleware(s.accessManager), s.clientAPIKeyPolicyMiddleware())
 	{
 		v1beta.GET("/models", s.geminiModelsHandler(geminiHandlers))
 		v1beta.POST("/interactions", geminiHandlers.Interactions)
@@ -669,6 +675,7 @@ func (s *Server) AttachWebsocketRoute(path string, handler http.Handler) {
 	s.wsRouteMu.Unlock()
 
 	authMiddleware := AuthMiddleware(s.accessManager)
+	policyMiddleware := s.clientAPIKeyPolicyMiddleware()
 	conditionalAuth := func(c *gin.Context) {
 		if !s.wsAuthEnabled.Load() {
 			c.Next()
@@ -681,7 +688,7 @@ func (s *Server) AttachWebsocketRoute(path string, handler http.Handler) {
 		c.Abort()
 	}
 
-	s.engine.GET(trimmed, conditionalAuth, finalHandler)
+	s.engine.GET(trimmed, conditionalAuth, policyMiddleware, finalHandler)
 }
 
 func (s *Server) registerManagementRoutes() {
@@ -753,6 +760,11 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PUT("/api-keys", s.mgmt.PutAPIKeys)
 		mgmt.PATCH("/api-keys", s.mgmt.PatchAPIKeys)
 		mgmt.DELETE("/api-keys", s.mgmt.DeleteAPIKeys)
+		mgmt.GET("/client-api-keys", s.mgmt.GetClientAPIKeys)
+		mgmt.POST("/client-api-keys", s.mgmt.CreateClientAPIKey)
+		mgmt.PUT("/client-api-keys/:id", s.mgmt.UpdateClientAPIKey)
+		mgmt.POST("/client-api-keys/:id/rotate", s.mgmt.RotateClientAPIKey)
+		mgmt.DELETE("/client-api-keys/:id", s.mgmt.DeleteClientAPIKey)
 		mgmt.GET("/api-key-usage", s.mgmt.GetAPIKeyUsage)
 		mgmt.GET("/usage-queue", s.mgmt.GetUsageQueue)
 		mgmt.GET("/usage-costs", s.mgmt.GetUsageCosts)
@@ -1726,9 +1738,10 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	if oldCfg == nil || oldCfg.UsageStatisticsEnabled != cfg.UsageStatisticsEnabled {
 		redisqueue.SetUsageStatisticsEnabled(cfg.UsageStatisticsEnabled)
 		if s.usageStore != nil {
-			s.usageStore.SetEnabled(cfg.UsageStatisticsEnabled)
+			s.usageStore.SetEnabled(usageAccountingRequired(cfg))
 		}
 	}
+	s.updateClientPolicies(cfg)
 
 	if oldCfg == nil || oldCfg.RedisUsageQueueRetentionSeconds != cfg.RedisUsageQueueRetentionSeconds {
 		redisqueue.SetRetentionSeconds(cfg.RedisUsageQueueRetentionSeconds)
@@ -1900,6 +1913,89 @@ func AuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
 		}
 		c.AbortWithStatusJSON(statusCode, gin.H{"error": err.Message})
 	}
+}
+
+func (s *Server) clientAPIKeyPolicyMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s == nil || s.clientPolicyManager == nil || c == nil || c.Request == nil {
+			c.Next()
+			return
+		}
+		rawKey, exists := c.Get("userApiKey")
+		apiKey, _ := rawKey.(string)
+		if !exists || strings.TrimSpace(apiKey) == "" {
+			c.Next()
+			return
+		}
+		decision := s.clientPolicyManager.Evaluate(apiKey, time.Now())
+		c.Set(clientpolicy.GinDecisionKey, decision)
+		c.Request = c.Request.WithContext(clientpolicy.WithDecision(c.Request.Context(), decision))
+		if !decision.Denied {
+			c.Next()
+			return
+		}
+		isModelList := c.Request.Method == http.MethodGet && (c.Request.URL.Path == "/v1/models" || c.Request.URL.Path == "/v1beta/models")
+		if isModelList && decision.DenialCode != "api_key_disabled" {
+			c.Next()
+			return
+		}
+		status := http.StatusTooManyRequests
+		errorType := "rate_limit_error"
+		if decision.DenialCode == "api_key_disabled" {
+			status = http.StatusForbidden
+			errorType = "permission_error"
+		}
+		resetAt := ""
+		if !decision.RetryAt.IsZero() {
+			resetAt = decision.RetryAt.UTC().Format(time.RFC3339)
+			seconds := int64(time.Until(decision.RetryAt).Seconds())
+			if seconds < 1 {
+				seconds = 1
+			}
+			c.Header("Retry-After", strconv.FormatInt(seconds, 10))
+			c.Header("X-Usage-Reset", resetAt)
+		}
+		c.AbortWithStatusJSON(status, gin.H{"error": gin.H{
+			"message":  decision.DenialMessage,
+			"type":     errorType,
+			"code":     decision.DenialCode,
+			"reset_at": resetAt,
+		}})
+	}
+}
+
+func (s *Server) updateClientPolicies(cfg *config.Config) {
+	if s == nil || cfg == nil {
+		return
+	}
+	if s.clientPolicyManager != nil {
+		s.clientPolicyManager.Update(cfg.APIKeys, cfg.ClientAPIKeyPolicies)
+	}
+	if s.usageStore == nil {
+		return
+	}
+	policies := make(map[string]config.ClientAPIKeyPolicy, len(cfg.ClientAPIKeyPolicies))
+	for _, policy := range cfg.ClientAPIKeyPolicies {
+		policies[strings.TrimSpace(policy.APIKey)] = policy
+	}
+	labels := make(map[string]string, len(cfg.APIKeys))
+	for _, apiKey := range cfg.APIKeys {
+		apiKey = strings.TrimSpace(apiKey)
+		if apiKey == "" {
+			continue
+		}
+		policy := policies[apiKey]
+		id := strings.TrimSpace(policy.ID)
+		if id == "" {
+			id = clientpolicy.ClientKeyID(apiKey)
+		}
+		labels[id] = clientpolicy.DisplayName(policy, apiKey)
+	}
+	s.usageStore.SetClientKeyLabels(labels)
+}
+
+func usageAccountingRequired(cfg *config.Config) bool {
+	return cfg != nil && (cfg.UsageStatisticsEnabled || len(cfg.ClientAPIKeyPolicies) > 0)
 }
 
 func configuredSignatureCacheEnabled(cfg *config.Config) bool {

@@ -22,11 +22,13 @@ type Totals struct {
 }
 
 type Breakdown struct {
-	Key      string `json:"key"`
-	Provider string `json:"provider,omitempty"`
-	Account  string `json:"account,omitempty"`
-	Model    string `json:"model,omitempty"`
-	AuthType string `json:"auth_type,omitempty"`
+	Key         string `json:"key"`
+	Provider    string `json:"provider,omitempty"`
+	Account     string `json:"account,omitempty"`
+	Model       string `json:"model,omitempty"`
+	AuthType    string `json:"auth_type,omitempty"`
+	ClientKeyID string `json:"client_key_id,omitempty"`
+	ClientKey   string `json:"client_key,omitempty"`
 	Totals
 }
 
@@ -55,6 +57,7 @@ type Report struct {
 	ByModel         []Breakdown        `json:"by_model"`
 	ByProviderModel []Breakdown        `json:"by_provider_model"`
 	ByAuthType      []Breakdown        `json:"by_auth_type"`
+	ByClientKey     []Breakdown        `json:"by_client_key"`
 	Daily           []DailyTotal       `json:"daily"`
 	UnpricedModels  []UnpricedModel    `json:"unpriced_models"`
 	Recent          []Event            `json:"recent"`
@@ -75,6 +78,7 @@ func (s *Store) Report(from, to *time.Time) Report {
 		ByModel:         make([]Breakdown, 0),
 		ByProviderModel: make([]Breakdown, 0),
 		ByAuthType:      make([]Breakdown, 0),
+		ByClientKey:     make([]Breakdown, 0),
 		Daily:           make([]DailyTotal, 0),
 		UnpricedModels:  make([]UnpricedModel, 0),
 		Recent:          make([]Event, 0),
@@ -85,6 +89,7 @@ func (s *Store) Report(from, to *time.Time) Report {
 	model := make(map[string]*Breakdown)
 	providerModel := make(map[string]*Breakdown)
 	authType := make(map[string]*Breakdown)
+	clientKey := make(map[string]*Breakdown)
 	daily := make(map[string]*DailyTotal)
 	unpriced := make(map[string]*UnpricedModel)
 
@@ -123,6 +128,13 @@ func (s *Store) Report(from, to *time.Time) Report {
 		authRow.AuthType = authKey
 		addEventTotals(&authRow.Totals, event)
 
+		clientKeyID := event.ClientKeyID
+		clientKeyRow := ensureBreakdown(clientKey, normalizedLabel(clientKeyID, "unattributed"))
+		clientKeyRow.ClientKeyID = clientKeyID
+		clientKeyRow.ClientKey = s.clientKeyLabel(clientKeyID)
+		clientKeyRow.Key = clientKeyRow.ClientKey
+		addEventTotals(&clientKeyRow.Totals, event)
+
 		date := event.Timestamp.UTC().Format("2006-01-02")
 		day := daily[date]
 		if day == nil {
@@ -149,6 +161,7 @@ func (s *Store) Report(from, to *time.Time) Report {
 	report.ByModel = sortedBreakdowns(model)
 	report.ByProviderModel = sortedBreakdowns(providerModel)
 	report.ByAuthType = sortedBreakdowns(authType)
+	report.ByClientKey = sortedBreakdowns(clientKey)
 	for _, value := range daily {
 		report.Daily = append(report.Daily, *value)
 	}

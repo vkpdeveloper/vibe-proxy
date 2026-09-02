@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/clientpolicy"
 	. "github.com/router-for-me/CLIProxyAPI/v7/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/interfaces"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
@@ -726,6 +727,9 @@ func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entr
 		return nil, nil, errMsg
 	}
 	if routeDecision.ExecutorPluginID != "" {
+		if errMsg := clientPolicyExecutionError(ctx, []string{routeDecision.ExecutorPluginID}, originalRequestedModel, routeDecision.Model); errMsg != nil {
+			return nil, nil, errMsg
+		}
 		return h.executeWithPluginExecutor(ctx, entryProtocol, responseProtocol, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, allowImageModel, routeDecision, execOptions)
@@ -733,6 +737,10 @@ func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entr
 		return nil, nil, errMsg
 	}
 	providers = adjustExecutionProvidersForEntryProtocol(entryProtocol, providers)
+	providers, errMsg = restrictClientPolicyExecution(ctx, providers, originalRequestedModel, normalizedModel)
+	if errMsg != nil {
+		return nil, nil, errMsg
+	}
 	reqMeta := requestExecutionMetadata(ctx)
 	reqMeta[coreexecutor.RequestedModelMetadataKey] = originalRequestedModel
 	addAuthSelectionModelMetadata(reqMeta, execOptions.AuthSelectionModel)
@@ -794,6 +802,9 @@ func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handle
 	originalRequestedModel := modelName
 	routeDecision := h.applyModelRouter(ctx, handlerType, modelName, rawJSON, false, execOptions)
 	if routeDecision.ExecutorPluginID != "" {
+		if errMsg := clientPolicyExecutionError(ctx, []string{routeDecision.ExecutorPluginID}, originalRequestedModel, routeDecision.Model); errMsg != nil {
+			return nil, nil, errMsg
+		}
 		return h.countWithPluginExecutor(ctx, handlerType, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, false, routeDecision, execOptions)
@@ -801,6 +812,10 @@ func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handle
 		return nil, nil, errMsg
 	}
 	providers = adjustExecutionProvidersForEntryProtocol(handlerType, providers)
+	providers, errMsg = restrictClientPolicyExecution(ctx, providers, originalRequestedModel, normalizedModel)
+	if errMsg != nil {
+		return nil, nil, errMsg
+	}
 	reqMeta := requestExecutionMetadata(ctx)
 	reqMeta[coreexecutor.RequestedModelMetadataKey] = originalRequestedModel
 	addAuthSelectionModelMetadata(reqMeta, execOptions.AuthSelectionModel)
@@ -1124,6 +1139,12 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 		return nil, nil, errChan
 	}
 	if routeDecision.ExecutorPluginID != "" {
+		if errMsg := clientPolicyExecutionError(ctx, []string{routeDecision.ExecutorPluginID}, originalRequestedModel, routeDecision.Model); errMsg != nil {
+			errChan := make(chan *interfaces.ErrorMessage, 1)
+			errChan <- errMsg
+			close(errChan)
+			return nil, nil, errChan
+		}
 		return h.streamWithPluginExecutor(ctx, entryProtocol, responseProtocol, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, allowImageModel, routeDecision, execOptions)
@@ -1134,6 +1155,13 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 		return nil, nil, errChan
 	}
 	providers = adjustExecutionProvidersForEntryProtocol(entryProtocol, providers)
+	providers, errMsg = restrictClientPolicyExecution(ctx, providers, originalRequestedModel, normalizedModel)
+	if errMsg != nil {
+		errChan := make(chan *interfaces.ErrorMessage, 1)
+		errChan <- errMsg
+		close(errChan)
+		return nil, nil, errChan
+	}
 	reqMeta := requestExecutionMetadata(ctx)
 	reqMeta[coreexecutor.RequestedModelMetadataKey] = originalRequestedModel
 	addAuthSelectionModelMetadata(reqMeta, execOptions.AuthSelectionModel)
@@ -1543,6 +1571,26 @@ func nativeInteractionsExecutionError() *interfaces.ErrorMessage {
 		StatusCode: http.StatusBadRequest,
 		Error:      fmt.Errorf("agent is only supported for native interactions execution"),
 	}
+}
+
+func restrictClientPolicyExecution(ctx context.Context, providers []string, requestedModel, normalizedModel string) ([]string, *interfaces.ErrorMessage) {
+	filtered, code, allowed := clientpolicy.RestrictExecution(ctx, providers, requestedModel, normalizedModel)
+	if allowed {
+		return filtered, nil
+	}
+	message := "the requested model is not allowed for this API key"
+	if code == "provider_not_allowed" {
+		message = "none of the providers available for this model are allowed for this API key"
+	}
+	return nil, &interfaces.ErrorMessage{
+		StatusCode: http.StatusForbidden,
+		Error:      fmt.Errorf("%s: %s", code, message),
+	}
+}
+
+func clientPolicyExecutionError(ctx context.Context, providers []string, requestedModel, normalizedModel string) *interfaces.ErrorMessage {
+	_, errMsg := restrictClientPolicyExecution(ctx, providers, requestedModel, normalizedModel)
+	return errMsg
 }
 
 // providersForExecution resolves the providers and normalized model for a request. When a model

@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/clientpolicy"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/usage"
 	log "github.com/sirupsen/logrus"
@@ -86,6 +87,7 @@ type Event struct {
 	ServiceTier     string      `json:"service_tier,omitempty"`
 	ReasoningEffort string      `json:"reasoning_effort,omitempty"`
 	RequestID       string      `json:"request_id,omitempty"`
+	ClientKeyID     string      `json:"client_key_id,omitempty"`
 	Failed          bool        `json:"failed"`
 	Tokens          TokenDetail `json:"tokens"`
 	Cost            CostDetail  `json:"cost"`
@@ -102,13 +104,14 @@ type HistoricalCoverage struct {
 }
 
 type Store struct {
-	mu       sync.RWMutex
-	dir      string
-	events   []Event
-	ids      map[string]struct{}
-	catalog  PricingCatalog
-	coverage HistoricalCoverage
-	enabled  atomic.Bool
+	mu              sync.RWMutex
+	dir             string
+	events          []Event
+	ids             map[string]struct{}
+	catalog         PricingCatalog
+	coverage        HistoricalCoverage
+	clientKeyLabels map[string]string
+	enabled         atomic.Bool
 }
 
 func DefaultStoreDirectory(configFilePath string) string {
@@ -131,7 +134,7 @@ func NewStore(dir, logDir string, enabled bool) (*Store, error) {
 		return nil, fmt.Errorf("create usage store: %w", errMkdir)
 	}
 
-	store := &Store{dir: dir, ids: make(map[string]struct{})}
+	store := &Store{dir: dir, ids: make(map[string]struct{}), clientKeyLabels: make(map[string]string)}
 	store.enabled.Store(enabled)
 	if errCatalog := json.Unmarshal(defaultPricingJSON, &store.catalog); errCatalog != nil {
 		return nil, fmt.Errorf("load embedded usage pricing: %w", errCatalog)
@@ -183,6 +186,10 @@ func (s *Store) eventFromRecord(ctx context.Context, record coreusage.Record) Ev
 	if tokens.TotalTokens == 0 {
 		tokens.TotalTokens = tokens.InputTokens + tokens.OutputTokens + tokens.ReasoningTokens + tokens.CacheReadTokens + tokens.CacheCreationTokens
 	}
+	clientKeyID := clientpolicy.ClientKeyID(record.APIKey)
+	if decision, ok := clientpolicy.FromContext(ctx); ok && decision.Managed && decision.ClientKeyID != "" {
+		clientKeyID = decision.ClientKeyID
+	}
 	event := Event{
 		Timestamp:       timestamp,
 		Provider:        provider,
@@ -194,6 +201,7 @@ func (s *Store) eventFromRecord(ctx context.Context, record coreusage.Record) Ev
 		ServiceTier:     normalizedLabel(record.ServiceTier, coreusage.DefaultServiceTier),
 		ReasoningEffort: strings.TrimSpace(record.ReasoningEffort),
 		RequestID:       requestID,
+		ClientKeyID:     clientKeyID,
 		Failed:          record.Failed,
 		Tokens:          tokens,
 		Origin:          "live",
@@ -466,7 +474,7 @@ func eventFingerprint(event Event) string {
 	if basis == "" {
 		basis = event.Timestamp.UTC().Format(time.RFC3339Nano)
 	}
-	basis += fmt.Sprintf("|%s|%s|%s|%d|%d|%d", event.Provider, event.Model, event.Account, event.Tokens.InputTokens, event.Tokens.OutputTokens, event.Tokens.TotalTokens)
+	basis += fmt.Sprintf("|%s|%s|%s|%s|%d|%d|%d", event.Provider, event.Model, event.Account, event.ClientKeyID, event.Tokens.InputTokens, event.Tokens.OutputTokens, event.Tokens.TotalTokens)
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:16])
 }
@@ -499,4 +507,59 @@ func (s *Store) Coverage() HistoricalCoverage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.coverage
+}
+
+// SetClientKeyLabels updates display names used when grouping current and historical events.
+func (s *Store) SetClientKeyLabels(labels map[string]string) {
+	if s == nil {
+		return
+	}
+	next := make(map[string]string, len(labels))
+	for id, label := range labels {
+		id = strings.TrimSpace(id)
+		label = strings.TrimSpace(label)
+		if id != "" && label != "" {
+			next[id] = label
+		}
+	}
+	s.mu.Lock()
+	s.clientKeyLabels = next
+	s.mu.Unlock()
+}
+
+func (s *Store) clientKeyLabel(id string) string {
+	if id == "" {
+		return "Unattributed / before key tracking"
+	}
+	s.mu.RLock()
+	label := s.clientKeyLabels[id]
+	s.mu.RUnlock()
+	if label != "" {
+		return label
+	}
+	return "Client key " + id[:min(8, len(id))]
+}
+
+// ClientUsage returns persisted usage for one key during the current UTC day and minute window.
+func (s *Store) ClientUsage(clientKeyID string, dayStart, minuteStart, now time.Time) clientpolicy.UsageSnapshot {
+	var snapshot clientpolicy.UsageSnapshot
+	if s == nil || strings.TrimSpace(clientKeyID) == "" {
+		return snapshot
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, event := range s.events {
+		if event.ClientKeyID != clientKeyID || event.Timestamp.Before(dayStart) || event.Timestamp.After(now) {
+			continue
+		}
+		snapshot.DailyRequests++
+		snapshot.DailyTokens += event.Tokens.TotalTokens
+		if event.Cost.Priced {
+			snapshot.DailyUSD += event.Cost.TotalUSD
+		}
+		if !event.Timestamp.Before(minuteStart) {
+			snapshot.MinuteRequests++
+		}
+	}
+	return snapshot
 }

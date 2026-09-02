@@ -22,6 +22,7 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 	store.HandleUsage(ctx, coreusage.Record{
 		Provider:    "codex",
 		Model:       "gpt-5.4",
+		APIKey:      "client-secret",
 		Source:      "person@example.com",
 		AuthType:    "oauth",
 		RequestedAt: requestedAt,
@@ -47,6 +48,13 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 	if len(report.ByAccount) != 1 || report.ByAccount[0].Account != "person@example.com" {
 		t.Fatalf("account breakdown = %+v", report.ByAccount)
 	}
+	if len(report.ByClientKey) != 1 || report.ByClientKey[0].ClientKeyID == "" {
+		t.Fatalf("client key breakdown = %+v", report.ByClientKey)
+	}
+	usage := store.ClientUsage(report.ByClientKey[0].ClientKeyID, requestedAt.Truncate(24*time.Hour), requestedAt.Add(-time.Minute), requestedAt.Add(time.Minute))
+	if usage.DailyRequests != 1 || usage.DailyTokens != 200_000 || usage.DailyUSD != 1.705 || usage.MinuteRequests != 1 {
+		t.Fatalf("client usage = %+v", usage)
+	}
 
 	reloaded, errReload := NewStore(filepath.Join(dir, "usage"), "", true)
 	if errReload != nil {
@@ -57,7 +65,7 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 	}
 	// Replaying the same request ID/model/tokens is idempotent.
 	reloaded.HandleUsage(ctx, coreusage.Record{
-		Provider: "codex", Model: "gpt-5.4", Source: "person@example.com", AuthType: "oauth", RequestedAt: requestedAt,
+		Provider: "codex", Model: "gpt-5.4", APIKey: "client-secret", Source: "person@example.com", AuthType: "oauth", RequestedAt: requestedAt,
 		Detail: coreusage.Detail{InputTokens: 100_000, OutputTokens: 100_000, CachedTokens: 20_000, TotalTokens: 200_000},
 	})
 	if got := reloaded.Report(nil, nil).Totals.Requests; got != 1 {
@@ -158,7 +166,7 @@ func TestEmptyReportUsesEmptyCollections(t *testing.T) {
 		t.Fatal(errStore)
 	}
 	report := store.Report(nil, nil)
-	if report.ByProvider == nil || report.ByAccount == nil || report.ByModel == nil || report.ByProviderModel == nil || report.ByAuthType == nil {
+	if report.ByProvider == nil || report.ByAccount == nil || report.ByModel == nil || report.ByProviderModel == nil || report.ByAuthType == nil || report.ByClientKey == nil {
 		t.Fatal("empty report breakdowns must be JSON arrays, not null")
 	}
 	if report.Daily == nil || report.UnpricedModels == nil || report.Recent == nil {
