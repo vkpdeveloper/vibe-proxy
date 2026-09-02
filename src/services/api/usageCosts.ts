@@ -21,6 +21,8 @@ export interface UsageBreakdown extends UsageTotals {
   account?: string;
   model?: string;
   auth_type?: string;
+  client_key_id?: string;
+  client_key?: string;
 }
 
 export interface UsageDailyTotal extends UsageTotals {
@@ -63,6 +65,7 @@ export interface UsageCostReport {
   by_model: UsageBreakdown[];
   by_provider_model: UsageBreakdown[];
   by_auth_type: UsageBreakdown[];
+  by_client_key: UsageBreakdown[];
   daily: UsageDailyTotal[];
   unpriced_models: Array<{ provider: string; model: string; requests: number; tokens: number }>;
   recent: UsageEvent[];
@@ -87,6 +90,7 @@ function normalizeReport(report: UsageCostReport): UsageCostReport {
     by_model: Array.isArray(report.by_model) ? report.by_model : [],
     by_provider_model: Array.isArray(report.by_provider_model) ? report.by_provider_model : [],
     by_auth_type: Array.isArray(report.by_auth_type) ? report.by_auth_type : [],
+    by_client_key: Array.isArray(report.by_client_key) ? report.by_client_key : [],
     daily: Array.isArray(report.daily) ? report.daily : [],
     unpriced_models: Array.isArray(report.unpriced_models) ? report.unpriced_models : [],
     recent: Array.isArray(report.recent) ? report.recent : [],

@@ -27,6 +27,7 @@ import {
   IconSidebarStore,
   IconSidebarSystem,
   IconSidebarUsage,
+  IconKey,
   IconChevronDown,
 } from '@/components/ui/icons';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
@@ -62,6 +63,7 @@ const sidebarIcons: Record<string, ReactNode> = {
   logs: <IconSidebarLogs size={18} />,
   system: <IconSidebarSystem size={18} />,
   usage: <IconSidebarUsage size={18} />,
+  apiKeys: <IconKey size={18} />,
 };
 
 interface SidebarNavLinkItem {
@@ -547,6 +549,12 @@ export function MainLayout() {
           labelKey: 'nav.ai_providers',
           metaKey: 'nav_meta.ai_providers',
           icon: sidebarIcons.aiProviders,
+        },
+        {
+          path: '/api-keys',
+          labelKey: 'nav.client_api_keys',
+          metaKey: 'nav_meta.client_api_keys',
+          icon: sidebarIcons.apiKeys,
         },
         {
           path: '/auth-files',
