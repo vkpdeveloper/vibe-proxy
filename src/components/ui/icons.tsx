@@ -369,6 +369,8 @@ export function IconDollarSign({ size = 20, ...props }: IconProps) {
   );
 }
 
+export const IconSidebarUsage = IconDollarSign;
+
 export function IconGithub({ size = 20, ...props }: IconProps) {
   return (
     <svg {...baseSvgProps} width={size} height={size} {...props}>
