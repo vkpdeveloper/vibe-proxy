@@ -1,3 +1,8 @@
 .env
 secrets.env
 data/
+
+# Deployment secrets & runtime data
+secrets.env
+data/
+.env
