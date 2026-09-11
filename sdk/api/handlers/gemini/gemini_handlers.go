@@ -48,7 +48,7 @@ func (h *GeminiAPIHandler) Models() []map[string]any {
 // GeminiModels handles the Gemini models listing endpoint.
 // It returns a JSON response containing available Gemini models and their specifications.
 func (h *GeminiAPIHandler) GeminiModels(c *gin.Context) {
-	rawModels := handlers.FilterModelsForClientPolicy(c.Request.Context(), h.Models())
+	rawModels := handlers.FilterModelsForClientPolicy(handlers.RequestContext(c), h.Models())
 	normalizedModels := make([]map[string]any, 0, len(rawModels))
 	defaultMethods := []string{"generateContent"}
 	for _, model := range rawModels {
@@ -72,7 +72,7 @@ func (h *GeminiAPIHandler) GeminiModels(c *gin.Context) {
 		}
 		normalizedModels = append(normalizedModels, normalizedModel)
 	}
-	c.JSON(http.StatusOK, gin.H{
+	h.WriteModelListResponse(c, h.HandlerType(), gin.H{
 		"models": normalizedModels,
 	})
 }
@@ -102,7 +102,7 @@ func (h *GeminiAPIHandler) GeminiGetHandler(c *gin.Context) {
 		name, _ := model["name"].(string)
 		// Match name with or without 'models/' prefix
 		if name == action || name == "models/"+action {
-			if len(handlers.FilterModelsForClientPolicy(c.Request.Context(), []map[string]any{model})) == 0 {
+			if len(handlers.FilterModelsForClientPolicy(handlers.RequestContext(c), []map[string]any{model})) == 0 {
 				break
 			}
 			targetModel = model
@@ -222,6 +222,15 @@ func (h *GeminiAPIHandler) handleStreamGenerateContent(c *gin.Context, modelName
 			return
 		case chunk, ok := <-dataChan:
 			if !ok {
+				if errMsg, hasPendingError := handlers.PendingStreamError(errChan); hasPendingError {
+					h.WriteErrorResponse(c, errMsg)
+					if errMsg != nil {
+						cliCancel(errMsg.Error)
+					} else {
+						cliCancel(nil)
+					}
+					return
+				}
 				// Closed without data
 				if alt == "" {
 					setSSEHeaders()

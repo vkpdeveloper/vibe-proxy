@@ -4,9 +4,19 @@ import (
 	"context"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/clientpolicy"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 )
+
+// RequestContext returns the request context for policy evaluation, falling back
+// to context.Background when no HTTP request is attached (e.g. in tests).
+func RequestContext(c *gin.Context) context.Context {
+	if c == nil || c.Request == nil {
+		return context.Background()
+	}
+	return c.Request.Context()
+}
 
 // HasManagedClientPolicy reports whether this request carries an explicit client-key policy.
 func HasManagedClientPolicy(ctx context.Context) bool {
