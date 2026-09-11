@@ -9,17 +9,19 @@ interface ProviderCategoryListProps {
   onSelect: (brand: ProviderBrand) => void;
 }
 
-const QUICK_FILL_BRANDS: ReadonlySet<ProviderBrand> = new Set([
-  'code0',
-  'fennoAI',
-  'qiniuCloud',
-  'claudeApi',
-]);
+const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = ['fennoAI', 'qiniuCloud', 'lmuAI'];
+
+const QUICK_FILL_BRANDS: ReadonlySet<ProviderBrand> = new Set(QUICK_FILL_BRAND_ORDER);
 
 export function ProviderCategoryList({ groups, activeBrand, onSelect }: ProviderCategoryListProps) {
   const { t } = useTranslation();
 
-  const quickFillGroups = groups.filter((g) => QUICK_FILL_BRANDS.has(g.id));
+  const quickFillGroups = groups
+    .filter((g) => QUICK_FILL_BRANDS.has(g.id))
+    .sort(
+      (left, right) =>
+        QUICK_FILL_BRAND_ORDER.indexOf(left.id) - QUICK_FILL_BRAND_ORDER.indexOf(right.id)
+    );
   const providerGroups = groups.filter((g) => !QUICK_FILL_BRANDS.has(g.id));
 
   const renderGroups = (items: ProviderGroup[]) => (
@@ -29,10 +31,17 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
         const total = group.resources.length;
         const activeCount = group.resources.filter((r) => !r.disabled).length;
         const logo = PROVIDER_LOGOS[group.id];
-        const itemClass = `${styles.item} ${active ? styles.active : ''}`;
+        const itemClass = [
+          styles.item,
+          active ? styles.active : '',
+          group.id === 'kimi' ? styles.itemKimi : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
         const logoClassName = [
           styles.logo,
           logo?.transparent ? styles.logoTransparent : '',
+          logo?.themeSurface ? styles.logoThemeSurface : '',
           logo?.darkSrc ? styles.logoThemeLight : '',
           logo?.invertOnDark ? styles.logoInvertOnDark : '',
         ]
@@ -41,6 +50,7 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
         const darkLogoClassName = [
           styles.logo,
           logo?.transparent ? styles.logoTransparent : '',
+          logo?.themeSurface ? styles.logoThemeSurface : '',
           styles.logoThemeDark,
         ]
           .filter(Boolean)
@@ -80,7 +90,14 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
                 </span>
               </span>
             </span>
-            <span className={`${styles.badge} ${total === 0 ? styles.badgeAmber : ''}`}>
+            <span
+              className={[
+                styles.badge,
+                total === 0 ? (group.id === 'kimi' ? styles.badgeKimi : styles.badgeAmber) : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               {total}
             </span>
           </button>

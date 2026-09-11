@@ -4,11 +4,18 @@ A single-file Web UI (React + TypeScript) for operating and troubleshooting the 
 
 [中文文档](README_CN.md)
 
-**Main Project**: https://github.com/router-for-me/CLIProxyAPI  
-**Example URL**: https://remote.router-for.me/  
-**Minimum Required Version**: ≥ 7.1.0 (recommended latest)
+**Main Project**: https://github.com/router-for-me/CLIProxyAPI   
+**Minimum Required Version**: ≥ 7.2.147 (recommended latest)
 
 Since version 6.0.19, the Web UI ships with the main program; access it via `/management.html` on the API port once the service is running.
+
+## Sponsor
+
+[![https://go.apimart.ai/gh-cli-proxy-api-management-center](./assets/apimart-en.png)](https://go.apimart.ai/gh-cli-proxy-api-management-center)
+
+Thanks to APIMart for sponsoring this project!
+
+APIMart is a low-cost API platform for AI image & video generation — GPT-Image-2 from $0.006/image, 160+ images per dollar. One async API covers both image and video: submit a task, get an ID, fetch results via polling or callback. Batch tens of thousands of images without timeouts, switch models without changing code. Pay-as-you-go with no monthly fee — [sign up here](https://go.apimart.ai/gh-cli-proxy-api-management-center) to get started.
 
 ## What this is (and isn’t)
 
@@ -138,7 +145,9 @@ The UI language is automatically detected from browser settings and can be manua
 bun run dev        # Vite dev server
 bun run build      # tsc + Vite build
 bun run preview    # serve dist locally
+bun run test       # Bun test suite
 bun run lint       # ESLint (fails on warnings)
+bun run verify     # test + lint + build
 bun run format     # Prettier
 bun run type-check # tsc --noEmit
 ```
@@ -149,7 +158,7 @@ Issues and PRs are welcome. Please include:
 
 - Reproduction steps (server version + UI version)
 - Screenshots for UI changes
-- Verification notes (`bun run lint`, `bun run type-check`, `bun run build`)
+- Verification notes (`bun run verify`, plus `bun run type-check` when run separately)
 
 ## License
 

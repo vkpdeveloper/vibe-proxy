@@ -3,6 +3,7 @@ import { IconExternalLink, IconPlus, IconSearch } from '@/components/ui/icons';
 import type { ProviderRecentUsageMap } from '@/components/providers/utils';
 import { PROVIDER_LOGOS } from '../brandLogos';
 import { CLAUDE_API_AFFILIATE_URL } from '../claudeApi';
+import { getKimiAffiliateUrl } from '../kimi';
 import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
 import { getSponsorProviderDefinition } from '../sponsorDefinitions';
 import type { ProviderGroup, ProviderResource } from '../types';
@@ -52,7 +53,7 @@ export function ProviderResourcePanel({
   onToggleDisabled,
   onCreate,
 }: ProviderResourcePanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const logo = PROVIDER_LOGOS[group.id];
   const providerTitle = t(`providersPage.providerNames.${group.id}`);
   const hasProviderInfo = group.resources.length > 0;
@@ -62,20 +63,36 @@ export function ProviderResourcePanel({
   const registrationUrl =
     group.id === 'claudeApi'
       ? CLAUDE_API_AFFILIATE_URL
-      : group.id === 'code0' || group.id === 'fennoAI' || group.id === 'qiniuCloud'
-        ? getSponsorProviderDefinition(group.id).affiliateUrl
-        : null;
+      : group.id === 'kimi'
+        ? getKimiAffiliateUrl(i18n.resolvedLanguage ?? i18n.language)
+        : group.id === 'code0' ||
+            group.id === 'lmuAI' ||
+            group.id === 'infistar' ||
+            group.id === 'fennoAI' ||
+            group.id === 'qiniuCloud'
+          ? getSponsorProviderDefinition(group.id).affiliateUrl
+          : null;
+  const registrationLabel = t(
+    group.id === 'kimi' ? 'providersPage.sponsor.registerNow' : 'providersPage.sponsor.registerLink'
+  );
   const emptyText = showSponsorRegistrationLink
     ? t('providersPage.sponsor.emptyRegisterHint')
     : t('providersPage.table.empty');
   const logoClassName = [
     styles.logo,
+    logo?.themeSurface ? styles.logoThemeSurface : '',
     logo?.darkSrc ? styles.logoThemeLight : '',
     logo?.invertOnDark ? styles.logoInvertOnDark : '',
   ]
     .filter(Boolean)
     .join(' ');
-  const darkLogoClassName = [styles.logo, styles.logoThemeDark].filter(Boolean).join(' ');
+  const darkLogoClassName = [
+    styles.logo,
+    logo?.themeSurface ? styles.logoThemeSurface : '',
+    styles.logoThemeDark,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const titleContent = (
     <>
@@ -125,17 +142,26 @@ export function ProviderResourcePanel({
                 <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
               </a>
             ) : showClaudeApiSponsorLink || registrationUrl ? (
-              <a
-                className={`${styles.sponsorLink} ${styles.sponsorLinkEmphasis}`}
-                href={registrationUrl ?? CLAUDE_API_AFFILIATE_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span className={styles.sponsorLinkText}>
-                  {t('providersPage.sponsor.registerLink')}
-                </span>
-                <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
-              </a>
+              <>
+                <a
+                  className={[
+                    styles.sponsorLink,
+                    styles.sponsorLinkEmphasis,
+                    group.id === 'kimi' ? styles.sponsorLinkKimi : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  href={registrationUrl ?? CLAUDE_API_AFFILIATE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span className={styles.sponsorLinkText}>{registrationLabel}</span>
+                  <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
+                </a>
+                {group.id === 'kimi' ? (
+                  <p className={styles.kimiPromo}>{t('providersPage.sponsor.kimiPromo')}</p>
+                ) : null}
+              </>
             ) : null}
           </div>
           <div className={styles.searchWrap}>

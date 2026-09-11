@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import { isModelExcluded } from '@/features/authFiles/constants';
-import styles from '@/pages/AuthFilesPage.module.scss';
+import styles from './AuthFileModelsModal.module.scss';
 
 export type AuthFileModelsModalProps = {
   open: boolean;
@@ -39,7 +39,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
       }
     >
       {loading ? (
-        <div className={styles.hint}>
+        <div className="hint">
           {t('auth_files.models_loading', { defaultValue: '正在加载模型列表...' })}
         </div>
       ) : error === 'unsupported' ? (
@@ -57,13 +57,13 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
           })}
         />
       ) : (
-        <div className={styles.modelsList}>
+        <div className={styles.list}>
           {models.map((model) => {
             const excludedModel = isModelExcluded(model.id, fileType, excluded);
             return (
               <div
                 key={model.id}
-                className={`${styles.modelItem} ${excludedModel ? styles.modelItemExcluded : ''}`}
+                className={`${styles.item} ${excludedModel ? styles.itemExcluded : ''}`}
                 onClick={() => {
                   onCopyText(model.id);
                 }}
@@ -81,7 +81,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
                 )}
                 {model.type && <span className={styles.modelType}>{model.type}</span>}
                 {excludedModel && (
-                  <span className={styles.modelExcludedBadge}>
+                  <span className={styles.excludedBadge}>
                     {t('auth_files.models_excluded_badge', { defaultValue: '已禁用' })}
                   </span>
                 )}

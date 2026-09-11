@@ -5,15 +5,18 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
+  type SyntheticEvent,
 } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { PageTransition } from '@/components/common/PageTransition';
 import { MainRoutes } from '@/router/MainRoutes';
-import { pluginsApi } from '@/services/api';
+import { authFilesApi, pluginsApi } from '@/services/api';
 import {
   IconSidebarAuthFiles,
   IconSidebarConfig,
@@ -38,6 +41,7 @@ import {
   useNotificationStore,
   useThemeStore,
 } from '@/stores';
+import { AUTH_FILES_CHANGED_EVENT } from '@/features/authFiles/authFilesEvents';
 import {
   collectPluginResourceEntries,
   PLUGIN_RESOURCES_REFRESH_EVENT,
@@ -48,6 +52,7 @@ import { APIKEY_FUN_DISPLAY_NAME, hasApiKeyFunConfig } from '@/features/provider
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
+import { getSidebarShortcutLabel, isSidebarToggleShortcut } from '@/utils/sidebarShortcut';
 import type { Theme } from '@/types';
 
 const sidebarIcons: Record<string, ReactNode> = {
@@ -73,6 +78,8 @@ interface SidebarNavLinkItem {
   metaKey?: string;
   label?: string;
   meta?: string;
+  badge?: number;
+  badgeLabel?: string;
   icon: ReactNode;
 }
 
@@ -86,6 +93,9 @@ interface SidebarNavDrawerItem {
 }
 
 type SidebarNavItem = SidebarNavLinkItem | SidebarNavDrawerItem;
+
+const NAV_TOOLTIP_ID = 'sidebar-nav-tooltip';
+const NAV_TOOLTIP_VIEWPORT_MARGIN = 8;
 
 interface SidebarNavGroup {
   id: string;
@@ -321,6 +331,14 @@ export function MainLayout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [authFilesCount, setAuthFilesCount] = useState<number | null>(null);
+  const [railTooltip, setRailTooltip] = useState<{
+    targetID: string;
+    label: string;
+    meta?: string;
+    anchorTop: number;
+    top: number;
+  } | null>(null);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [pluginResources, setPluginResources] = useState<PluginResourceEntry[]>([]);
@@ -328,6 +346,9 @@ export function MainLayout() {
     () => new Set()
   );
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const authFilesCountRequestRef = useRef(0);
+  const railTooltipRef = useRef<HTMLDivElement | null>(null);
+  const focusedRailItemRef = useRef<HTMLElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -366,6 +387,34 @@ export function MainLayout() {
       window.removeEventListener('resize', updateHeaderHeight);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (!railTooltip) return;
+
+    const updateRailTooltipPosition = () => {
+      const tooltip = railTooltipRef.current;
+      if (!tooltip) return;
+
+      const halfHeight = tooltip.offsetHeight / 2;
+      const minTop = NAV_TOOLTIP_VIEWPORT_MARGIN + halfHeight;
+      const maxTop = Math.max(
+        minTop,
+        window.innerHeight - NAV_TOOLTIP_VIEWPORT_MARGIN - halfHeight
+      );
+      const top = Math.min(maxTop, Math.max(minTop, railTooltip.anchorTop));
+
+      setRailTooltip((current) => {
+        if (!current || current.targetID !== railTooltip.targetID || current.top === top) {
+          return current;
+        }
+        return { ...current, top };
+      });
+    };
+
+    updateRailTooltipPosition();
+    window.addEventListener('resize', updateRailTooltipPosition);
+    return () => window.removeEventListener('resize', updateRailTooltipPosition);
+  }, [railTooltip]);
 
   // Keep the content center available to bottom overlays that align with the main area.
   useLayoutEffect(() => {
@@ -453,18 +502,39 @@ export function MainLayout() {
     }
   }, [connectionStatus, supportsPlugin]);
 
+  const loadAuthFilesCount = useCallback(async () => {
+    const requestID = ++authFilesCountRequestRef.current;
+    if (connectionStatus !== 'connected') {
+      setAuthFilesCount(null);
+      return;
+    }
+
+    try {
+      const response = await authFilesApi.list();
+      if (requestID !== authFilesCountRequestRef.current) return;
+      setAuthFilesCount(Array.isArray(response?.files) ? response.files.length : null);
+    } catch {
+      if (requestID !== authFilesCountRequestRef.current) return;
+      setAuthFilesCount(null);
+    }
+  }, [connectionStatus]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadPluginResources();
+      void loadAuthFilesCount();
     }, 0);
 
     window.addEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadPluginResources);
+    window.addEventListener(AUTH_FILES_CHANGED_EVENT, loadAuthFilesCount);
 
     return () => {
+      authFilesCountRequestRef.current += 1;
       window.clearTimeout(timer);
       window.removeEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadPluginResources);
+      window.removeEventListener(AUTH_FILES_CHANGED_EVENT, loadAuthFilesCount);
     };
-  }, [apiBase, loadPluginResources]);
+  }, [apiBase, loadPluginResources, loadAuthFilesCount]);
 
   const pluginResourceGroups = pluginResources.reduce<
     Array<{ pluginID: string; pluginTitle: string; entries: PluginResourceEntry[] }>
@@ -560,6 +630,11 @@ export function MainLayout() {
           path: '/auth-files',
           labelKey: 'nav.auth_files',
           metaKey: 'nav_meta.auth_files',
+          badge: authFilesCount ?? undefined,
+          badgeLabel:
+            typeof authFilesCount === 'number'
+              ? t('sidebar.auth_files_count', { count: authFilesCount })
+              : undefined,
           icon: sidebarIcons.authFiles,
         },
         {
@@ -684,6 +759,7 @@ export function MainLayout() {
     const results = await Promise.allSettled([
       fetchConfig(true),
       loadPluginResources(),
+      loadAuthFilesCount(),
       triggerHeaderRefresh(),
     ]);
     const rejected = results.find((result) => result.status === 'rejected');
@@ -712,24 +788,132 @@ export function MainLayout() {
     });
   }, []);
 
+  const showRailTooltip = useCallback(
+    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const anchorTop = rect.top + rect.height / 2;
+      setRailTooltip({ targetID, label, meta, anchorTop, top: anchorTop });
+    },
+    []
+  );
+  const hideRailTooltip = useCallback(() => setRailTooltip(null), []);
+  const handleRailTooltipMouseEnter = useCallback(
+    (event: ReactMouseEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
+      const focusedItem = focusedRailItemRef.current;
+      if (focusedItem && focusedItem !== event.currentTarget) return;
+      showRailTooltip(event, targetID, label, meta);
+    },
+    [showRailTooltip]
+  );
+  const handleRailTooltipMouseLeave = useCallback(() => {
+    if (!focusedRailItemRef.current) hideRailTooltip();
+  }, [hideRailTooltip]);
+  const handleRailTooltipFocus = useCallback(
+    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
+      focusedRailItemRef.current = event.currentTarget;
+      showRailTooltip(event, targetID, label, meta);
+    },
+    [showRailTooltip]
+  );
+  const handleRailTooltipBlur = useCallback(
+    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
+      if (focusedRailItemRef.current === event.currentTarget) {
+        focusedRailItemRef.current = null;
+      }
+      if (event.currentTarget.matches(':hover')) {
+        showRailTooltip(event, targetID, label, meta);
+      } else {
+        hideRailTooltip();
+      }
+    },
+    [hideRailTooltip, showRailTooltip]
+  );
+
+  const isMac = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const platform =
+      (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
+      navigator.platform ||
+      navigator.userAgent ||
+      '';
+    return /(Mac|iPhone|iPod|iPad)/i.test(platform);
+  }, []);
+
+  const shortcutText = getSidebarShortcutLabel(isMac);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isSidebarToggleShortcut(event)) {
+        event.preventDefault();
+        hideRailTooltip();
+        setSidebarCollapsed((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hideRailTooltip]);
+
+  const renderNavBadge = (badge?: number, badgeLabel?: string) =>
+    typeof badge === 'number' ? (
+      <>
+        {badge > 0 ? (
+          <span className="nav-badge" aria-hidden="true">
+            {badge}
+          </span>
+        ) : null}
+        {badgeLabel ? <span className="nav-badge-sr-only">{badgeLabel}</span> : null}
+      </>
+    ) : null;
+
   const renderNavLink = (item: SidebarNavLinkItem, className = 'nav-item') => {
     const itemLabel = item.label ?? (item.labelKey ? t(item.labelKey) : '');
     const itemMeta = item.meta ?? (item.metaKey ? t(item.metaKey) : '');
+    const accessibleLabel = item.badgeLabel ? `${itemLabel}, ${item.badgeLabel}` : itemLabel;
 
     return (
       <NavLink
         key={item.path}
         to={item.path}
         className={({ isActive }) => `${className} ${isActive ? 'active' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-        title={showSidebarLabels ? undefined : itemLabel}
+        onClick={() => {
+          focusedRailItemRef.current = null;
+          setSidebarOpen(false);
+          hideRailTooltip();
+        }}
+        aria-label={showSidebarLabels ? undefined : accessibleLabel}
+        aria-describedby={
+          !showSidebarLabels && itemMeta && railTooltip?.targetID === item.path
+            ? NAV_TOOLTIP_ID
+            : undefined
+        }
+        onMouseEnter={
+          showSidebarLabels
+            ? undefined
+            : (event) => handleRailTooltipMouseEnter(event, item.path, itemLabel, itemMeta)
+        }
+        onMouseLeave={showSidebarLabels ? undefined : handleRailTooltipMouseLeave}
+        onFocus={
+          showSidebarLabels
+            ? undefined
+            : (event) => handleRailTooltipFocus(event, item.path, itemLabel, itemMeta)
+        }
+        onBlur={
+          showSidebarLabels
+            ? undefined
+            : (event) => handleRailTooltipBlur(event, item.path, itemLabel, itemMeta)
+        }
       >
         <span className="nav-icon">{item.icon}</span>
-        {showSidebarLabels && (
-          <span className="nav-text">
-            <span className="nav-label">{itemLabel}</span>
-            {itemMeta ? <span className="nav-meta">{itemMeta}</span> : null}
-          </span>
+        {showSidebarLabels ? (
+          <>
+            <span className="nav-text">
+              <span className="nav-label">{itemLabel}</span>
+            </span>
+            {renderNavBadge(item.badge, item.badgeLabel)}
+          </>
+        ) : (
+          renderNavBadge(item.badge)
         )}
       </NavLink>
     );
@@ -751,15 +935,35 @@ export function MainLayout() {
             isOpen ? 'open' : ''
           }`}
           onClick={() => togglePluginResourceDrawer(item.id)}
-          title={showSidebarLabels ? undefined : item.label}
+          aria-label={showSidebarLabels ? undefined : item.label}
+          aria-describedby={
+            !showSidebarLabels && item.meta && railTooltip?.targetID === item.id
+              ? NAV_TOOLTIP_ID
+              : undefined
+          }
           aria-expanded={isOpen}
+          onMouseEnter={
+            showSidebarLabels
+              ? undefined
+              : (event) => handleRailTooltipMouseEnter(event, item.id, item.label, item.meta)
+          }
+          onMouseLeave={showSidebarLabels ? undefined : handleRailTooltipMouseLeave}
+          onFocus={
+            showSidebarLabels
+              ? undefined
+              : (event) => handleRailTooltipFocus(event, item.id, item.label, item.meta)
+          }
+          onBlur={
+            showSidebarLabels
+              ? undefined
+              : (event) => handleRailTooltipBlur(event, item.id, item.label, item.meta)
+          }
         >
           <span className="nav-icon">{item.icon}</span>
           {showSidebarLabels && (
             <>
               <span className="nav-text">
                 <span className="nav-label">{item.label}</span>
-                {item.meta ? <span className="nav-meta">{item.meta}</span> : null}
               </span>
               <span className="nav-drawer-caret" aria-hidden="true">
                 <IconChevronDown size={14} />
@@ -780,6 +984,8 @@ export function MainLayout() {
     ? t('sidebar.toggle_collapse', { defaultValue: 'Close navigation' })
     : t('sidebar.toggle_expand', { defaultValue: 'Open navigation' });
 
+  const sidebarToggleLabel = sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse');
+
   return (
     <div
       className={`app-shell ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''} ${
@@ -792,17 +998,22 @@ export function MainLayout() {
         <button
           type="button"
           className="sidebar-toggle-floating"
-          onClick={() => setSidebarCollapsed((prev) => !prev)}
-          title={
-            sidebarCollapsed
-              ? t('sidebar.expand', { defaultValue: '展开' })
-              : t('sidebar.collapse', { defaultValue: '收起' })
+          onClick={() => {
+            hideRailTooltip();
+            setSidebarCollapsed((prev) => !prev);
+          }}
+          onMouseEnter={(event) =>
+            handleRailTooltipMouseEnter(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
           }
-          aria-label={
-            sidebarCollapsed
-              ? t('sidebar.expand', { defaultValue: '展开' })
-              : t('sidebar.collapse', { defaultValue: '收起' })
+          onMouseLeave={handleRailTooltipMouseLeave}
+          onFocus={(event) =>
+            handleRailTooltipFocus(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
           }
+          onBlur={(event) =>
+            handleRailTooltipBlur(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
+          }
+          aria-label={`${sidebarToggleLabel} (${shortcutText})`}
+          aria-describedby={railTooltip?.targetID === 'sidebar-toggle' ? NAV_TOOLTIP_ID : undefined}
         >
           {sidebarCollapsed ? headerIcons.chevronRight : headerIcons.chevronLeft}
         </button>
@@ -955,17 +1166,21 @@ export function MainLayout() {
         <aside
           className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
         >
-          <div className="sidebar-brand" title={fullBrandName}>
-            <img src={INLINE_LOGO_JPEG} alt="CPAMC logo" className="sidebar-brand-logo" />
-            {showSidebarLabels && <span className="sidebar-brand-title">{abbrBrandName}</span>}
+          <div className="sidebar-header">
+            <div className="sidebar-brand" title={fullBrandName}>
+              <img src={INLINE_LOGO_JPEG} alt="CPAMC logo" className="sidebar-brand-logo" />
+              {showSidebarLabels && (
+                <span className="sidebar-brand-text">
+                  <span className="sidebar-brand-title">{abbrBrandName}</span>
+                  <span className="sidebar-brand-subtitle">{t('sidebar.subtitle')}</span>
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="nav-section">
             {navGroups.map((group, idx) => (
-              <div
-                className={`nav-group ${group.id === 'plugin-pages' ? 'nav-group-bottom' : ''}`}
-                key={group.id}
-              >
+              <div className="nav-group" key={group.id}>
                 {showSidebarLabels ? (
                   <div className="nav-group-label">{t(group.labelKey)}</div>
                 ) : (
@@ -976,6 +1191,21 @@ export function MainLayout() {
             ))}
           </div>
         </aside>
+
+        {railTooltip && (
+          <div
+            ref={railTooltipRef}
+            id={NAV_TOOLTIP_ID}
+            className="nav-tooltip"
+            role="tooltip"
+            style={{ top: railTooltip.top }}
+          >
+            <span className="nav-tooltip-label" aria-hidden="true">
+              {railTooltip.label}
+            </span>
+            {railTooltip.meta ? <span className="nav-tooltip-meta">{railTooltip.meta}</span> : null}
+          </div>
+        )}
 
         <div
           className={`content${isLogsPage ? ' content-logs' : ''}${
