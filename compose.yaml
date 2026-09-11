@@ -1,0 +1,51 @@
+name: vibe-proxy
+
+services:
+  cli-proxy-api:
+    build:
+      context: ./CLIProxyAPI
+    image: vibe-proxy/cli-proxy-api:local
+    restart: always
+    expose:
+      - "8317"
+    volumes:
+      - ./data/config.yaml:/CLIProxyAPI/config.yaml
+      - ./data/auths:/root/.cli-proxy-api
+      - ./data/logs:/CLIProxyAPI/logs
+      - ./data/usage:/CLIProxyAPI/usage
+    networks:
+      - vibe-proxy
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/edge.Dockerfile
+      args:
+        VITE_API_BASE: /api
+    image: vibe-proxy/nginx:local
+    restart: always
+    depends_on:
+      - cli-proxy-api
+    ports:
+      - "${BIND_ADDRESS:-100.75.80.66}:${PORT:-8954}:80"
+    networks:
+      - vibe-proxy
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.3
+    # The tunnel credential stays owner-only on the host, so run as its owner.
+    user: "${CLOUDFLARED_UID:-1000}:${CLOUDFLARED_GID:-1000}"
+    restart: always
+    depends_on:
+      - nginx
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ${HOME}/.cloudflared/3111cade-e66f-4a23-b07c-1cdb408678c5.json:/etc/cloudflared/credentials.json:ro
+    networks:
+      - vibe-proxy
+
+networks:
+  vibe-proxy:
+    name: vibe-proxy-network
+    driver: bridge

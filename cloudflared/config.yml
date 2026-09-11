@@ -1,0 +1,7 @@
+tunnel: 3111cade-e66f-4a23-b07c-1cdb408678c5
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: lame-proxy.ordinity.com
+    service: http://nginx:80
+  - service: http_status:404
