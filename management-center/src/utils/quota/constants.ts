@@ -26,6 +26,14 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#eae7ff', text: '#3538d4' },
     dark: { bg: '#262395', text: '#b5b0ff' },
   },
+  cursor: {
+    light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
+    dark: { bg: '#252525', text: '#f5f5f5', border: '1px solid #484848' },
+  },
+  'opencode-go': {
+    light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
+    dark: { bg: '#252525', text: '#f7f7f7', border: '1px solid #484848' },
+  },
   kimi: {
     light: { bg: '#dce8ff', text: '#0560cf' },
     dark: { bg: '#003880', text: '#70b5ff' },
@@ -132,6 +140,27 @@ export const CODEX_REQUEST_HEADERS = {
   Authorization: 'Bearer $TOKEN$',
   'Content-Type': 'application/json',
   'User-Agent': 'codex-tui/0.149.1 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.149.1)',
+};
+
+// Cursor dashboard API configuration (unofficial individual-account API)
+export const CURSOR_DASHBOARD_API_BASE = 'https://api2.cursor.sh/aiserver.v1.DashboardService';
+export const CURSOR_CURRENT_PERIOD_USAGE_URL = `${CURSOR_DASHBOARD_API_BASE}/GetCurrentPeriodUsage`;
+export const CURSOR_PLAN_INFO_URL = `${CURSOR_DASHBOARD_API_BASE}/GetPlanInfo`;
+export const CURSOR_SAND_USAGE_URL = `${CURSOR_DASHBOARD_API_BASE}/GetSandUsageStatus`;
+
+export const CURSOR_REQUEST_HEADERS = {
+  Authorization: 'Bearer $TOKEN$',
+  'Content-Type': 'application/json',
+  Accept: 'application/json',
+  'Connect-Protocol-Version': '1',
+};
+
+// OpenCode Go API configuration (official API-key usage endpoint)
+export const OPENCODE_GO_USAGE_URL = 'https://opencode.ai/zen/go/v1/usage';
+
+export const OPENCODE_GO_REQUEST_HEADERS = {
+  Authorization: 'Bearer $TOKEN$',
+  Accept: 'application/json',
 };
 
 // Kimi API configuration

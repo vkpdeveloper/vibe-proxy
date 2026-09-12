@@ -15,6 +15,8 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
+import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import { formatRelativeInstant, TYPE_COLORS } from '@/utils/quota';
 import { useNow } from '@/hooks/useNow';
 import type { ResolvedTheme, ThemeColors } from '@/types';
@@ -90,12 +92,17 @@ export function QuotaTimeline({
 
   const laneInputs = useMemo(
     () =>
-      entries.map((entry) => ({
-        name: entry.file.name,
-        displayName: displayNameFor(entry.file.name),
-        provider: entry.type,
-        quota: quotaFor(entry),
-      })),
+      entries.map((entry) => {
+        const identity = deriveAuthFileIdentity(entry.file);
+        const displayIdentity = identity.kind === 'fileName' ? entry.file.name : identity.primary;
+        return {
+          name: entry.file.name,
+          displayName: displayNameFor(displayIdentity),
+          privateEmail: identity.kind === 'email',
+          provider: entry.type,
+          quota: quotaFor(entry),
+        };
+      }),
     [entries, quotaFor, displayNameFor]
   );
 
@@ -345,8 +352,11 @@ function Lane({ lane, span, now, mode, cells, nowPercent, resolvedTheme }: LaneP
       <div className={styles.laneHead}>
         <div className={styles.laneTop}>
           <span className={styles.laneDot} />
-          <span className={styles.laneName} title={lane.displayName}>
-            {lane.displayName}
+          <span
+            className={styles.laneName}
+            title={lane.privateEmail ? undefined : lane.displayName}
+          >
+            {lane.privateEmail ? <EmailPrivacyText text={lane.displayName} /> : lane.displayName}
           </span>
           {periodLabel && <span className={styles.lanePeriod}>{periodLabel}</span>}
         </div>
@@ -395,11 +405,15 @@ function Lane({ lane, span, now, mode, cells, nowPercent, resolvedTheme }: LaneP
                 key={window.startMs}
                 className={`${styles.window} ${styles[`window${capitalize(window.state)}`]}`}
                 style={{ left: `${window.leftPercent}%`, width: `${window.widthPercent}%` }}
-                title={`${lane.displayName}\n${formatDay(window.startMs)} ${formatTime(
-                  window.startMs
-                )} → ${formatDay(window.endMs)} ${formatTime(window.endMs)}${
-                  window.remaining !== null ? `\n${window.remaining}% remaining` : ''
-                }`}
+                title={[
+                  lane.privateEmail ? null : lane.displayName,
+                  `${formatDay(window.startMs)} ${formatTime(window.startMs)} → ${formatDay(
+                    window.endMs
+                  )} ${formatTime(window.endMs)}`,
+                  window.remaining !== null ? `${window.remaining}% remaining` : null,
+                ]
+                  .filter((line): line is string => line !== null)
+                  .join('\n')}
               >
                 {/* Only the API-reported current window has meaningful usage;
                     projected windows intentionally have no fill. */}

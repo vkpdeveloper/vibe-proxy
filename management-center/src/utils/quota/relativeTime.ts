@@ -89,10 +89,28 @@ export function formatInstantShort(ms: number): string {
   });
 }
 
+/** A readable, localized alternative for the click-to-cycle reset label. */
+export function formatInstantFull(ms: number, locale?: string): string {
+  if (!Number.isFinite(ms)) return '-';
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(ms));
+  } catch {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(ms));
+  }
+}
+
 export interface ResetDisplay {
   absolute: string;
   /** Null when no usable instant was available — render the absolute half alone. */
   relative: string | null;
+  /** Null alongside relative when the reset instant itself is unavailable. */
+  full: string | null;
 }
 
 /**
@@ -122,5 +140,6 @@ export function buildResetDisplay(
   return {
     absolute: absolute ?? formatInstantShort(usableMs as number),
     relative: usableMs === null ? null : formatRelativeInstant(usableMs, nowMs, locale),
+    full: usableMs === null ? null : formatInstantFull(usableMs, locale),
   };
 }

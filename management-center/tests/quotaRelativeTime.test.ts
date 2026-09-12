@@ -88,6 +88,7 @@ describe('buildResetDisplay', () => {
     expect(display).not.toBeNull();
     expect(display?.absolute).toBe('08-13 14:30');
     expect(display?.relative).toContain('11 days');
+    expect(display?.full).toContain('2026');
   });
 
   test('keeps the baked label alone when the instant is missing', () => {
@@ -95,6 +96,7 @@ describe('buildResetDisplay', () => {
     expect(buildResetDisplay('08-13 14:30', null, NOW, 'en')).toEqual({
       absolute: '08-13 14:30',
       relative: null,
+      full: null,
     });
     expect(buildResetDisplay('08-13 14:30', undefined, NOW, 'en')?.relative).toBeNull();
   });
@@ -104,6 +106,7 @@ describe('buildResetDisplay', () => {
     const display = buildResetDisplay(undefined, at, NOW, 'en');
     expect(display?.absolute).toBe(formatInstantShort(at));
     expect(display?.relative).toContain('2 hours');
+    expect(display?.full).toContain('2026');
   });
 
   test('returns null when there is nothing to render', () => {
@@ -122,6 +125,8 @@ describe('buildResetDisplay', () => {
 
   test('rejects a non-finite instant', () => {
     expect(buildResetDisplay(undefined, Number.NaN, NOW, 'en')).toBeNull();
-    expect(buildResetDisplay('08-13 14:30', Number.POSITIVE_INFINITY, NOW, 'en')?.relative).toBeNull();
+    expect(
+      buildResetDisplay('08-13 14:30', Number.POSITIVE_INFINITY, NOW, 'en')?.relative
+    ).toBeNull();
   });
 });

@@ -36,6 +36,8 @@ import {
   buildTabCounts,
   classifyQuotaFiles,
   filterEntriesByTab,
+  hasStoredQuotaCapacity,
+  hasStoredQuotaError,
   paginate,
   sortQuotaEntries,
   type QuotaFileEntry,
@@ -103,7 +105,9 @@ export function QuotaPage() {
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
+  const cursorQuota = useQuotaStore((state) => state.cursorQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
+  const openCodeGoQuota = useQuotaStore((state) => state.openCodeGoQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
 
   const quotaByType = useMemo<Record<QuotaProviderType, Record<string, QuotaCardState>>>(
@@ -112,10 +116,12 @@ export function QuotaPage() {
         antigravity: antigravityQuota,
         claude: claudeQuota,
         codex: codexQuota,
+        cursor: cursorQuota,
         kimi: kimiQuota,
+        'opencode-go': openCodeGoQuota,
         xai: xaiQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
-    [antigravityQuota, claudeQuota, codexQuota, kimiQuota, xaiQuota]
+    [antigravityQuota, claudeQuota, codexQuota, cursorQuota, kimiQuota, openCodeGoQuota, xaiQuota]
   );
 
   const getQuota = useCallback(
@@ -172,8 +178,8 @@ export function QuotaPage() {
     let attention = 0;
     entries.forEach((entry) => {
       const status = quotaByType[entry.type][entry.file.name]?.status;
-      if (status === 'success') loaded += 1;
-      else if (status === 'error') attention += 1;
+      if (status === 'success' || hasStoredQuotaCapacity(entry.file)) loaded += 1;
+      else if (status === 'error' || hasStoredQuotaError(entry.file)) attention += 1;
     });
     return { loadedCount: loaded, attentionCount: attention };
   }, [entries, quotaByType]);

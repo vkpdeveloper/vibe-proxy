@@ -2,6 +2,7 @@ package usage
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -92,6 +93,59 @@ func TestStorePricesClaudeSeparateCacheAndProtectsAPIKey(t *testing.T) {
 	// $3 base input + $0.30 cache read + $3.75 cache write + $15 output.
 	if events[0].Cost.TotalUSD != 22.05 {
 		t.Fatalf("estimated cost = %.8f, want 22.05", events[0].Cost.TotalUSD)
+	}
+}
+
+func TestStorePricesGPT6Astra(t *testing.T) {
+	store, errStore := NewStore(filepath.Join(t.TempDir(), "usage"), "", true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	store.HandleUsage(context.Background(), coreusage.Record{
+		Provider: "codex", Model: "gpt-6-astra", Source: "person@example.com", AuthType: "oauth",
+		Detail: coreusage.Detail{
+			InputTokens:         100_000,
+			OutputTokens:        100_000,
+			CacheReadTokens:     10_000,
+			CacheCreationTokens: 10_000,
+			TotalTokens:         200_000,
+		},
+	})
+	events := store.Events()
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	// 80k regular input ($0.80) + 10k cached input ($0.01) + 10k cache writes ($0.125) + 100k output ($5).
+	if math.Abs(events[0].Cost.TotalUSD-5.935) > 1e-9 {
+		t.Fatalf("estimated cost = %.8f, want 5.935", events[0].Cost.TotalUSD)
+	}
+	if events[0].Cost.RuleID != "openai-gpt-6-astra" {
+		t.Fatalf("pricing rule = %q, want openai-gpt-6-astra", events[0].Cost.RuleID)
+	}
+}
+
+func TestStorePricesGPT6AstraLongContext(t *testing.T) {
+	store, errStore := NewStore(filepath.Join(t.TempDir(), "usage"), "", true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	store.HandleUsage(context.Background(), coreusage.Record{
+		Provider: "codex", Model: "gpt-6-astra", Source: "person@example.com", AuthType: "oauth",
+		Detail: coreusage.Detail{
+			InputTokens:         1_000_000,
+			OutputTokens:        1_000_000,
+			CacheReadTokens:     100_000,
+			CacheCreationTokens: 100_000,
+			TotalTokens:         2_000_000,
+		},
+	})
+	events := store.Events()
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	// Above 272k context: 800k regular input ($16) + 100k cached ($0.20) + 100k writes ($2.50) + 1M output ($75).
+	if math.Abs(events[0].Cost.TotalUSD-93.7) > 1e-9 {
+		t.Fatalf("estimated long-context cost = %.8f, want 93.7", events[0].Cost.TotalUSD)
 	}
 }
 

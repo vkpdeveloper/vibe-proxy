@@ -6,51 +6,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { AntigravityQuotaState, AntigravityQuotaSubscription } from '@/types';
+import { buildResetDisplay } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
+import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 import { getNextAntigravityCountdownUpdateDelay } from './countdown';
-
-const formatAntigravityDuration = (t: TFunction, deltaMs: number): string => {
-  const totalMinutes = Math.max(1, Math.ceil(deltaMs / 60000));
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) {
-    return t('antigravity_quota.duration_day_hour', {
-      days,
-      hours,
-    });
-  }
-  if (hours > 0) {
-    return t('antigravity_quota.duration_hour_minute', {
-      hours,
-      minutes,
-    });
-  }
-  if (minutes > 0) {
-    return t('antigravity_quota.duration_minute', {
-      minutes,
-    });
-  }
-  return t('antigravity_quota.duration_less_than_minute');
-};
-
-const formatAntigravityResetLabel = (
-  resetTime: string | undefined,
-  t: TFunction,
-  nowMs: number
-): string => {
-  if (!resetTime) return '-';
-  const resetMs = new Date(resetTime).getTime();
-  if (Number.isNaN(resetMs)) return '-';
-  const deltaMs = resetMs - nowMs;
-  if (deltaMs <= 0) return t('antigravity_quota.refresh_available');
-  return t('antigravity_quota.refreshes_in', {
-    duration: formatAntigravityDuration(t, deltaMs),
-  });
-};
 
 const ANTIGRAVITY_GROUP_LABEL_KEYS = new Map<string, string>([
   ['gemini models', 'group_gemini_models'],
@@ -109,7 +70,7 @@ const getAntigravityPlanLabel = (
 };
 
 export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<AntigravityQuotaState>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const groups = quota.groups ?? [];
   const planLabel = getAntigravityPlanLabel(quota.subscription, t);
   const normalizedPlan = quota.subscription?.plan?.toLowerCase() ?? '';
@@ -194,7 +155,13 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                     : t('antigravity_quota.remaining_percent', {
                         percent: Math.round(percent),
                       });
-                const resetLabel = formatAntigravityResetLabel(bucket.resetTime, t, nowMs);
+                const resetAtMs = bucket.resetTime ? new Date(bucket.resetTime).getTime() : null;
+                const resetDisplay = buildResetDisplay(
+                  null,
+                  resetAtMs !== null && Number.isFinite(resetAtMs) ? resetAtMs : null,
+                  nowMs,
+                  i18n.resolvedLanguage
+                );
                 const bucketLabel = translateAntigravityQuotaLabel(
                   bucket.label,
                   ANTIGRAVITY_BUCKET_LABEL_KEYS,
@@ -215,16 +182,9 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                       </span>
                       <div className={classes.quotaMeta}>
                         <span className={classes.quotaPercent}>{percentLabel}</span>
-                        <span
-                          className={
-                            soon
-                              ? `${classes.quotaReset} ${classes.quotaResetRelativeSoon}`
-                              : classes.quotaReset
-                          }
-                          title={soon ? t('quota_management.soonest_row_hint') : undefined}
-                        >
-                          {resetLabel}
-                        </span>
+                        {resetDisplay && (
+                          <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
+                        )}
                       </div>
                     </div>
                     <QuotaMeter percent={percent} classes={classes} index={index} />

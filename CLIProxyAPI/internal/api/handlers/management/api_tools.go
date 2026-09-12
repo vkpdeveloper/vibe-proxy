@@ -233,6 +233,11 @@ func tokenValueForAuth(auth *coreauth.Auth) string {
 	if v := tokenValueFromMetadata(auth.Metadata); v != "" {
 		return v
 	}
+	if auth.Metadata != nil {
+		if v, ok := auth.Metadata[coreauth.AttributeAPIKey].(string); ok && strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
 	if auth.Attributes != nil {
 		if v := strings.TrimSpace(auth.Attributes["api_key"]); v != "" {
 			return v

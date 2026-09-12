@@ -90,10 +90,7 @@ export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaStat
           {expiryDisplay && (
             <span className={classes.codexPlanItem}>
               <span className={classes.codexPlanLabel}>{t('codex_quota.expires_label')}</span>
-              <span className={classes.codexPlanValue}>{expiryDisplay.absolute}</span>
-              {expiryDisplay.relative && (
-                <span className={classes.quotaResetRelative}>{expiryDisplay.relative}</span>
-              )}
+              <QuotaResetLabel display={expiryDisplay} classes={classes} />
             </span>
           )}
           {rateLimitResetCreditsAvailableCount !== null && (

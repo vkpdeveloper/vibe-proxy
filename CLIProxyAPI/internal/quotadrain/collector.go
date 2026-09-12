@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultRefreshInterval = 2 * time.Minute
+	DefaultRefreshInterval = 5 * time.Minute
 	DefaultStaleAfter      = 10 * time.Minute
 	MinimumRefreshInterval = 30 * time.Second
 	maxWorkers             = 4
@@ -48,7 +48,8 @@ func positiveDuration(raw string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
-// Collector periodically acquires provider quota metadata for OAuth auths.
+// Collector periodically acquires provider quota metadata for OAuth auths and
+// explicit quota-tracker credentials such as OpenCode Go API keys.
 type Collector struct {
 	manager *coreauth.Manager
 
@@ -228,11 +229,21 @@ func (c *Collector) collect(ctx context.Context, settings Settings) {
 }
 
 func supportedAuth(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Disabled || auth.Status == coreauth.StatusDisabled || auth.AuthKind() != coreauth.AuthKindOAuth {
+	if auth == nil || auth.Disabled || auth.Status == coreauth.StatusDisabled {
 		return false
 	}
-	switch strings.ToLower(strings.TrimSpace(auth.Provider)) {
-	case "claude", "codex", "kimi", "xai", "antigravity":
+	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
+	if provider == "opencode-go" {
+		// OpenCode Go is quota-only, so the useful eligibility check is the
+		// presence of the API key itself. File-backed tracker credentials can be
+		// synthesized before auth-kind attributes are normalized.
+		return authString(auth, "api_key", "api-key") != ""
+	}
+	if auth.AuthKind() != coreauth.AuthKindOAuth {
+		return false
+	}
+	switch provider {
+	case "claude", "codex", "cursor", "kimi", "xai", "antigravity":
 		return true
 	default:
 		return false

@@ -23,8 +23,16 @@ export function isCodexFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'codex';
 }
 
+export function isCursorFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'cursor';
+}
+
 export function isKimiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'kimi';
+}
+
+export function isOpenCodeGoFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'opencode-go';
 }
 
 export function isXaiFile(file: AuthFileItem): boolean {

@@ -283,7 +283,7 @@ type RoutingConfig struct {
 // QuotaDrainRoutingConfig configures proactive quota snapshots for credential routing.
 type QuotaDrainRoutingConfig struct {
 	// RefreshInterval controls how often supported OAuth providers are queried.
-	// Default: 2m.
+	// Default: 5m.
 	RefreshInterval string `yaml:"refresh-interval,omitempty" json:"refresh-interval,omitempty"`
 
 	// StaleAfter controls how long a successful snapshot may affect routing.

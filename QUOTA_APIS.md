@@ -5,7 +5,9 @@ This document describes every upstream quota API used by the Management Center:
 - Antigravity
 - Claude
 - Codex
+- Cursor
 - Kimi
+- OpenCode Go
 - xAI/Grok
 
 It documents the current implementation and live response observations made on
@@ -15,7 +17,7 @@ credit IDs.
 ## Common request flow
 
 The Management Center does not expose provider OAuth tokens to the browser. For
-each quota refresh, it calls the proxy's management relay:
+each manual quota refresh, it calls the proxy's management relay:
 
 ```text
 Browser -> POST /api/v0/management/api-call -> provider upstream API
@@ -49,6 +51,10 @@ returns the upstream status, headers, and body:
 Do not put access tokens, refresh tokens, raw account IDs, or user IDs in this
 document, frontend code, logs, or screenshots.
 
+When quota-drain routing is enabled, the backend also refreshes and caches
+provider snapshots every five minutes. The automatic collector keeps tokens on
+the server and does not delay or rate-limit a user-triggered manual refresh.
+
 ## Provider summary
 
 | Provider | Upstream endpoint(s) | Request pattern |
@@ -56,7 +62,9 @@ document, frontend code, logs, or screenshots.
 | Antigravity | `retrieveUserQuotaSummary` on three fallback hosts | `POST` with a Google project ID |
 | Claude | `/api/oauth/usage`, `/api/oauth/profile` | Two parallel `GET` requests |
 | Codex | `/backend-api/wham/usage`, reset-credit endpoints | `GET`; manual reset is an explicit `POST` |
+| Cursor | `DashboardService/GetCurrentPeriodUsage`, `GetPlanInfo`, `GetSandUsageStatus` | Three parallel authenticated `POST` requests |
 | Kimi | `/coding/v1/usages` | `GET` |
+| OpenCode Go | `/zen/go/v1/usage` | `GET` with the account API key |
 | xAI/Grok | `/v1/billing?format=credits`, `/v1/billing` | Two parallel `GET` requests |
 
 ## Antigravity
@@ -322,6 +330,87 @@ Code Review limits, and every `additional_rate_limits[]` item. It displays
 reset-credit count and available-credit expiry times. Inactive/zero `credits`,
 `spend_control`, and `promo` data are not displayed.
 
+## Cursor
+
+Cursor tracking uses the individual IDE dashboard API. This API is not part of
+Cursor's documented Admin API and may change without notice.
+
+### Endpoints and headers
+
+```http
+POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage
+POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetPlanInfo
+POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetSandUsageStatus
+Authorization: Bearer <cursor_access_token>
+Content-Type: application/json
+Accept: application/json
+Connect-Protocol-Version: 1
+```
+
+Both requests use `{}` as their JSON body. The token can be imported from
+Cursor's local `state.vscdb` with `scripts/import-cursor-auth.zsh`. The generated
+auth file has `type: "cursor"` and is tracker-only; the proxy does not route model
+requests through it.
+
+### Expected response shapes
+
+```ts
+type CursorCurrentPeriodUsage = {
+  billingCycleStart?: string;
+  billingCycleEnd?: string;
+  planUsage?: {
+    totalSpend?: number;       // cents
+    includedSpend?: number;    // cents
+    bonusSpend?: number;       // cents
+    limit?: number;            // cents
+    autoPercentUsed?: number;  // Cursor Models pool
+    apiPercentUsed?: number;   // Other Models pool
+    totalPercentUsed?: number;
+  };
+  spendLimitUsage?: {
+    pooledLimit?: number;      // cents
+    pooledUsed?: number;       // cents
+    pooledRemaining?: number;  // cents
+    individualUsed?: number;   // cents
+    limitType?: string;
+  };
+};
+
+type CursorPlanInfo = {
+  planInfo?: {
+    planName?: string;
+    includedAmountCents?: number;
+    price?: string;
+    billingCycleEnd?: string;
+  };
+};
+
+type CursorSandUsage = {
+  currentPeriodStart?: string;
+  nextResetTimestampUtc?: string;
+  usagePercent?: number;
+  hasAvailableUsage?: boolean;
+  hasNonZeroIncludedLimit?: boolean;
+  usesPooledEnterpriseAllowance?: boolean;
+  grokPlanLabel?: string;
+};
+```
+
+### UI mapping
+
+The card displays the separate Cursor Models and Other Models monthly pools,
+plan name, on-demand spend when a spend limit exists, and the billing-cycle
+reset. The aggregate total is shown only as a compatibility fallback when
+Cursor does not report either split pool, because it is not a third allowance.
+The card also renders Grok Bot's separate weekly meter and reset from
+`GetSandUsageStatus`; that percentage is never merged into the monthly Cursor
+Models pool. Cursor reports consumed percentages; the card converts them to
+remaining percentages. `includedAmountCents` is used as the fallback total
+limit when `planUsage.limit` is zero or missing. Sand usage is best-effort, so a
+failed Grok Bot request does not hide the monthly Cursor data. Pooled enterprise
+sand allowances are omitted because their semantics differ from the personal
+weekly meter.
+
 ## Kimi
 
 ### Endpoint and headers
@@ -365,6 +454,43 @@ also becomes a row. The UI uses a provider-supplied name/title/scope when
 available, otherwise derives a label from its window duration. It accepts both
 `used` and `remaining`, and derives one from the other when possible. Reset
 hints support absolute timestamps and relative seconds.
+
+## OpenCode Go
+
+### Endpoint and headers
+
+```http
+GET https://opencode.ai/zen/go/v1/usage
+Authorization: Bearer <api_key>
+Accept: application/json
+```
+
+Add the key from **Logins → Other login methods → OpenCode Go**. The generated
+auth file has `type: "opencode-go"` and `auth_kind: "api_key"`. It is used only
+for quota tracking; the key stays in the backend auth directory and is not sent
+to the browser after upload.
+
+### Expected response shape
+
+```ts
+type OpenCodeGoUsageResponse = {
+  usage?: {
+    rolling?: { status?: string; percent?: number; resetsAt?: string };
+    weekly?: { status?: string; percent?: number; resetsAt?: string };
+    monthly?: { status?: string; percent?: number; resetsAt?: string };
+  };
+};
+```
+
+### UI mapping
+
+The three percentages become separate 5-hour, weekly, and monthly remaining
+usage rows with clickable reset timestamps. These allowances are shared across
+the models available in OpenCode Go. The supported usage endpoint does not
+return a per-model split, so the UI does not attribute aggregate consumption to
+individual models. The backend collector refreshes the credential every five
+minutes and exposes the latest snapshot to the quota page; manual refreshes are
+still available on demand.
 
 ## xAI / Grok
 
@@ -423,10 +549,10 @@ identifies SuperGrok plans from the monthly limit.
 The endpoint constants, request headers, and provider fetch functions are in:
 
 - `management-center/src/utils/quota/constants.ts`
-- `management-center/src/components/quota/quotaConfigs.ts`
+- `management-center/src/features/quota/providers/*/data.ts`
 
 Response models and dynamic mapping are in:
 
 - `management-center/src/types/quota.ts`
-- `management-center/src/utils/quota/builders.ts`
-- `management-center/src/utils/quota/resetCredits.ts`
+- `management-center/src/features/quota/providers/*/*QuotaBody.tsx`
+- `CLIProxyAPI/internal/quotadrain/providers.go`

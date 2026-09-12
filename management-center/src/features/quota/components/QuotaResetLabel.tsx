@@ -1,13 +1,20 @@
 /**
- * `08-13 14:30 · in 11 days` — the absolute instant plus its countdown.
+ * A reset instant that cycles every quota card through compact → relative
+ * → full date on click.
  *
  * Shared by every provider body so the two halves can never drift apart in
  * markup or spacing. The separator lives in CSS (`.quotaResetRelative::before`)
  * rather than here, so the relative half stays independently styleable.
  */
 
+import { useTranslation } from 'react-i18next';
 import type { ResetDisplay } from '@/utils/quota';
 import type { QuotaClassMap } from '../types';
+import {
+  getResetDisplayFormats,
+  getResetDisplayValue,
+  useQuotaResetDisplayStore,
+} from './resetDisplayFormats';
 
 export interface QuotaResetLabelProps {
   display: ResetDisplay;
@@ -17,20 +24,32 @@ export interface QuotaResetLabelProps {
 }
 
 export function QuotaResetLabel({ display, classes, soon = false }: QuotaResetLabelProps) {
+  const { t } = useTranslation();
+  const mode = useQuotaResetDisplayStore((state) => state.mode);
+  const cycleMode = useQuotaResetDisplayStore((state) => state.cycleMode);
+  const formats = getResetDisplayFormats(display);
+  const value = getResetDisplayValue(display, mode);
+
+  if (formats.length === 1) {
+    return <span className={classes.quotaReset}>{value}</span>;
+  }
+
   return (
-    <>
-      <span className={classes.quotaReset}>{display.absolute}</span>
-      {display.relative && (
-        <span
-          className={
-            soon
-              ? `${classes.quotaResetRelative} ${classes.quotaResetRelativeSoon}`
-              : classes.quotaResetRelative
-          }
-        >
-          {display.relative}
-        </span>
-      )}
-    </>
+    <button
+      type="button"
+      className={
+        soon
+          ? `${classes.quotaResetCycle} ${classes.quotaResetRelativeSoon}`
+          : classes.quotaResetCycle
+      }
+      onClick={(event) => {
+        event.stopPropagation();
+        cycleMode();
+      }}
+      aria-label={t('quota_management.cycle_reset_time')}
+      title={t('quota_management.cycle_reset_time')}
+    >
+      {value}
+    </button>
   );
 }

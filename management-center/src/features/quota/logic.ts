@@ -7,7 +7,9 @@ import type { AuthFileItem } from '@/types';
 import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
 import { CLAUDE_CONFIG } from './providers/claude/data';
 import { CODEX_CONFIG } from './providers/codex/data';
+import { CURSOR_CONFIG } from './providers/cursor/data';
 import { KIMI_CONFIG } from './providers/kimi/data';
+import { OPENCODE_GO_CONFIG } from './providers/opencodeGo/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import type { QuotaProviderType } from './providers/types';
 import { QUOTA_TAB_ORDER, type QuotaSortMode, type QuotaTabId } from './constants';
@@ -16,7 +18,9 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   antigravity: ANTIGRAVITY_CONFIG.filterFn,
   claude: CLAUDE_CONFIG.filterFn,
   codex: CODEX_CONFIG.filterFn,
+  cursor: CURSOR_CONFIG.filterFn,
   kimi: KIMI_CONFIG.filterFn,
+  'opencode-go': OPENCODE_GO_CONFIG.filterFn,
   xai: XAI_CONFIG.filterFn,
 };
 
@@ -100,6 +104,28 @@ export const isQuotaRefreshDisabled = (
   loading: boolean,
   resetting: boolean
 ): boolean => !canRefresh || loading || resetting;
+
+/** A backend-collected window counts as loaded before this browser fetches it itself. */
+export const hasStoredQuotaCapacity = (file: AuthFileItem): boolean => {
+  const state = file.quota_capacity ?? file.quotaCapacity;
+  if (!state || state.supported !== true || !Array.isArray(state.windows)) return false;
+
+  return state.windows.some(
+    (window) =>
+      window &&
+      typeof window.id === 'string' &&
+      typeof window.label === 'string' &&
+      (window.known === false ||
+        (window.known === true &&
+          typeof window.remaining_percent === 'number' &&
+          Number.isFinite(window.remaining_percent)))
+  );
+};
+
+export const hasStoredQuotaError = (file: AuthFileItem): boolean => {
+  const state = file.quota_capacity ?? file.quotaCapacity;
+  return Boolean(state && typeof state.last_error === 'string' && state.last_error.trim());
+};
 
 export interface QuotaPagination<T> {
   pageItems: T[];

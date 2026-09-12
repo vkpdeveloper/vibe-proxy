@@ -14,6 +14,7 @@ import (
 	"time"
 
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -49,12 +50,22 @@ func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth 
 			return nil, err
 		}
 		return parseCodexCapacity(payload, now)
+	case "cursor":
+		return fetchCursorCapacity(ctx, auth, now)
 	case "kimi":
 		payload, err := requestJSON(ctx, manager, auth, http.MethodGet, "https://api.kimi.com/coding/v1/usages", nil, nil)
 		if err != nil {
 			return nil, err
 		}
 		return parseKimiCapacity(payload, now)
+	case "opencode-go":
+		payload, err := requestBearerJSON(ctx, auth, http.MethodGet, "https://opencode.ai/zen/go/v1/usage", nil, http.Header{
+			"Accept": []string{"application/json"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		return parseOpenCodeGoCapacity(payload, now)
 	case "xai":
 		return fetchXAICapacity(ctx, manager, auth, now)
 	case "antigravity":
@@ -62,6 +73,147 @@ func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth 
 	default:
 		return nil, fmt.Errorf("unsupported quota provider %q", provider)
 	}
+}
+
+const cursorDashboardAPIBase = "https://api2.cursor.sh/aiserver.v1.DashboardService"
+
+func requestBearerJSON(ctx context.Context, auth *coreauth.Auth, method, target string, body []byte, headers http.Header) (map[string]any, error) {
+	token := authString(auth, "access_token", "accessToken", "token", "api_key", "api-key")
+	if token == "" {
+		return nil, fmt.Errorf("quota access token is missing")
+	}
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target, reader)
+	if err != nil {
+		return nil, fmt.Errorf("build quota request: %w", err)
+	}
+	if headers != nil {
+		req.Header = headers.Clone()
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	if proxyURL := strings.TrimSpace(auth.ProxyURL); proxyURL != "" {
+		transport, _, errBuild := proxyutil.BuildHTTPTransport(proxyURL)
+		if errBuild != nil {
+			return nil, fmt.Errorf("build quota proxy: %w", errBuild)
+		}
+		client.Transport = transport
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("quota request failed: %w", err)
+	}
+	defer func() {
+		if errClose := resp.Body.Close(); errClose != nil {
+			log.Debugf("quota-drain: close response body: %v", errClose)
+		}
+	}()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxQuotaResponseBytes))
+		return nil, fmt.Errorf("quota endpoint returned HTTP %d", resp.StatusCode)
+	}
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxQuotaResponseBytes))
+	decoder.UseNumber()
+	var payload map[string]any
+	if errDecode := decoder.Decode(&payload); errDecode != nil {
+		return nil, fmt.Errorf("decode quota response: %w", errDecode)
+	}
+	if payload == nil {
+		return nil, fmt.Errorf("quota response was empty")
+	}
+	return payload, nil
+}
+
+func fetchCursorCapacity(ctx context.Context, auth *coreauth.Auth, now time.Time) ([]coreauth.CapacityWindow, error) {
+	headers := http.Header{
+		"Content-Type":             []string{"application/json"},
+		"Accept":                   []string{"application/json"},
+		"Connect-Protocol-Version": []string{"1"},
+	}
+	windows := make([]coreauth.CapacityWindow, 0, 3)
+	var lastErr error
+
+	period, err := requestBearerJSON(ctx, auth, http.MethodPost, cursorDashboardAPIBase+"/GetCurrentPeriodUsage", []byte("{}"), headers)
+	if err != nil {
+		lastErr = err
+	} else {
+		windows = append(windows, parseCursorPeriodCapacity(period, now)...)
+	}
+
+	sand, err := requestBearerJSON(ctx, auth, http.MethodPost, cursorDashboardAPIBase+"/GetSandUsageStatus", []byte("{}"), headers)
+	if err != nil {
+		lastErr = err
+	} else {
+		windows = append(windows, parseCursorSandCapacity(sand, now)...)
+	}
+
+	if len(windows) == 0 && lastErr != nil {
+		return nil, lastErr
+	}
+	return requireWindows(windows)
+}
+
+func parseCursorPeriodCapacity(payload map[string]any, now time.Time) []coreauth.CapacityWindow {
+	usage := objectValue(value(payload, "planUsage", "plan_usage"))
+	resetAt := parseAbsoluteTime(value(payload, "billingCycleEnd", "billing_cycle_end"), now)
+	windows := make([]coreauth.CapacityWindow, 0, 2)
+	appendPercent := func(id, label string, raw any) {
+		used, known := numberValue(raw)
+		if !known {
+			return
+		}
+		// Cursor tracker credentials are display-only and are never selected for
+		// model execution, so their allowance windows must not affect routing.
+		windows = append(windows, capacityWindow(id, label, used, resetAt, false, "", used >= 100))
+	}
+	appendPercent("cursor-models", "Cursor Models", value(usage, "autoPercentUsed", "auto_percent_used"))
+	appendPercent("other-models", "Other Models", value(usage, "apiPercentUsed", "api_percent_used"))
+	if len(windows) == 0 {
+		appendPercent("cursor-included", "Overall included usage", value(usage, "totalPercentUsed", "total_percent_used"))
+	}
+	return windows
+}
+
+func parseCursorSandCapacity(payload map[string]any, now time.Time) []coreauth.CapacityWindow {
+	if boolValue(value(payload, "usesPooledEnterpriseAllowance", "uses_pooled_enterprise_allowance")) {
+		return nil
+	}
+	used, known := numberValue(value(payload, "usagePercent", "usage_percent"))
+	if !known {
+		return nil
+	}
+	resetAt := parseAbsoluteTime(value(payload, "nextResetTimestampUtc", "next_reset_timestamp_utc"), now)
+	return []coreauth.CapacityWindow{
+		capacityWindow("cursor-grok-bot", "Grok Bot · Weekly usage", used, resetAt, false, "", used >= 100),
+	}
+}
+
+func parseOpenCodeGoCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
+	usage := objectValue(value(payload, "usage"))
+	specs := []struct {
+		key   string
+		label string
+	}{
+		{key: "rolling", label: "5-hour usage"},
+		{key: "weekly", label: "Weekly usage"},
+		{key: "monthly", label: "Monthly usage"},
+	}
+	windows := make([]coreauth.CapacityWindow, 0, len(specs))
+	for _, spec := range specs {
+		window := objectValue(value(usage, spec.key))
+		used, known := numberValue(value(window, "percent"))
+		if !known {
+			continue
+		}
+		resetAt := parseAbsoluteTime(value(window, "resetsAt", "resets_at"), now)
+		rateLimited := strings.EqualFold(stringValue(value(window, "status")), "rate-limited")
+		windows = append(windows, capacityWindow("opencode-go-"+spec.key, spec.label, used, resetAt, false, "", rateLimited || used >= 100))
+	}
+	return requireWindows(windows)
 }
 
 func requestJSON(ctx context.Context, manager *coreauth.Manager, auth *coreauth.Auth, method, target string, body []byte, headers http.Header) (map[string]any, error) {
@@ -245,29 +397,48 @@ func fetchXAICapacity(ctx context.Context, manager *coreauth.Manager, auth *core
 			lastErr = err
 			continue
 		}
-		config := objectValue(value(payload, "config"))
-		used, known := numberValue(value(config, "creditUsagePercent", "credit_usage_percent"))
-		if !known {
-			limit, hasLimit := nestedNumber(value(config, "monthlyLimit", "monthly_limit"))
-			spent, hasSpent := nestedNumber(value(config, "used"))
-			if hasLimit && limit > 0 && hasSpent {
-				used, known = spent/limit*100, true
-			}
-		}
-		if !known {
-			continue
-		}
-		period := objectValue(value(config, "currentPeriod", "current_period"))
-		resetAt := parseAbsoluteTime(value(period, "end"), now)
-		if resetAt.IsZero() {
-			resetAt = parseAbsoluteTime(value(config, "billingPeriodEnd", "billing_period_end"), now)
-		}
-		windows = append(windows, capacityWindow(target.id, target.label, used, resetAt, true, "", used >= 100))
+		windows = append(windows, parseXAICapacity(payload, target.id, target.label, now)...)
 	}
 	if len(windows) == 0 && lastErr != nil {
 		return nil, lastErr
 	}
 	return requireWindows(windows)
+}
+
+func parseXAICapacity(payload map[string]any, id, label string, now time.Time) []coreauth.CapacityWindow {
+	config := objectValue(value(payload, "config"))
+	if len(config) == 0 {
+		return nil
+	}
+	used, known := numberValue(value(config, "creditUsagePercent", "credit_usage_percent"))
+	if !known {
+		limit, hasLimit := nestedNumber(value(config, "monthlyLimit", "monthly_limit"))
+		spent, hasSpent := nestedNumber(value(config, "used"))
+		if hasLimit && limit > 0 && hasSpent {
+			used, known = spent/limit*100, true
+		}
+	}
+	period := objectValue(value(config, "currentPeriod", "current_period"))
+	resetAt := parseAbsoluteTime(value(period, "end"), now)
+	if resetAt.IsZero() {
+		resetAt = parseAbsoluteTime(value(config, "billingPeriodEnd", "billing_period_end"), now)
+	}
+	if known {
+		return []coreauth.CapacityWindow{capacityWindow(id, label, used, resetAt, true, "", used >= 100)}
+	}
+	// Paid xAI accounts can return a real billing period while intentionally
+	// omitting a percentage/limit. Preserve that successful reading as an
+	// unknown, display-only window instead of turning it into a refresh error.
+	if resetAt.IsZero() {
+		return nil
+	}
+	return []coreauth.CapacityWindow{{
+		ID:      id,
+		Label:   label,
+		ResetAt: resetAt,
+		Known:   false,
+		Routing: false,
+	}}
 }
 
 func fetchAntigravityCapacity(ctx context.Context, manager *coreauth.Manager, auth *coreauth.Auth, now time.Time) ([]coreauth.CapacityWindow, error) {

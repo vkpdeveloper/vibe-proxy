@@ -49,6 +49,7 @@ export interface TimelineResetCreditMark extends TimelineResetCredit {
 export interface TimelineLane {
   name: string;
   displayName: string;
+  privateEmail?: boolean;
   provider: QuotaProviderType;
   /** Instant a window boundary falls on; all other boundaries derive from it. */
   anchorMs: number | null;
@@ -310,6 +311,7 @@ interface AntigravityBucketLike {
 export interface TimelineLaneInput {
   name: string;
   displayName: string;
+  privateEmail?: boolean;
   provider: QuotaProviderType;
   quota: { status?: string } | undefined;
   /**
@@ -335,10 +337,11 @@ const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
  * scheduled", which is the truth.
  */
 export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
-  const { name, displayName, provider, quota, maxPeriodHours } = input;
+  const { name, displayName, privateEmail = false, provider, quota, maxPeriodHours } = input;
   const empty: TimelineLane = {
     name,
     displayName,
+    privateEmail,
     provider,
     anchorMs: null,
     periodHours: null,
@@ -349,7 +352,12 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
 
   if (!quota || quota.status !== 'success') return empty;
 
-  if (provider === 'claude' || provider === 'codex') {
+  if (
+    provider === 'claude' ||
+    provider === 'codex' ||
+    provider === 'cursor' ||
+    provider === 'opencode-go'
+  ) {
     const windows = ((quota as { windows?: WindowLike[] }).windows ?? []).filter(
       (window) => typeof window.resetAtMs === 'number'
     );
@@ -396,7 +404,7 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
       ...empty,
       anchorMs: chosen.resetAtMs ?? null,
       periodHours: chosen.periodHours ?? null,
-      // Claude and Codex store percent USED.
+      // These providers store percent USED.
       remaining:
         typeof chosen.usedPercent === 'number' ? clampPercent(100 - chosen.usedPercent) : null,
       limits: windows

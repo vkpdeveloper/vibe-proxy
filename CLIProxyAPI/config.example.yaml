@@ -236,7 +236,7 @@ routing:
   # It drains the account with the least remaining quota first, then advances to the next.
   # Unknown or stale quota data remains eligible as a safe fallback.
   quota-drain:
-    refresh-interval: "2m"
+    refresh-interval: "5m"
     stale-after: "10m"
   # Enable universal session-sticky routing for all clients.
   # Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,

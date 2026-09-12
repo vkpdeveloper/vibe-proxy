@@ -113,6 +113,43 @@ describe('QuotaTimeline rendering', () => {
     expect(markup).not.toContain('role="status"');
   });
 
+  test('uses account email in a privacy-controlled lane label', () => {
+    const markup = renderToStaticMarkup(
+      createElement(QuotaTimeline, {
+        entries: [
+          {
+            file: {
+              name: 'cursor-local.json',
+              email: 'cursor.owner@example.com',
+              type: 'cursor',
+            },
+            type: 'cursor',
+          },
+        ],
+        displayNameFor: (name: string) => name,
+        resolvedTheme: 'light',
+        now: new Date(2026, 6, 29, 12).getTime(),
+        quotaFor: () => ({
+          status: 'success',
+          windows: [
+            {
+              id: 'cursor-models',
+              label: 'Cursor Models',
+              usedPercent: 2,
+              resetAtMs: new Date(2026, 7, 1, 12).getTime(),
+              periodHours: 720,
+            },
+          ],
+        }),
+      })
+    );
+
+    expect(markup).toContain('cursor.owner@example.com');
+    expect(markup).toContain('aria-label="Reveal email address"');
+    expect(markup).not.toContain('title="cursor.owner@example.com"');
+    expect(markup).not.toContain('cursor-local.json');
+  });
+
   test('renders an unexpired Codex reset credit as an expiry tick', () => {
     const markup = renderToStaticMarkup(
       createElement(QuotaTimeline, {

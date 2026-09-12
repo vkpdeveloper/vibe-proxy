@@ -11,10 +11,13 @@ export interface QuotaClassMap {
   // 额度行（五个提供商共用）
   quotaRow: string;
   quotaRowHeader: string;
+  quotaLabel: string;
   quotaModel: string;
+  quotaDescription: string;
   quotaMeta: string;
   quotaPercent: string;
   quotaReset: string;
+  quotaResetCycle: string;
   quotaResetRelative: string;
   quotaResetRelativeSoon: string;
   quotaAmount: string;
@@ -51,10 +54,13 @@ export interface QuotaClassMap {
 export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'quotaRow',
   'quotaRowHeader',
+  'quotaLabel',
   'quotaModel',
+  'quotaDescription',
   'quotaMeta',
   'quotaPercent',
   'quotaReset',
+  'quotaResetCycle',
   'quotaResetRelative',
   'quotaResetRelativeSoon',
   'quotaAmount',

@@ -10,17 +10,21 @@
 import { useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconNetwork, IconRefreshCw } from '@/components/ui/icons';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
+import { useNow } from '@/hooks/useNow';
 import type { AuthFileItem, QuotaCapacityState, QuotaCapacityWindow, ResolvedTheme } from '@/types';
-import { formatQuotaResetTime, resolveQuotaErrorMessage } from '@/utils/quota';
+import { buildResetDisplay, formatQuotaResetTime, resolveQuotaErrorMessage } from '@/utils/quota';
 import {
   getAuthFileIcon,
   getThemeSurfaceIconBackground,
   getTypeLabel,
   isThemeSurfaceIconProvider,
 } from '@/features/authFiles/constants';
+import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
+import { QuotaResetLabel } from './QuotaResetLabel';
 import bodyStyles from './QuotaBody.module.scss';
 import styles from './QuotaCard.module.scss';
 
@@ -33,6 +37,21 @@ interface StoredQuotaSnapshot {
   fetchedAt: string | null;
   stale: boolean;
 }
+
+const STORED_WINDOW_DESCRIPTIONS: Partial<Record<QuotaFileEntry['type'], Record<string, string>>> =
+  {
+    cursor: {
+      'cursor-models': 'cursor_quota.cursor_models_desc',
+      'other-models': 'cursor_quota.other_models_desc',
+      'cursor-grok-bot': 'cursor_quota.grok_bot_weekly_desc',
+      'cursor-included': 'cursor_quota.overall_included_usage_desc',
+    },
+    'opencode-go': {
+      'opencode-go-rolling': 'opencode_go_quota.five_hour_desc',
+      'opencode-go-weekly': 'opencode_go_quota.weekly_desc',
+      'opencode-go-monthly': 'opencode_go_quota.monthly_desc',
+    },
+  };
 
 const parseTimestamp = (value?: string): number | null => {
   if (!value) return null;
@@ -47,9 +66,12 @@ const resolveStoredQuotaSnapshot = (item: AuthFileItem): StoredQuotaSnapshot | n
   const windows = (Array.isArray(state.windows) ? state.windows : []).filter(
     (window): window is QuotaCapacityWindow =>
       Boolean(window) &&
-      window.known === true &&
-      typeof window.remaining_percent === 'number' &&
-      Number.isFinite(window.remaining_percent)
+      typeof window.id === 'string' &&
+      typeof window.label === 'string' &&
+      (window.known === false ||
+        (window.known === true &&
+          typeof window.remaining_percent === 'number' &&
+          Number.isFinite(window.remaining_percent)))
   );
   const fetchedAt = parseTimestamp(state.fetched_at);
   const staleAt = parseTimestamp(state.stale_at);
@@ -87,9 +109,12 @@ export function QuotaCard(props: QuotaCardProps) {
     onRefresh,
     onReset,
   } = props;
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const now = useNow();
   const adapter = QUOTA_ADAPTERS[entry.type];
   const file = entry.file;
+  const identity = deriveAuthFileIdentity(file);
+  const displayIdentity = identity.kind === 'fileName' ? file.name : identity.primary;
 
   // 挂载时捕获一次延迟：后续 props 变 null 不影响本卡（React 19 禁渲染期读 ref）
   const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);
@@ -154,8 +179,15 @@ export function QuotaCard(props: QuotaCardProps) {
             {t('auth_files.routing_selected')}
           </span>
         )}
-        <span className={styles.fileName} title={file.name}>
-          {file.name}
+        <span
+          className={styles.fileName}
+          title={identity.kind === 'email' ? undefined : displayIdentity}
+        >
+          {identity.kind === 'email' ? (
+            <EmailPrivacyText text={displayIdentity} />
+          ) : (
+            displayIdentity
+          )}
         </span>
       </header>
 
@@ -163,26 +195,41 @@ export function QuotaCard(props: QuotaCardProps) {
         {status === 'idle' && storedSnapshot ? (
           <div className={styles.snapshotBody}>
             {storedSnapshot.windows.map((window) => {
-              const remaining = Math.max(0, Math.min(100, window.remaining_percent));
-              const resetLabel = formatQuotaResetTime(window.reset_at);
+              const remaining =
+                window.known === true && Number.isFinite(window.remaining_percent)
+                  ? Math.max(0, Math.min(100, window.remaining_percent))
+                  : null;
+              const resetAtMs = parseTimestamp(window.reset_at);
+              const resetDisplay = buildResetDisplay(null, resetAtMs, now, i18n.resolvedLanguage);
+              const descriptionKey = STORED_WINDOW_DESCRIPTIONS[entry.type]?.[window.id];
 
               return (
                 <div key={window.id} className={styles.snapshotRow}>
                   <div className={styles.snapshotRowHeader}>
-                    <span className={styles.snapshotModel}>{window.label}</span>
+                    <span className={styles.snapshotLabel}>
+                      <span className={styles.snapshotModel}>{window.label}</span>
+                      {descriptionKey && (
+                        <span className={styles.snapshotDescription}>{t(descriptionKey)}</span>
+                      )}
+                    </span>
                     <div className={styles.snapshotMeta}>
-                      <span className={styles.snapshotPercent}>{Math.round(remaining)}%</span>
-                      {resetLabel !== '-' && (
-                        <span className={styles.snapshotReset}>{resetLabel}</span>
+                      <span className={styles.snapshotPercent}>
+                        {remaining === null
+                          ? t('quota_management.usage_not_reported')
+                          : t('auth_files.quota_drain_remaining', {
+                              percent: Math.round(remaining),
+                            })}
+                      </span>
+                      {resetDisplay && (
+                        <QuotaResetLabel display={resetDisplay} classes={quotaClasses} />
                       )}
                     </div>
                   </div>
-                  <div className={styles.snapshotTrack}>
-                    <div
-                      className={styles.snapshotFill}
-                      style={{ width: `${remaining}%` }}
-                    />
-                  </div>
+                  {remaining !== null && (
+                    <div className={styles.snapshotTrack}>
+                      <div className={styles.snapshotFill} style={{ width: `${remaining}%` }} />
+                    </div>
+                  )}
                 </div>
               );
             })}

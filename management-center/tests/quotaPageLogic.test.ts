@@ -4,6 +4,8 @@ import {
   buildTabCounts,
   classifyQuotaFiles,
   filterEntriesByTab,
+  hasStoredQuotaCapacity,
+  hasStoredQuotaError,
   isQuotaRefreshDisabled,
   paginate,
   resolveQuotaProviderType,
@@ -20,6 +22,8 @@ const FILES: AuthFileItem[] = [
   file('claude-a.json', 'claude'),
   file('kimi-a.json', 'kimi'),
   file('codex-b.json', 'codex'),
+  file('cursor-a.json', 'cursor'),
+  file('opencode-go.json', 'opencode-go'),
   file('grok-a.json', 'grok'), // 别名归一到 xai
   file('gemini-a.json', 'gemini'), // 不支持额度
   file('claude-off.json', 'claude', { disabled: true }), // 停用
@@ -39,22 +43,32 @@ describe('classifyQuotaFiles', () => {
     const entries = classifyQuotaFiles(FILES);
     expect(entries.map((entry) => entry.file.name)).not.toContain('gemini-a.json');
     expect(entries.map((entry) => entry.file.name)).not.toContain('claude-off.json');
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(7);
   });
 
   test('orders entries by provider tab order', () => {
     const entries = classifyQuotaFiles(FILES);
-    expect(entries.map((entry) => entry.type)).toEqual(['claude', 'codex', 'codex', 'xai', 'kimi']);
+    expect(entries.map((entry) => entry.type)).toEqual([
+      'claude',
+      'codex',
+      'codex',
+      'cursor',
+      'opencode-go',
+      'xai',
+      'kimi',
+    ]);
   });
 });
 
 describe('buildTabCounts', () => {
   test('counts per provider plus an all total, zero-filling empty tabs', () => {
     expect(buildTabCounts(classifyQuotaFiles(FILES))).toEqual({
-      all: 5,
+      all: 7,
       claude: 1,
       antigravity: 0,
       codex: 2,
+      cursor: 1,
+      'opencode-go': 1,
       xai: 1,
       kimi: 1,
     });
@@ -65,7 +79,7 @@ describe('filterEntriesByTab', () => {
   const entries = classifyQuotaFiles(FILES);
 
   test("passes everything through on the 'all' tab", () => {
-    expect(filterEntriesByTab(entries, 'all')).toHaveLength(5);
+    expect(filterEntriesByTab(entries, 'all')).toHaveLength(7);
   });
 
   test('filters to a single provider', () => {
@@ -81,6 +95,51 @@ describe('isQuotaRefreshDisabled', () => {
   test('blocks a single-card refresh while the same quota is resetting', () => {
     expect(isQuotaRefreshDisabled(true, false, true)).toBe(true);
     expect(isQuotaRefreshDisabled(true, false, false)).toBe(false);
+  });
+});
+
+describe('stored quota status', () => {
+  test('counts known and display-only backend snapshots as loaded', () => {
+    expect(
+      hasStoredQuotaCapacity(
+        file('cursor.json', 'cursor', {
+          quota_capacity: {
+            supported: true,
+            windows: [
+              {
+                id: 'cursor-models',
+                label: 'Cursor Models',
+                known: true,
+                remaining_percent: 98,
+              },
+            ],
+          },
+        })
+      )
+    ).toBe(true);
+    expect(
+      hasStoredQuotaCapacity(
+        file('xai.json', 'xai', {
+          quota_capacity: {
+            supported: true,
+            windows: [{ id: 'xai-weekly', label: 'Weekly credits', known: false }],
+          },
+        })
+      )
+    ).toBe(true);
+  });
+
+  test('does not treat an error without windows as loaded', () => {
+    const failed = file('xai.json', 'xai', {
+      quota_capacity: {
+        supported: true,
+        windows: [],
+        last_error: 'upstream unavailable',
+      },
+    });
+
+    expect(hasStoredQuotaCapacity(failed)).toBe(false);
+    expect(hasStoredQuotaError(failed)).toBe(true);
   });
 });
 
@@ -134,6 +193,7 @@ describe('sortQuotaEntries', () => {
         'claude-a.json': 100,
         'kimi-a.json': 200,
         'codex-b.json': 400,
+        'cursor-a.json': 250,
         'grok-a.json': 50,
       })
     );
@@ -141,8 +201,10 @@ describe('sortQuotaEntries', () => {
       'grok-a.json',
       'claude-a.json',
       'kimi-a.json',
+      'cursor-a.json',
       'codex-a.json',
       'codex-b.json',
+      'opencode-go.json',
     ]);
   });
 
@@ -159,6 +221,8 @@ describe('sortQuotaEntries', () => {
       // unresolved tail, in the order classifyQuotaFiles produced
       'claude-a.json',
       'codex-a.json',
+      'cursor-a.json',
+      'opencode-go.json',
       'grok-a.json',
     ]);
   });

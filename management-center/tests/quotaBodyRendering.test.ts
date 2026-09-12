@@ -13,11 +13,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '@/i18n';
 import { CodexQuotaBody } from '@/features/quota/providers/codex/CodexQuotaBody';
 import { ClaudeQuotaBody } from '@/features/quota/providers/claude/ClaudeQuotaBody';
+import { CursorQuotaBody } from '@/features/quota/providers/cursor/CursorQuotaBody';
 import { KimiQuotaBody } from '@/features/quota/providers/kimi/KimiQuotaBody';
+import {
+  getResetDisplayFormats,
+  getResetDisplayValue,
+  useQuotaResetDisplayStore,
+} from '@/features/quota/components/resetDisplayFormats';
 import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
-import { formatInstantShort } from '@/utils/quota';
+import { buildResetDisplay, formatInstantShort } from '@/utils/quota';
 import { DAY_MS, HOUR_MS } from '@/utils/time/durations';
-import type { ClaudeQuotaState, CodexQuotaState, KimiQuotaState } from '@/types';
+import type { ClaudeQuotaState, CodexQuotaState, CursorQuotaState, KimiQuotaState } from '@/types';
 
 const classes = bindQuotaClasses(
   Object.fromEntries(QUOTA_CLASS_KEYS.map((key) => [key, key])),
@@ -60,19 +66,18 @@ describe('CodexQuotaBody', () => {
     rateLimitResetCreditsAvailableCount: 1,
   };
 
-  test('renders a window reset as absolute plus countdown', () => {
+  test('renders a window reset as a clickable compact timestamp', () => {
     const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
 
     expect(markup).toContain('08-02 18:00');
-    expect(markup).toContain('quotaResetRelative');
-    expect(markup).toMatch(/3 hours/);
+    expect(markup).toContain('aria-label="Change reset time format"');
   });
 
-  test('renders reset-credit expiry in local time with a countdown', () => {
+  test('renders reset-credit expiry in local time as a cycling control', () => {
     const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
 
     expect(markup).toContain(formatInstantShort(now + 11 * DAY_MS));
-    expect(markup).toMatch(/11 days/);
+    expect(markup).toContain('quotaResetCycle');
   });
 
   test('highlights a credit expiring within the final hour', () => {
@@ -136,12 +141,12 @@ describe('CodexQuotaBody', () => {
     const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota: stale, classes }));
 
     expect(markup).toContain('08-02 18:00');
-    expect(markup).not.toContain('quotaResetRelative');
+    expect(markup).not.toContain('quotaResetCycle');
   });
 });
 
 describe('KimiQuotaBody', () => {
-  test('renders the concrete reset time alongside its countdown', () => {
+  test('renders the concrete reset time as a cycling control', () => {
     const resetAtMs = now + 3 * HOUR_MS;
     const quota: KimiQuotaState = {
       status: 'success',
@@ -160,14 +165,110 @@ describe('KimiQuotaBody', () => {
     const markup = renderToStaticMarkup(createElement(KimiQuotaBody, { quota, classes }));
 
     expect(markup).toContain(formatInstantShort(resetAtMs));
-    expect(markup).toContain('quotaResetRelative');
-    expect(markup).toMatch(/3 hours/);
+    expect(markup).toContain('quotaResetCycle');
     expect(markup).not.toContain('resets in 3h');
   });
 });
 
+describe('reset time formats', () => {
+  test('cycles compact, relative, and full formats before returning to compact', () => {
+    const display = buildResetDisplay(null, now + 3 * HOUR_MS, now, 'en');
+    expect(display).not.toBeNull();
+    const formats = getResetDisplayFormats(display!);
+
+    expect(formats).toHaveLength(3);
+    expect(formats[0]).toBe(formatInstantShort(now + 3 * HOUR_MS));
+    expect(formats[1]).toMatch(/3 hours/);
+    expect(formats[2]).not.toBe(formats[0]);
+  });
+
+  test('one shared cycle changes the display value used by every card', () => {
+    const first = buildResetDisplay(null, now + 3 * HOUR_MS, now, 'en')!;
+    const second = buildResetDisplay(null, now + 5 * DAY_MS, now, 'en')!;
+    const displayBoth = () => {
+      const { mode } = useQuotaResetDisplayStore.getState();
+      return [getResetDisplayValue(first, mode), getResetDisplayValue(second, mode)];
+    };
+
+    useQuotaResetDisplayStore.getState().setMode('compact');
+    expect(displayBoth()).toEqual([first.absolute, second.absolute]);
+
+    useQuotaResetDisplayStore.getState().cycleMode();
+    expect(displayBoth()).toEqual([first.relative, second.relative]);
+
+    useQuotaResetDisplayStore.getState().cycleMode();
+    expect(displayBoth()).toEqual([first.full, second.full]);
+
+    useQuotaResetDisplayStore.getState().cycleMode();
+    expect(useQuotaResetDisplayStore.getState().mode).toBe('compact');
+  });
+});
+
+describe('CursorQuotaBody', () => {
+  test('explains the two monthly pools without rendering the aggregate as a third pool', () => {
+    const quota: CursorQuotaState = {
+      status: 'success',
+      planType: 'Pro',
+      windows: [
+        {
+          id: 'cursor-models',
+          label: 'Cursor Models',
+          labelKey: 'cursor_quota.cursor_models',
+          descriptionKey: 'cursor_quota.cursor_models_desc',
+          usedPercent: 2,
+          resetAtMs: now + 30 * DAY_MS,
+          periodHours: 720,
+        },
+        {
+          id: 'other-models',
+          label: 'Other Models',
+          labelKey: 'cursor_quota.other_models',
+          descriptionKey: 'cursor_quota.other_models_desc',
+          usedPercent: 0,
+          resetAtMs: now + 30 * DAY_MS,
+          periodHours: 720,
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(createElement(CursorQuotaBody, { quota, classes }));
+
+    expect(markup).toContain('Cursor Models');
+    expect(markup).toContain('Cursor Grok and Composer');
+    expect(markup).toContain('Other Models');
+    expect(markup).toContain('Claude, GPT, Gemini');
+    expect(markup).toContain('98% left');
+    expect(markup).toContain('100% left');
+    expect(markup).not.toContain('Included usage');
+  });
+
+  test('renders Grok Bot as a separate weekly meter with its own reset', () => {
+    const resetAtMs = now + 5 * DAY_MS;
+    const quota: CursorQuotaState = {
+      status: 'success',
+      windows: [
+        {
+          id: 'grok-bot',
+          label: 'Grok Bot · Weekly usage',
+          labelKey: 'cursor_quota.grok_bot_weekly',
+          descriptionKey: 'cursor_quota.grok_bot_weekly_desc',
+          usedPercent: 9,
+          resetAtMs,
+          periodHours: 168,
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(createElement(CursorQuotaBody, { quota, classes }));
+
+    expect(markup).toContain('Grok Bot · Weekly usage');
+    expect(markup).toContain('91% left');
+    expect(markup).toContain('Separate allowance included with your Cursor plan');
+    expect(markup).toContain(formatInstantShort(resetAtMs));
+    expect(markup).toContain('aria-label="Change reset time format"');
+  });
+});
+
 describe('ClaudeQuotaBody', () => {
-  test('pairs each window reset with a countdown', () => {
+  test('makes every window reset format clickable', () => {
     const quota: ClaudeQuotaState = {
       status: 'success',
       windows: [
@@ -193,7 +294,6 @@ describe('ClaudeQuotaBody', () => {
 
     expect(markup).toContain('08-02 17:00');
     expect(markup).toContain('08-06 04:00');
-    expect(markup).toMatch(/2 hours/);
-    expect(markup).toMatch(/4 days/);
+    expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(2);
   });
 });

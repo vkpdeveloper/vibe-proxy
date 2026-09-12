@@ -7,7 +7,9 @@ import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
   CodexQuotaState,
+  CursorQuotaState,
   KimiQuotaState,
+  OpenCodeGoQuotaState,
   XaiQuotaState,
 } from '@/types';
 
@@ -18,12 +20,16 @@ interface QuotaStoreState {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
+  cursorQuota: Record<string, CursorQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
+  openCodeGoQuota: Record<string, OpenCodeGoQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
+  setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
+  setOpenCodeGoQuota: (updater: QuotaUpdater<Record<string, OpenCodeGoQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
@@ -40,7 +46,9 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   antigravityQuota: {},
   claudeQuota: {},
   codexQuota: {},
+  cursorQuota: {},
   kimiQuota: {},
+  openCodeGoQuota: {},
   xaiQuota: {},
   setAntigravityQuota: (updater) =>
     set((state) => ({
@@ -54,9 +62,17 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
     set((state) => ({
       codexQuota: resolveUpdater(updater, state.codexQuota),
     })),
+  setCursorQuota: (updater) =>
+    set((state) => ({
+      cursorQuota: resolveUpdater(updater, state.cursorQuota),
+    })),
   setKimiQuota: (updater) =>
     set((state) => ({
       kimiQuota: resolveUpdater(updater, state.kimiQuota),
+    })),
+  setOpenCodeGoQuota: (updater) =>
+    set((state) => ({
+      openCodeGoQuota: resolveUpdater(updater, state.openCodeGoQuota),
     })),
   setXaiQuota: (updater) =>
     set((state) => ({
@@ -68,18 +84,16 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       antigravityQuota: {},
       claudeQuota: {},
       codexQuota: {},
+      cursorQuota: {},
       kimiQuota: {},
+      openCodeGoQuota: {},
       xaiQuota: {},
     })),
 }));
 
-export const captureQuotaCacheGeneration = (): number =>
-  useQuotaStore.getState().cacheGeneration;
+export const captureQuotaCacheGeneration = (): number => useQuotaStore.getState().cacheGeneration;
 
-export const commitIfQuotaCacheCurrent = (
-  generation: number,
-  commit: () => void
-): boolean => {
+export const commitIfQuotaCacheCurrent = (generation: number, commit: () => void): boolean => {
   if (useQuotaStore.getState().cacheGeneration !== generation) return false;
   commit();
   return true;

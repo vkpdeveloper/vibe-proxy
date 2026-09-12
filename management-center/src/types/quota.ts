@@ -249,6 +249,113 @@ export interface CodexQuotaState {
   errorStatus?: number;
 }
 
+// Cursor dashboard API payload types
+export interface CursorPlanUsagePayload {
+  totalSpend?: number | string;
+  includedSpend?: number | string;
+  bonusSpend?: number | string;
+  limit?: number | string;
+  autoPercentUsed?: number | string;
+  apiPercentUsed?: number | string;
+  totalPercentUsed?: number | string;
+}
+
+export interface CursorSpendLimitUsagePayload {
+  pooledLimit?: number | string;
+  pooledUsed?: number | string;
+  pooledRemaining?: number | string;
+  individualUsed?: number | string;
+  limitType?: string;
+}
+
+export interface CursorCurrentPeriodUsagePayload {
+  billingCycleStart?: string | number;
+  billingCycleEnd?: string | number;
+  planUsage?: CursorPlanUsagePayload | null;
+  spendLimitUsage?: CursorSpendLimitUsagePayload | null;
+  displayMessage?: string;
+}
+
+export interface CursorPlanInfoPayload {
+  planInfo?: {
+    planName?: string;
+    includedAmountCents?: number | string;
+    price?: string;
+    billingCycleEnd?: string | number;
+  } | null;
+}
+
+export interface CursorSandUsagePayload {
+  currentPeriodStart?: string | number;
+  current_period_start?: string | number;
+  nextResetTimestampUtc?: string | number;
+  next_reset_timestamp_utc?: string | number;
+  usagePercent?: number | string;
+  usage_percent?: number | string;
+  usesPooledEnterpriseAllowance?: boolean;
+  uses_pooled_enterprise_allowance?: boolean;
+  hasAvailableUsage?: boolean;
+  hasNonZeroIncludedLimit?: boolean;
+  grokPlanLabel?: string;
+}
+
+export interface CursorQuotaWindow {
+  id: string;
+  label: string;
+  labelKey?: string;
+  descriptionKey?: string;
+  usedPercent: number | null;
+  resetAtMs: number | null;
+  periodHours: number | null;
+  usedCents?: number | null;
+  limitCents?: number | null;
+}
+
+export interface CursorQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  windows: CursorQuotaWindow[];
+  planType?: string | null;
+  onDemandUsedCents?: number | null;
+  onDemandLimitCents?: number | null;
+  billingCycleEnd?: string | null;
+  error?: string;
+  errorStatus?: number;
+}
+
+// OpenCode Go API-key usage payload and normalized state
+export interface OpenCodeGoUsageWindowPayload {
+  status?: 'ok' | 'rate-limited' | string;
+  percent?: number | string;
+  resetsAt?: string | number;
+  resets_at?: string | number;
+}
+
+export interface OpenCodeGoUsagePayload {
+  usage?: {
+    rolling?: OpenCodeGoUsageWindowPayload | null;
+    weekly?: OpenCodeGoUsageWindowPayload | null;
+    monthly?: OpenCodeGoUsageWindowPayload | null;
+  } | null;
+}
+
+export interface OpenCodeGoQuotaWindow {
+  id: 'rolling' | 'weekly' | 'monthly';
+  label: string;
+  labelKey: string;
+  descriptionKey: string;
+  usedPercent: number | null;
+  resetAtMs: number | null;
+  periodHours: number | null;
+  rateLimited: boolean;
+}
+
+export interface OpenCodeGoQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  windows: OpenCodeGoQuotaWindow[];
+  error?: string;
+  errorStatus?: number;
+}
+
 // Kimi API payload types
 export interface KimiUsageDetail {
   used?: number | string;

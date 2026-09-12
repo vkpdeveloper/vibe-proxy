@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { IconPlug } from '@/components/ui/icons';
+import { IconEye, IconEyeOff, IconPlug } from '@/components/ui/icons';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
-import { oauthApi, pluginsApi, type BuiltInOAuthProvider } from '@/services/api';
+import { authFilesApi, oauthApi, pluginsApi, type BuiltInOAuthProvider } from '@/services/api';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
@@ -24,6 +24,8 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
+import iconOpenCodeGoDark from '@/assets/icons/opencode-go-dark.svg';
+import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 
 interface ProviderState {
   url?: string;
@@ -51,6 +53,15 @@ interface VertexImportState {
   loading: boolean;
   error?: string;
   result?: VertexImportResult;
+}
+
+interface OpenCodeGoImportState {
+  apiKey: string;
+  email: string;
+  showKey: boolean;
+  loading: boolean;
+  error?: string;
+  success: boolean;
 }
 
 interface BuiltInOAuthProviderCard {
@@ -252,6 +263,13 @@ export function OAuthPage() {
     fileName: '',
     location: '',
     loading: false,
+  });
+  const [openCodeGoState, setOpenCodeGoState] = useState<OpenCodeGoImportState>({
+    apiKey: '',
+    email: '',
+    showKey: false,
+    loading: false,
+    success: false,
   });
   const pollingTimers = useRef<Partial<Record<string, number>>>({});
   const successResetTimers = useRef<Partial<Record<string, number>>>({});
@@ -569,6 +587,54 @@ export function OAuthPage() {
     }
   };
 
+  const handleOpenCodeGoImport = async () => {
+    const apiKey = openCodeGoState.apiKey.trim();
+    const email = openCodeGoState.email.trim();
+    if (!apiKey) {
+      const message = t('opencode_go_login.api_key_required');
+      setOpenCodeGoState((prev) => ({ ...prev, error: message, success: false }));
+      showNotification(message, 'warning');
+      return;
+    }
+
+    setOpenCodeGoState((prev) => ({ ...prev, loading: true, error: undefined, success: false }));
+    try {
+      const credential = {
+        type: 'opencode-go',
+        auth_kind: 'api_key',
+        api_key: apiKey,
+        note: 'OpenCode Go quota tracking',
+        ...(email ? { email } : {}),
+      };
+      const file = new File([JSON.stringify(credential, null, 2)], 'opencode-go.json', {
+        type: 'application/json',
+      });
+      const result = await authFilesApi.uploadFiles([file]);
+      if (result.failed.length > 0 || result.uploaded < 1) {
+        throw new Error(result.failed[0]?.error || t('notification.upload_failed'));
+      }
+
+      setOpenCodeGoState((prev) => ({
+        ...prev,
+        apiKey: '',
+        loading: false,
+        error: undefined,
+        success: true,
+      }));
+      notifyAuthFilesChanged();
+      showNotification(t('opencode_go_login.success'), 'success');
+    } catch (err: unknown) {
+      const message = getErrorMessage(err) || t('notification.upload_failed');
+      setOpenCodeGoState((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+        success: false,
+      }));
+      showNotification(`${t('opencode_go_login.failed')} ${message}`, 'error');
+    }
+  };
+
   const renderOAuthProviderCard = (provider: OAuthProviderCard, featured = false) => {
     const state = states[provider.id] || {};
     const showKimiSignUp = featured && provider.kind === 'builtin' && provider.id === 'kimi';
@@ -735,9 +801,99 @@ export function OAuthPage() {
           </div>
         </section>
 
-        {/* Vertex JSON 登录 */}
         <section className={styles.providerSection}>
           <h2 className={styles.sectionTitle}>{t('auth_login.other_login_methods')}</h2>
+          <Card
+            title={
+              <span className={styles.cardTitle}>
+                <img
+                  src={resolvedTheme === 'dark' ? iconOpenCodeGoLight : iconOpenCodeGoDark}
+                  alt=""
+                  className={styles.cardTitleIcon}
+                />
+                {t('opencode_go_login.title')}
+              </span>
+            }
+            extra={
+              <Button onClick={handleOpenCodeGoImport} loading={openCodeGoState.loading}>
+                {t('opencode_go_login.add_button')}
+              </Button>
+            }
+          >
+            <div className={styles.cardContent}>
+              <div className={styles.cardHint}>{t('opencode_go_login.description')}</div>
+              <Input
+                label={t('opencode_go_login.api_key_label')}
+                hint={t('opencode_go_login.api_key_hint')}
+                placeholder={t('opencode_go_login.api_key_placeholder')}
+                type={openCodeGoState.showKey ? 'text' : 'password'}
+                name="opencode-go-api-key"
+                autoComplete="off"
+                spellCheck={false}
+                value={openCodeGoState.apiKey}
+                onChange={(event) =>
+                  setOpenCodeGoState((prev) => ({
+                    ...prev,
+                    apiKey: event.target.value,
+                    error: undefined,
+                    success: false,
+                  }))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void handleOpenCodeGoImport();
+                }}
+                rightElement={
+                  <button
+                    type="button"
+                    className={styles.secretToggle}
+                    onClick={() =>
+                      setOpenCodeGoState((prev) => ({ ...prev, showKey: !prev.showKey }))
+                    }
+                    aria-label={
+                      openCodeGoState.showKey
+                        ? t('login.hide_key', { defaultValue: 'Hide key' })
+                        : t('login.show_key', { defaultValue: 'Show key' })
+                    }
+                    title={
+                      openCodeGoState.showKey
+                        ? t('login.hide_key', { defaultValue: 'Hide key' })
+                        : t('login.show_key', { defaultValue: 'Show key' })
+                    }
+                  >
+                    {openCodeGoState.showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                }
+              />
+              <Input
+                label={t('opencode_go_login.email_label')}
+                hint={t('opencode_go_login.email_hint')}
+                placeholder={t('opencode_go_login.email_placeholder')}
+                type="email"
+                autoComplete="email"
+                value={openCodeGoState.email}
+                onChange={(event) =>
+                  setOpenCodeGoState((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                    error: undefined,
+                    success: false,
+                  }))
+                }
+              />
+              {openCodeGoState.error && (
+                <div className="status-badge error">{openCodeGoState.error}</div>
+              )}
+              {openCodeGoState.success && (
+                <div className={styles.successActions}>
+                  <span className="status-badge success">{t('opencode_go_login.success')}</span>
+                  <Button variant="secondary" size="sm" onClick={() => navigate('/quota')}>
+                    {t('opencode_go_login.view_quota')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+
           <Card
             title={
               <span className={styles.cardTitle}>

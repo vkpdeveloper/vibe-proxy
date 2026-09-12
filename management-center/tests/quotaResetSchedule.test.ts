@@ -99,6 +99,16 @@ describe('collectQuotaRowInstants', () => {
     expect(collectQuotaRowInstants('kimi', quota).map((i) => i.rowId)).toEqual(['r1']);
   });
 
+  test('collects Cursor billing-cycle resets', () => {
+    const quota = {
+      status: 'success',
+      windows: [{ id: 'cursor-models', resetAtMs: NOW + DAY_MS }],
+    };
+    expect(collectQuotaRowInstants('cursor', quota).map((instant) => instant.rowId)).toEqual([
+      'cursor-models',
+    ]);
+  });
+
   test('returns nothing unless the credential loaded successfully', () => {
     for (const status of ['idle', 'loading', 'error']) {
       expect(collectQuotaRowInstants('claude', { ...claudeQuota, status })).toEqual([]);

@@ -44,7 +44,7 @@ export function resetCreditRowId(
   return credit.id || `${credit.expiresAt}-${index}`;
 }
 
-/* Structural shapes — the five provider states disagree about where a window
+/* Structural shapes — the provider states disagree about where a window
    lives, so each is read on its own terms rather than through a lossy
    normalized model. */
 
@@ -90,7 +90,12 @@ export function collectQuotaRowInstants(
   const state = quota as { status?: string } | undefined;
   if (!state || state.status !== 'success') return [];
 
-  if (provider === 'claude' || provider === 'codex') {
+  if (
+    provider === 'claude' ||
+    provider === 'codex' ||
+    provider === 'cursor' ||
+    provider === 'opencode-go'
+  ) {
     const windows = collectRows((quota as { windows?: WindowLike[] }).windows ?? [], 'window');
     if (provider !== 'codex') return windows;
 

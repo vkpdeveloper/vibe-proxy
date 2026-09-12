@@ -166,11 +166,9 @@ export function SectionNetwork({
                   label={t(
                     'config_management.visual.sections.network.quota_drain_refresh_interval'
                   )}
-                  placeholder="2m"
+                  placeholder="5m"
                   value={values.routingQuotaDrainRefreshInterval}
-                  onChange={(e) =>
-                    onChange({ routingQuotaDrainRefreshInterval: e.target.value })
-                  }
+                  onChange={(e) => onChange({ routingQuotaDrainRefreshInterval: e.target.value })}
                   disabled={disabled}
                   hint={t(
                     'config_management.visual.sections.network.quota_drain_refresh_interval_hint'
@@ -184,9 +182,7 @@ export function SectionNetwork({
                   value={values.routingQuotaDrainStaleAfter}
                   onChange={(e) => onChange({ routingQuotaDrainStaleAfter: e.target.value })}
                   disabled={disabled}
-                  hint={t(
-                    'config_management.visual.sections.network.quota_drain_stale_after_hint'
-                  )}
+                  hint={t('config_management.visual.sections.network.quota_drain_stale_after_hint')}
                 />
               </FieldAnchor>
             </>
