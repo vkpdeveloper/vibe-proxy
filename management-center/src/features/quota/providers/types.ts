@@ -12,6 +12,7 @@ import type {
   ClaudeQuotaState,
   CodexQuotaState,
   CursorQuotaState,
+  DevinCliQuotaState,
   KimiQuotaState,
   OpenCodeGoQuotaState,
   XaiQuotaState,
@@ -20,7 +21,7 @@ import type {
 export type QuotaUpdater<T> = T | ((prev: T) => T);
 
 export type QuotaProviderType =
-  'antigravity' | 'claude' | 'codex' | 'cursor' | 'kimi' | 'opencode-go' | 'xai';
+  'antigravity' | 'claude' | 'codex' | 'cursor' | 'devin-cli' | 'kimi' | 'opencode-go' | 'xai';
 
 /** useQuotaStore 的结构契约（storeSelector/storeSetter 依赖）。 */
 export interface QuotaStore {
@@ -28,6 +29,7 @@ export interface QuotaStore {
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   cursorQuota: Record<string, CursorQuotaState>;
+  devinCliQuota: Record<string, DevinCliQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   openCodeGoQuota: Record<string, OpenCodeGoQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
@@ -35,6 +37,7 @@ export interface QuotaStore {
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
+  setDevinCliQuota: (updater: QuotaUpdater<Record<string, DevinCliQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setOpenCodeGoQuota: (updater: QuotaUpdater<Record<string, OpenCodeGoQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;

@@ -62,6 +62,9 @@ interface ResetCreditLike {
 /** Row id used by the xAI weekly limit, which has no id of its own. */
 export const XAI_WEEKLY_ROW_ID = 'xai:weekly';
 
+/** Row id of the Grok Bot window the xAI card borrows from the Cursor credential. */
+export const XAI_GROK_BOT_ROW_ID = 'xai:grok-bot';
+
 const isUsableMs = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
@@ -94,6 +97,7 @@ export function collectQuotaRowInstants(
     provider === 'claude' ||
     provider === 'codex' ||
     provider === 'cursor' ||
+    provider === 'devin-cli' ||
     provider === 'opencode-go'
   ) {
     const windows = collectRows((quota as { windows?: WindowLike[] }).windows ?? [], 'window');
@@ -115,11 +119,22 @@ export function collectQuotaRowInstants(
   }
 
   if (provider === 'xai') {
-    const billing = (
-      quota as { billing?: { periodType?: string; resetAtMs?: number | null } | null }
-    ).billing;
-    if (!billing || billing.periodType !== 'weekly' || !isUsableMs(billing.resetAtMs)) return [];
-    return [{ rowId: XAI_WEEKLY_ROW_ID, atMs: billing.resetAtMs, kind: 'window' }];
+    const state = quota as {
+      billing?: { periodType?: string; resetAtMs?: number | null } | null;
+      grokBot?: { resetAtMs?: number | null } | null;
+    };
+    const instants: QuotaRowInstant[] = [];
+    if (
+      state.billing &&
+      state.billing.periodType === 'weekly' &&
+      isUsableMs(state.billing.resetAtMs)
+    ) {
+      instants.push({ rowId: XAI_WEEKLY_ROW_ID, atMs: state.billing.resetAtMs, kind: 'window' });
+    }
+    if (state.grokBot && isUsableMs(state.grokBot.resetAtMs)) {
+      instants.push({ rowId: XAI_GROK_BOT_ROW_ID, atMs: state.grokBot.resetAtMs, kind: 'window' });
+    }
+    return instants;
   }
 
   if (provider === 'antigravity') {

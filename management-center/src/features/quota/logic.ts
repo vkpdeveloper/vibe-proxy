@@ -3,11 +3,13 @@
  * React-free —— 由 tests/quotaPageLogic.test.ts 直接消费。
  */
 
-import type { AuthFileItem } from '@/types';
+import type { AuthFileItem, CursorQuotaState, XaiGrokBotWindow } from '@/types';
+import { isCursorFile, isDisabledAuthFile, parseIsoToMs } from '@/utils/quota';
 import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
 import { CLAUDE_CONFIG } from './providers/claude/data';
 import { CODEX_CONFIG } from './providers/codex/data';
 import { CURSOR_CONFIG } from './providers/cursor/data';
+import { DEVIN_CLI_CONFIG } from './providers/devinCli/data';
 import { KIMI_CONFIG } from './providers/kimi/data';
 import { OPENCODE_GO_CONFIG } from './providers/opencodeGo/data';
 import { XAI_CONFIG } from './providers/xai/data';
@@ -19,6 +21,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   claude: CLAUDE_CONFIG.filterFn,
   codex: CODEX_CONFIG.filterFn,
   cursor: CURSOR_CONFIG.filterFn,
+  'devin-cli': DEVIN_CLI_CONFIG.filterFn,
   kimi: KIMI_CONFIG.filterFn,
   'opencode-go': OPENCODE_GO_CONFIG.filterFn,
   xai: XAI_CONFIG.filterFn,
@@ -104,6 +107,48 @@ export const isQuotaRefreshDisabled = (
   loading: boolean,
   resetting: boolean
 ): boolean => !canRefresh || loading || resetting;
+
+/**
+ * Grok Bot usage is a Cursor-plan allowance: it is only reported by Cursor's
+ * `GetSandUsageStatus`, never by the xAI billing API. The xAI card borrows the
+ * window from whichever enabled Cursor credential reports it — the browser-side
+ * fetch first, then the backend-collected `quota_capacity` snapshot as a
+ * fallback so the row still appears before the Cursor card is refreshed.
+ */
+export function resolveXaiGrokBotWindow(
+  files: AuthFileItem[],
+  cursorQuota: Record<string, CursorQuotaState>
+): XaiGrokBotWindow | null {
+  for (const file of files) {
+    if (!isCursorFile(file) || isDisabledAuthFile(file)) continue;
+
+    const live = cursorQuota[file.name];
+    if (live?.status === 'success') {
+      const window = live.windows.find((entry) => entry.id === 'grok-bot');
+      if (window) {
+        return {
+          usedPercent: typeof window.usedPercent === 'number' ? window.usedPercent : null,
+          resetAtMs: typeof window.resetAtMs === 'number' ? window.resetAtMs : null,
+        };
+      }
+    }
+
+    const stored = (file.quota_capacity ?? file.quotaCapacity)?.windows ?? [];
+    const storedWindow = stored.find(
+      (entry) =>
+        entry.id === 'cursor-grok-bot' &&
+        entry.known === true &&
+        typeof entry.remaining_percent === 'number'
+    );
+    if (storedWindow) {
+      return {
+        usedPercent: Math.max(0, Math.min(100, 100 - storedWindow.remaining_percent)),
+        resetAtMs: parseIsoToMs(storedWindow.reset_at),
+      };
+    }
+  }
+  return null;
+}
 
 /** A backend-collected window counts as loaded before this browser fetches it itself. */
 export const hasStoredQuotaCapacity = (file: AuthFileItem): boolean => {

@@ -14,7 +14,9 @@ import i18n from '@/i18n';
 import { CodexQuotaBody } from '@/features/quota/providers/codex/CodexQuotaBody';
 import { ClaudeQuotaBody } from '@/features/quota/providers/claude/ClaudeQuotaBody';
 import { CursorQuotaBody } from '@/features/quota/providers/cursor/CursorQuotaBody';
+import { DevinCliQuotaBody } from '@/features/quota/providers/devinCli/DevinCliQuotaBody';
 import { KimiQuotaBody } from '@/features/quota/providers/kimi/KimiQuotaBody';
+import { XaiQuotaBody } from '@/features/quota/providers/xai/XaiQuotaBody';
 import {
   getResetDisplayFormats,
   getResetDisplayValue,
@@ -23,7 +25,14 @@ import {
 import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
 import { buildResetDisplay, formatInstantShort } from '@/utils/quota';
 import { DAY_MS, HOUR_MS } from '@/utils/time/durations';
-import type { ClaudeQuotaState, CodexQuotaState, CursorQuotaState, KimiQuotaState } from '@/types';
+import type {
+  ClaudeQuotaState,
+  CodexQuotaState,
+  CursorQuotaState,
+  DevinCliQuotaState,
+  KimiQuotaState,
+  XaiQuotaState,
+} from '@/types';
 
 const classes = bindQuotaClasses(
   Object.fromEntries(QUOTA_CLASS_KEYS.map((key) => [key, key])),
@@ -295,5 +304,88 @@ describe('ClaudeQuotaBody', () => {
     expect(markup).toContain('08-02 17:00');
     expect(markup).toContain('08-06 04:00');
     expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(2);
+  });
+});
+
+describe('DevinCliQuotaBody', () => {
+  test('renders plan chip, daily and weekly meters, and the overage balance', () => {
+    const quota: DevinCliQuotaState = {
+      status: 'success',
+      planType: 'Pro',
+      planEndMs: now + 20 * DAY_MS,
+      overageBalanceUsd: 45.23,
+      windows: [
+        {
+          id: 'daily',
+          label: 'Daily quota',
+          labelKey: 'devin_cli_quota.daily',
+          descriptionKey: 'devin_cli_quota.daily_desc',
+          usedPercent: 25,
+          resetAtMs: now + 6 * HOUR_MS,
+          periodHours: 24,
+        },
+        {
+          id: 'weekly',
+          label: 'Weekly quota',
+          labelKey: 'devin_cli_quota.weekly',
+          descriptionKey: 'devin_cli_quota.weekly_desc',
+          usedPercent: 60,
+          resetAtMs: now + 3 * DAY_MS,
+          periodHours: 168,
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(createElement(DevinCliQuotaBody, { quota, classes }));
+
+    expect(markup).toContain('Pro');
+    expect(markup).toContain('Daily quota');
+    expect(markup).toContain('Weekly quota');
+    expect(markup).toContain('75% left');
+    expect(markup).toContain('40% left');
+    expect(markup).toContain('Devin daily ACU allowance');
+    expect(markup).toContain('$45.23');
+    expect(markup).toContain('Extra usage balance');
+    expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(3);
+  });
+});
+
+describe('XaiQuotaBody', () => {
+  const xaiBilling = {
+    mode: 'billing' as const,
+    periodType: 'weekly' as const,
+    usagePercent: 7,
+    periodStart: '2026-09-11T17:32:46Z',
+    periodEnd: '2026-09-18T17:32:46Z',
+    productUsage: [{ product: 'GrokBuild', usagePercent: 7 }],
+    monthlyLimitCents: 0,
+    usedCents: 0,
+    includedUsedCents: 0,
+    onDemandCapCents: 0,
+    onDemandUsedCents: 0,
+    onDemandUsedPercent: 0,
+    usedPercent: 7,
+    resetAtMs: now + 4 * DAY_MS,
+    periodHours: 168,
+  };
+
+  test('renders the Grok Bot window borrowed from the Cursor credential', () => {
+    const quota: XaiQuotaState = {
+      status: 'success',
+      billing: xaiBilling,
+      grokBot: { usedPercent: 16.35, resetAtMs: now + 2 * DAY_MS },
+    };
+    const markup = renderToStaticMarkup(createElement(XaiQuotaBody, { quota, classes }));
+
+    expect(markup).toContain('Weekly limit');
+    expect(markup).toContain('Grok Bot');
+    expect(markup).toContain('bundled with the Cursor plan');
+    expect(markup).toContain('Used 16%');
+  });
+
+  test('omits the Grok Bot row when no Cursor credential reports it', () => {
+    const quota: XaiQuotaState = { status: 'success', billing: xaiBilling };
+    const markup = renderToStaticMarkup(createElement(XaiQuotaBody, { quota, classes }));
+
+    expect(markup).not.toContain('Grok Bot');
   });
 });

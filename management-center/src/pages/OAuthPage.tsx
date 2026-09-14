@@ -26,6 +26,8 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconOpenCodeGoDark from '@/assets/icons/opencode-go-dark.svg';
 import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
+import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
+import iconDevinCliLight from '@/assets/icons/devin-cli-light.svg';
 
 interface ProviderState {
   url?: string;
@@ -57,6 +59,16 @@ interface VertexImportState {
 
 interface OpenCodeGoImportState {
   apiKey: string;
+  email: string;
+  showKey: boolean;
+  loading: boolean;
+  error?: string;
+  success: boolean;
+}
+
+interface DevinCliImportState {
+  apiKey: string;
+  serverUrl: string;
   email: string;
   showKey: boolean;
   loading: boolean;
@@ -266,6 +278,14 @@ export function OAuthPage() {
   });
   const [openCodeGoState, setOpenCodeGoState] = useState<OpenCodeGoImportState>({
     apiKey: '',
+    email: '',
+    showKey: false,
+    loading: false,
+    success: false,
+  });
+  const [devinCliState, setDevinCliState] = useState<DevinCliImportState>({
+    apiKey: '',
+    serverUrl: '',
     email: '',
     showKey: false,
     loading: false,
@@ -635,6 +655,62 @@ export function OAuthPage() {
     }
   };
 
+  const handleDevinCliImport = async () => {
+    const apiKey = devinCliState.apiKey.trim();
+    const serverUrl = devinCliState.serverUrl.trim().replace(/\/+$/, '');
+    const email = devinCliState.email.trim();
+    if (!apiKey) {
+      const message = t('devin_cli_login.api_key_required');
+      setDevinCliState((prev) => ({ ...prev, error: message, success: false }));
+      showNotification(message, 'warning');
+      return;
+    }
+    if (serverUrl && !serverUrl.startsWith('https://')) {
+      const message = t('devin_cli_login.server_url_invalid');
+      setDevinCliState((prev) => ({ ...prev, error: message, success: false }));
+      showNotification(message, 'warning');
+      return;
+    }
+
+    setDevinCliState((prev) => ({ ...prev, loading: true, error: undefined, success: false }));
+    try {
+      const credential = {
+        type: 'devin-cli',
+        auth_kind: 'api_key',
+        api_key: apiKey,
+        note: 'Devin CLI quota tracking',
+        ...(serverUrl ? { api_server_url: serverUrl } : {}),
+        ...(email ? { email } : {}),
+      };
+      const file = new File([JSON.stringify(credential, null, 2)], 'devin-cli.json', {
+        type: 'application/json',
+      });
+      const result = await authFilesApi.uploadFiles([file]);
+      if (result.failed.length > 0 || result.uploaded < 1) {
+        throw new Error(result.failed[0]?.error || t('notification.upload_failed'));
+      }
+
+      setDevinCliState((prev) => ({
+        ...prev,
+        apiKey: '',
+        loading: false,
+        error: undefined,
+        success: true,
+      }));
+      notifyAuthFilesChanged();
+      showNotification(t('devin_cli_login.success'), 'success');
+    } catch (err: unknown) {
+      const message = getErrorMessage(err) || t('notification.upload_failed');
+      setDevinCliState((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+        success: false,
+      }));
+      showNotification(`${t('devin_cli_login.failed')} ${message}`, 'error');
+    }
+  };
+
   const renderOAuthProviderCard = (provider: OAuthProviderCard, featured = false) => {
     const state = states[provider.id] || {};
     const showKimiSignUp = featured && provider.kind === 'builtin' && provider.id === 'kimi';
@@ -888,6 +964,114 @@ export function OAuthPage() {
                   <span className="status-badge success">{t('opencode_go_login.success')}</span>
                   <Button variant="secondary" size="sm" onClick={() => navigate('/quota')}>
                     {t('opencode_go_login.view_quota')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card
+            title={
+              <span className={styles.cardTitle}>
+                <img
+                  src={resolvedTheme === 'dark' ? iconDevinCliLight : iconDevinCliDark}
+                  alt=""
+                  className={styles.cardTitleIcon}
+                />
+                {t('devin_cli_login.title')}
+              </span>
+            }
+            extra={
+              <Button onClick={handleDevinCliImport} loading={devinCliState.loading}>
+                {t('devin_cli_login.add_button')}
+              </Button>
+            }
+          >
+            <div className={styles.cardContent}>
+              <div className={styles.cardHint}>{t('devin_cli_login.description')}</div>
+              <Input
+                label={t('devin_cli_login.api_key_label')}
+                hint={t('devin_cli_login.api_key_hint')}
+                placeholder={t('devin_cli_login.api_key_placeholder')}
+                type={devinCliState.showKey ? 'text' : 'password'}
+                name="devin-cli-api-key"
+                autoComplete="off"
+                spellCheck={false}
+                value={devinCliState.apiKey}
+                onChange={(event) =>
+                  setDevinCliState((prev) => ({
+                    ...prev,
+                    apiKey: event.target.value,
+                    error: undefined,
+                    success: false,
+                  }))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void handleDevinCliImport();
+                }}
+                rightElement={
+                  <button
+                    type="button"
+                    className={styles.secretToggle}
+                    onClick={() =>
+                      setDevinCliState((prev) => ({ ...prev, showKey: !prev.showKey }))
+                    }
+                    aria-label={
+                      devinCliState.showKey
+                        ? t('login.hide_key', { defaultValue: 'Hide key' })
+                        : t('login.show_key', { defaultValue: 'Show key' })
+                    }
+                    title={
+                      devinCliState.showKey
+                        ? t('login.hide_key', { defaultValue: 'Hide key' })
+                        : t('login.show_key', { defaultValue: 'Show key' })
+                    }
+                  >
+                    {devinCliState.showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                }
+              />
+              <Input
+                label={t('devin_cli_login.server_url_label')}
+                hint={t('devin_cli_login.server_url_hint')}
+                placeholder={t('devin_cli_login.server_url_placeholder')}
+                type="url"
+                autoComplete="off"
+                spellCheck={false}
+                value={devinCliState.serverUrl}
+                onChange={(event) =>
+                  setDevinCliState((prev) => ({
+                    ...prev,
+                    serverUrl: event.target.value,
+                    error: undefined,
+                    success: false,
+                  }))
+                }
+              />
+              <Input
+                label={t('devin_cli_login.email_label')}
+                hint={t('devin_cli_login.email_hint')}
+                placeholder={t('devin_cli_login.email_placeholder')}
+                type="email"
+                autoComplete="email"
+                value={devinCliState.email}
+                onChange={(event) =>
+                  setDevinCliState((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                    error: undefined,
+                    success: false,
+                  }))
+                }
+              />
+              {devinCliState.error && (
+                <div className="status-badge error">{devinCliState.error}</div>
+              )}
+              {devinCliState.success && (
+                <div className={styles.successActions}>
+                  <span className="status-badge success">{t('devin_cli_login.success')}</span>
+                  <Button variant="secondary" size="sm" onClick={() => navigate('/quota')}>
+                    {t('devin_cli_login.view_quota')}
                   </Button>
                 </div>
               )}

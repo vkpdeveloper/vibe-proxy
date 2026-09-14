@@ -251,6 +251,11 @@ func (h *Handler) listAuthFilesFromDisk(c *gin.Context) {
 				if projectID := strings.TrimSpace(gjson.GetBytes(data, "project_id").String()); projectID != "" {
 					fileData["project_id"] = projectID
 				}
+				if typeValue == "devin-cli" {
+					if serverURL := strings.TrimSpace(gjson.GetBytes(data, "api_server_url").String()); serverURL != "" {
+						fileData["api_server_url"] = serverURL
+					}
+				}
 				if pv := gjson.GetBytes(data, "priority"); pv.Exists() {
 					switch pv.Type {
 					case gjson.Number:
@@ -360,6 +365,11 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth) gin.H {
 	}
 	if projectID := authProjectID(auth); projectID != "" {
 		entry["project_id"] = projectID
+	}
+	if strings.EqualFold(strings.TrimSpace(auth.Provider), "devin-cli") {
+		if serverURL := stringValue(auth.Metadata, "api_server_url"); serverURL != "" {
+			entry["api_server_url"] = serverURL
+		}
 	}
 	if accountType, account := auth.AccountInfo(); accountType != "" || account != "" {
 		if accountType != "" {

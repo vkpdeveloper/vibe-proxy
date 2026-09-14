@@ -30,6 +30,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
     dark: { bg: '#252525', text: '#f5f5f5', border: '1px solid #484848' },
   },
+  'devin-cli': {
+    light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
+    dark: { bg: '#252525', text: '#f5f5f5', border: '1px solid #484848' },
+  },
   'opencode-go': {
     light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
     dark: { bg: '#252525', text: '#f7f7f7', border: '1px solid #484848' },
@@ -154,6 +158,31 @@ export const CURSOR_REQUEST_HEADERS = {
   Accept: 'application/json',
   'Connect-Protocol-Version': '1',
 };
+
+// Devin CLI seat-management API (Connect-RPC; the credential key travels in
+// the request body's metadata, which is why the $TOKEN$ placeholder sits in
+// `data` rather than in a header).
+export const DEVIN_CLI_DEFAULT_API_SERVER_URL = 'https://server.codeium.com';
+export const DEVIN_CLI_USER_STATUS_PATH =
+  '/exa.seat_management_pb.SeatManagementService/GetUserStatus';
+export const DEVIN_CLI_COMPAT_VERSION = '1.108.2';
+
+export const DEVIN_CLI_REQUEST_HEADERS = {
+  'Content-Type': 'application/json',
+  Accept: 'application/json',
+  'Connect-Protocol-Version': '1',
+};
+
+export const DEVIN_CLI_USER_STATUS_BODY = JSON.stringify({
+  metadata: {
+    apiKey: '$TOKEN$',
+    ideName: 'devin',
+    ideVersion: DEVIN_CLI_COMPAT_VERSION,
+    extensionName: 'devin',
+    extensionVersion: DEVIN_CLI_COMPAT_VERSION,
+    locale: 'en',
+  },
+});
 
 // OpenCode Go API configuration (official API-key usage endpoint)
 export const OPENCODE_GO_USAGE_URL = 'https://opencode.ai/zen/go/v1/usage';

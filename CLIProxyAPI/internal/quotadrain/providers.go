@@ -52,6 +52,8 @@ func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth 
 		return parseCodexCapacity(payload, now)
 	case "cursor":
 		return fetchCursorCapacity(ctx, auth, now)
+	case "devin-cli":
+		return fetchDevinCliCapacity(ctx, auth, now)
 	case "kimi":
 		payload, err := requestJSON(ctx, manager, auth, http.MethodGet, "https://api.kimi.com/coding/v1/usages", nil, nil)
 		if err != nil {
@@ -82,6 +84,15 @@ func requestBearerJSON(ctx context.Context, auth *coreauth.Auth, method, target 
 	if token == "" {
 		return nil, fmt.Errorf("quota access token is missing")
 	}
+	req, err := newQuotaRequest(ctx, method, target, body, headers)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	return executeQuotaRequest(auth, req)
+}
+
+func newQuotaRequest(ctx context.Context, method, target string, body []byte, headers http.Header) (*http.Request, error) {
 	var reader io.Reader
 	if body != nil {
 		reader = bytes.NewReader(body)
@@ -93,8 +104,10 @@ func requestBearerJSON(ctx context.Context, auth *coreauth.Auth, method, target 
 	if headers != nil {
 		req.Header = headers.Clone()
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	return req, nil
+}
 
+func executeQuotaRequest(auth *coreauth.Auth, req *http.Request) (map[string]any, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
 	if proxyURL := strings.TrimSpace(auth.ProxyURL); proxyURL != "" {
 		transport, _, errBuild := proxyutil.BuildHTTPTransport(proxyURL)
@@ -190,6 +203,94 @@ func parseCursorSandCapacity(payload map[string]any, now time.Time) []coreauth.C
 	return []coreauth.CapacityWindow{
 		capacityWindow("cursor-grok-bot", "Grok Bot · Weekly usage", used, resetAt, false, "", used >= 100),
 	}
+}
+
+const (
+	devinCliDefaultAPIServerURL = "https://server.codeium.com"
+	devinCliUserStatusPath      = "/exa.seat_management_pb.SeatManagementService/GetUserStatus"
+	// devinCliCompatVersion mirrors the IDE version Devin CLI reports in its
+	// Connect-RPC metadata, matching what open-source trackers send.
+	devinCliCompatVersion = "1.108.2"
+)
+
+// resolveDevinCliAPIServerURL returns the credential's Connect-RPC base URL.
+// Only https URLs are honored; anything else falls back to the default host.
+func resolveDevinCliAPIServerURL(auth *coreauth.Auth) string {
+	raw := strings.TrimSpace(authString(auth, "api_server_url", "apiServerUrl"))
+	if raw == "" || !strings.HasPrefix(raw, "https://") {
+		return devinCliDefaultAPIServerURL
+	}
+	if trimmed := strings.TrimRight(raw, "/"); trimmed != "" {
+		return trimmed
+	}
+	return devinCliDefaultAPIServerURL
+}
+
+func fetchDevinCliCapacity(ctx context.Context, auth *coreauth.Auth, now time.Time) ([]coreauth.CapacityWindow, error) {
+	apiKey := authString(auth, "api_key", "api-key")
+	if apiKey == "" {
+		return nil, fmt.Errorf("devin cli api key is missing")
+	}
+	// Devin's seat-management API authenticates inside the Connect-RPC body,
+	// not with an Authorization header.
+	body, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"apiKey":           apiKey,
+			"ideName":          "devin",
+			"ideVersion":       devinCliCompatVersion,
+			"extensionName":    "devin",
+			"extensionVersion": devinCliCompatVersion,
+			"locale":           "en",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build devin cli quota request: %w", err)
+	}
+	req, err := newQuotaRequest(ctx, http.MethodPost, resolveDevinCliAPIServerURL(auth)+devinCliUserStatusPath, body, http.Header{
+		"Content-Type":             []string{"application/json"},
+		"Accept":                   []string{"application/json"},
+		"Connect-Protocol-Version": []string{"1"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	payload, err := executeQuotaRequest(auth, req)
+	if err != nil {
+		return nil, err
+	}
+	return parseDevinCliCapacity(payload, now)
+}
+
+func parseDevinCliCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
+	userStatus := objectValue(value(payload, "userStatus", "user_status"))
+	planStatus := objectValue(value(userStatus, "planStatus", "plan_status"))
+	planInfo := objectValue(value(planStatus, "planInfo", "plan_info"))
+
+	hideDaily := boolValue(value(planInfo, "hideDailyQuota", "hide_daily_quota"))
+	dailyRemaining, dailyKnown := numberValue(value(planStatus, "dailyQuotaRemainingPercent", "daily_quota_remaining_percent"))
+	weeklyRemaining, weeklyKnown := numberValue(value(planStatus, "weeklyQuotaRemainingPercent", "weekly_quota_remaining_percent"))
+	dailyReset := parseAbsoluteTime(value(planStatus, "dailyQuotaResetAtUnix", "daily_quota_reset_at_unix"), now)
+	weeklyReset := parseAbsoluteTime(value(planStatus, "weeklyQuotaResetAtUnix", "weekly_quota_reset_at_unix"), now)
+
+	// Devin reports percent REMAINING; the tracker displays percent used.
+	windows := make([]coreauth.CapacityWindow, 0, 2)
+	appendRemaining := func(id, label string, remaining float64, resetAt time.Time) {
+		used := 100 - remaining
+		// Tracker credentials are display-only and never route traffic.
+		windows = append(windows, capacityWindow(id, label, used, resetAt, false, "", remaining <= 0))
+	}
+	if !hideDaily && dailyKnown {
+		appendRemaining("devin-cli-daily", "Daily quota", dailyRemaining, dailyReset)
+	}
+	if weeklyKnown {
+		appendRemaining("devin-cli-weekly", "Weekly quota", weeklyRemaining, weeklyReset)
+	} else if hideDaily && dailyKnown {
+		// Plans that hide the daily meter and report no weekly quota still have a
+		// real daily allowance; surface it in the weekly row so the card stays
+		// meaningful (mirrors openusage's Devin fallback).
+		appendRemaining("devin-cli-weekly", "Weekly quota", dailyRemaining, weeklyReset)
+	}
+	return requireWindows(windows)
 }
 
 func parseOpenCodeGoCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {

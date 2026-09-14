@@ -356,6 +356,7 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
     provider === 'claude' ||
     provider === 'codex' ||
     provider === 'cursor' ||
+    provider === 'devin-cli' ||
     provider === 'opencode-go'
   ) {
     const windows = ((quota as { windows?: WindowLike[] }).windows ?? []).filter(
@@ -429,6 +430,12 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
     const remaining =
       typeof billing.usagePercent === 'number' ? clampPercent(100 - billing.usagePercent) : null;
 
+    const grokBot = (quota as { grokBot?: { usedPercent?: number | null } | null }).grokBot;
+    const grokBotLimit: TimelineLimit[] =
+      grokBot && typeof grokBot.usedPercent === 'number'
+        ? [{ label: 'Grok Bot', remaining: clampPercent(100 - grokBot.usedPercent) }]
+        : [];
+
     return {
       ...empty,
       anchorMs: billing.resetAtMs,
@@ -438,13 +445,18 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
       remaining,
       // Per-product usage is the closest analogue to the other providers'
       // per-window breakdown.
-      limits: (billing.productUsage ?? [])
-        .map((entry) => ({
-          label: entry.product ?? '',
-          remaining:
-            typeof entry.usagePercent === 'number' ? clampPercent(100 - entry.usagePercent) : null,
-        }))
-        .filter((limit): limit is TimelineLimit => limit.remaining !== null),
+      limits: [
+        ...(billing.productUsage ?? [])
+          .map((entry) => ({
+            label: entry.product ?? '',
+            remaining:
+              typeof entry.usagePercent === 'number'
+                ? clampPercent(100 - entry.usagePercent)
+                : null,
+          }))
+          .filter((limit): limit is TimelineLimit => limit.remaining !== null),
+        ...grokBotLimit,
+      ],
     };
   }
 

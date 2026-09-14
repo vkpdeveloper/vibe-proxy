@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -267,6 +268,118 @@ func TestSupportedAuthIncludesOpenCodeGoAPIKeyTracker(t *testing.T) {
 	delete(auth.Metadata, "api_key")
 	if supportedAuth(auth) {
 		t.Fatal("supportedAuth(opencode-go without an API key) = true, want false")
+	}
+}
+
+func TestSupportedAuthIncludesDevinCliAPIKeyTracker(t *testing.T) {
+	auth := &coreauth.Auth{
+		Provider: "devin-cli",
+		Metadata: map[string]any{
+			"auth_kind": "api_key",
+			"api_key":   "devin-cli-key",
+		},
+	}
+	if !supportedAuth(auth) {
+		t.Fatal("supportedAuth(devin-cli) = false, want true")
+	}
+
+	delete(auth.Metadata, "api_key")
+	if supportedAuth(auth) {
+		t.Fatal("supportedAuth(devin-cli without an API key) = true, want false")
+	}
+}
+
+func TestParseDevinCliCapacity_FlipsRemainingPercentToUsed(t *testing.T) {
+	now := time.Now().UTC()
+	dailyReset := now.Add(18 * time.Hour).Truncate(time.Second)
+	weeklyReset := now.Add(5 * 24 * time.Hour).Truncate(time.Second)
+	windows, err := parseDevinCliCapacity(map[string]any{
+		"userStatus": map[string]any{
+			"planStatus": map[string]any{
+				"planInfo":                    map[string]any{"planName": "Pro"},
+				"dailyQuotaRemainingPercent":  75.0,
+				"weeklyQuotaRemainingPercent": "40",
+				"dailyQuotaResetAtUnix":       float64(dailyReset.Unix()),
+				"weeklyQuotaResetAtUnix":      strconv.FormatInt(weeklyReset.Unix(), 10),
+			},
+		},
+	}, now)
+	if err != nil {
+		t.Fatalf("parseDevinCliCapacity() error = %v", err)
+	}
+	if len(windows) != 2 {
+		t.Fatalf("len(windows) = %d, want 2", len(windows))
+	}
+	if windows[0].ID != "devin-cli-daily" || windows[0].UsedPercent != 25 || windows[0].RemainingPercent != 75 {
+		t.Fatalf("daily window = %#v, want 75%% remaining", windows[0])
+	}
+	if !windows[0].ResetAt.Equal(dailyReset) {
+		t.Fatalf("daily ResetAt = %s, want %s", windows[0].ResetAt, dailyReset)
+	}
+	if windows[1].ID != "devin-cli-weekly" || windows[1].UsedPercent != 60 {
+		t.Fatalf("weekly window = %#v, want 60%% used", windows[1])
+	}
+	if !windows[1].ResetAt.Equal(weeklyReset) {
+		t.Fatalf("weekly ResetAt = %s, want %s", windows[1].ResetAt, weeklyReset)
+	}
+	for _, window := range windows {
+		if window.Routing {
+			t.Fatalf("Devin CLI tracker window %q must be display-only", window.ID)
+		}
+	}
+}
+
+func TestParseDevinCliCapacity_HiddenDailyFillsWeekly(t *testing.T) {
+	now := time.Now().UTC()
+	weeklyReset := now.Add(3 * 24 * time.Hour).Truncate(time.Second)
+	windows, err := parseDevinCliCapacity(map[string]any{
+		"userStatus": map[string]any{
+			"planStatus": map[string]any{
+				"planInfo":                   map[string]any{"hideDailyQuota": true},
+				"dailyQuotaRemainingPercent": 30.0,
+				"weeklyQuotaResetAtUnix":     float64(weeklyReset.Unix()),
+			},
+		},
+	}, now)
+	if err != nil {
+		t.Fatalf("parseDevinCliCapacity() error = %v", err)
+	}
+	if len(windows) != 1 {
+		t.Fatalf("len(windows) = %d, want 1", len(windows))
+	}
+	if windows[0].ID != "devin-cli-weekly" || windows[0].UsedPercent != 70 {
+		t.Fatalf("weekly-from-daily window = %#v, want 70%% used", windows[0])
+	}
+}
+
+func TestParseDevinCliCapacity_MarksExhaustedAtZeroRemaining(t *testing.T) {
+	windows, err := parseDevinCliCapacity(map[string]any{
+		"userStatus": map[string]any{
+			"planStatus": map[string]any{"weeklyQuotaRemainingPercent": 0.0},
+		},
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("parseDevinCliCapacity() error = %v", err)
+	}
+	if len(windows) != 1 || !windows[0].HardExhausted {
+		t.Fatalf("windows = %#v, want exhausted weekly", windows)
+	}
+}
+
+func TestResolveDevinCliAPIServerURL(t *testing.T) {
+	auth := &coreauth.Auth{Metadata: map[string]any{}}
+	if got := resolveDevinCliAPIServerURL(auth); got != devinCliDefaultAPIServerURL {
+		t.Fatalf("default = %q, want %q", got, devinCliDefaultAPIServerURL)
+	}
+
+	auth.Metadata["api_server_url"] = "https://windsurf.example.com/"
+	if got := resolveDevinCliAPIServerURL(auth); got != "https://windsurf.example.com" {
+		t.Fatalf("custom = %q, want trailing slash trimmed", got)
+	}
+
+	auth.Metadata["api_server_url"] = "http://insecure.example.com"
+	if got := resolveDevinCliAPIServerURL(auth); got != devinCliDefaultAPIServerURL {
+		t.Fatalf("non-https = %q, want default host", got)
 	}
 }
 

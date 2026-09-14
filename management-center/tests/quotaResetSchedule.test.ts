@@ -109,6 +109,39 @@ describe('collectQuotaRowInstants', () => {
     ]);
   });
 
+  test('collects the xAI weekly limit and the borrowed Grok Bot reset', () => {
+    const quota = {
+      status: 'success',
+      billing: { periodType: 'weekly', resetAtMs: NOW + 4 * DAY_MS },
+      grokBot: { resetAtMs: NOW + 2 * DAY_MS },
+    };
+    expect(collectQuotaRowInstants('xai', quota).map((instant) => instant.rowId)).toEqual([
+      'xai:weekly',
+      'xai:grok-bot',
+    ]);
+    // A monthly-period billing rollover still contributes nothing.
+    expect(
+      collectQuotaRowInstants('xai', {
+        status: 'success',
+        billing: { periodType: 'monthly', resetAtMs: NOW + DAY_MS },
+      })
+    ).toEqual([]);
+  });
+
+  test('collects Devin CLI daily and weekly resets', () => {
+    const quota = {
+      status: 'success',
+      windows: [
+        { id: 'daily', resetAtMs: NOW + 6 * HOUR_MS },
+        { id: 'weekly', resetAtMs: NOW + 3 * DAY_MS },
+      ],
+    };
+    expect(collectQuotaRowInstants('devin-cli', quota).map((instant) => instant.rowId)).toEqual([
+      'daily',
+      'weekly',
+    ]);
+  });
+
   test('returns nothing unless the credential loaded successfully', () => {
     for (const status of ['idle', 'loading', 'error']) {
       expect(collectQuotaRowInstants('claude', { ...claudeQuota, status })).toEqual([]);

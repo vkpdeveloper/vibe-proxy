@@ -233,10 +233,11 @@ func supportedAuth(auth *coreauth.Auth) bool {
 		return false
 	}
 	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
-	if provider == "opencode-go" {
-		// OpenCode Go is quota-only, so the useful eligibility check is the
-		// presence of the API key itself. File-backed tracker credentials can be
-		// synthesized before auth-kind attributes are normalized.
+	if provider == "opencode-go" || provider == "devin-cli" {
+		// OpenCode Go and Devin CLI are quota-only, so the useful eligibility
+		// check is the presence of the API key itself. File-backed tracker
+		// credentials can be synthesized before auth-kind attributes are
+		// normalized.
 		return authString(auth, "api_key", "api-key") != ""
 	}
 	if auth.AuthKind() != coreauth.AuthKindOAuth {

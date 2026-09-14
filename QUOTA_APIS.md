@@ -65,6 +65,7 @@ the server and does not delay or rate-limit a user-triggered manual refresh.
 | Cursor | `DashboardService/GetCurrentPeriodUsage`, `GetPlanInfo`, `GetSandUsageStatus` | Three parallel authenticated `POST` requests |
 | Kimi | `/coding/v1/usages` | `GET` |
 | OpenCode Go | `/zen/go/v1/usage` | `GET` with the account API key |
+| Devin CLI | `SeatManagementService/GetUserStatus` on `server.codeium.com` | Connect-RPC `POST`; the API key travels in the body |
 | xAI/Grok | `/v1/billing?format=credits`, `/v1/billing` | Two parallel `GET` requests |
 
 ## Antigravity
@@ -491,6 +492,85 @@ return a per-model split, so the UI does not attribute aggregate consumption to
 individual models. The backend collector refreshes the credential every five
 minutes and exposes the latest snapshot to the quota page; manual refreshes are
 still available on demand.
+
+## Devin CLI
+
+Devin CLI tracking uses the Connect-RPC seat-management endpoint shared with
+the Windsurf-backed Devin products. The API is not publicly documented and may
+change without notice.
+
+### Endpoint and headers
+
+```http
+POST https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus
+Content-Type: application/json
+Accept: application/json
+Connect-Protocol-Version: 1
+```
+
+```json
+{
+  "metadata": {
+    "apiKey": "<windsurf_api_key>",
+    "ideName": "devin",
+    "ideVersion": "1.108.2",
+    "extensionName": "devin",
+    "extensionVersion": "1.108.2",
+    "locale": "en"
+  }
+}
+```
+
+Unlike every other provider here, the credential travels inside the JSON body
+(`metadata.apiKey`), not in an `Authorization` header. The auth file has
+`type: "devin-cli"` and `auth_kind: "api_key"`; it is tracker-only and never
+routes model requests. `scripts/import-devin-auth.zsh` imports the session
+token from `~/.local/share/devin/credentials.toml` (`windsurf_api_key`, plus
+`api_server_url` when a custom server is configured), with a Devin desktop-app
+`state.vscdb` fallback on macOS. **Logins → Other login methods → Devin CLI**
+accepts the token, an optional `https://` API server URL, and an optional
+account email instead. Because the key sits in the request body, the manual
+refresh path relies on `$TOKEN$` substitution inside the api-call `data` field;
+the stored `api_server_url` is exposed on the auth-file entry so the UI can
+target custom servers.
+
+### Expected response shape
+
+```ts
+type DevinCliUserStatus = {
+  userStatus?: {
+    name?: string;
+    email?: string;
+    planStatus?: {
+      planInfo?: {
+        planName?: string;
+        hideDailyQuota?: boolean;
+      };
+      planStart?: string;                    // ISO-8601 instant
+      planEnd?: string;                      // ISO-8601 instant
+      dailyQuotaRemainingPercent?: number | string;
+      weeklyQuotaRemainingPercent?: number | string;
+      dailyQuotaResetAtUnix?: number | string;
+      weeklyQuotaResetAtUnix?: number | string;
+      overageBalanceMicros?: number | string; // USD * 1e6
+    };
+  };
+};
+```
+
+Snake-case alternatives (`user_status`, `plan_status`, `plan_info`,
+`daily_quota_remaining_percent`, and similar) are also accepted.
+
+### UI mapping
+
+The card shows the plan name and plan-period end, a daily meter and a weekly
+meter with clickable reset times, and the extra-usage balance in USD when
+`overageBalanceMicros` is present. Devin reports percent *remaining*; the UI
+inverts it to percent used for the shared row component. When `hideDailyQuota`
+is set and no weekly figure is returned, the daily allowance is surfaced in
+the weekly row so the card stays meaningful. The backend collector refreshes
+the credential every five minutes and exposes the latest snapshot to the quota
+page; manual refreshes are still available on demand.
 
 ## xAI / Grok
 

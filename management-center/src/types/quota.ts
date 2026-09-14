@@ -322,6 +322,67 @@ export interface CursorQuotaState {
   errorStatus?: number;
 }
 
+// Devin CLI seat-management API payload and normalized state
+export interface DevinCliPlanInfoPayload {
+  planName?: string;
+  plan_name?: string;
+  hideDailyQuota?: boolean;
+  hide_daily_quota?: boolean;
+}
+
+export interface DevinCliPlanStatusPayload {
+  planInfo?: DevinCliPlanInfoPayload | null;
+  plan_info?: DevinCliPlanInfoPayload | null;
+  planStart?: string;
+  plan_start?: string;
+  planEnd?: string;
+  plan_end?: string;
+  dailyQuotaRemainingPercent?: number | string;
+  daily_quota_remaining_percent?: number | string;
+  weeklyQuotaRemainingPercent?: number | string;
+  weekly_quota_remaining_percent?: number | string;
+  dailyQuotaResetAtUnix?: number | string;
+  daily_quota_reset_at_unix?: number | string;
+  weeklyQuotaResetAtUnix?: number | string;
+  weekly_quota_reset_at_unix?: number | string;
+  overageBalanceMicros?: number | string;
+  overage_balance_micros?: number | string;
+}
+
+export interface DevinCliUserStatusPayload {
+  userStatus?: {
+    name?: string;
+    email?: string;
+    planStatus?: DevinCliPlanStatusPayload | null;
+    plan_status?: DevinCliPlanStatusPayload | null;
+  } | null;
+  user_status?: {
+    planStatus?: DevinCliPlanStatusPayload | null;
+    plan_status?: DevinCliPlanStatusPayload | null;
+  } | null;
+}
+
+export interface DevinCliQuotaWindow {
+  id: string;
+  label: string;
+  labelKey: string;
+  descriptionKey: string;
+  usedPercent: number | null;
+  resetAtMs: number | null;
+  periodHours: number | null;
+}
+
+export interface DevinCliQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  windows: DevinCliQuotaWindow[];
+  planType?: string | null;
+  /** Extra-usage balance in USD, converted from the payload's micros. */
+  overageBalanceUsd?: number | null;
+  planEndMs?: number | null;
+  error?: string;
+  errorStatus?: number;
+}
+
 // OpenCode Go API-key usage payload and normalized state
 export interface OpenCodeGoUsageWindowPayload {
   status?: 'ok' | 'rate-limited' | string;
@@ -502,9 +563,20 @@ export interface XaiBillingSummary {
   periodHours?: number | null;
 }
 
+/**
+ * Grok Bot weekly usage, reported through the Cursor seat API rather than the
+ * xAI billing endpoints. Filled at render time from the Cursor credential's
+ * quota data; `null`/absent when no Cursor credential reports it.
+ */
+export interface XaiGrokBotWindow {
+  usedPercent: number | null;
+  resetAtMs: number | null;
+}
+
 export interface XaiQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   billing: XaiBillingSummary | null;
+  grokBot?: XaiGrokBotWindow | null;
   error?: string;
   errorStatus?: number;
 }

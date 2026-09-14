@@ -19,6 +19,8 @@ import { CODEX_CONFIG } from './codex/data';
 import { CodexQuotaBody } from './codex/CodexQuotaBody';
 import { CURSOR_CONFIG } from './cursor/data';
 import { CursorQuotaBody } from './cursor/CursorQuotaBody';
+import { DEVIN_CLI_CONFIG } from './devinCli/data';
+import { DevinCliQuotaBody } from './devinCli/DevinCliQuotaBody';
 import { KIMI_CONFIG } from './kimi/data';
 import { KimiQuotaBody } from './kimi/KimiQuotaBody';
 import { OPENCODE_GO_CONFIG } from './opencodeGo/data';
@@ -56,6 +58,7 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
   claude: { ...CLAUDE_CONFIG, Body: ClaudeQuotaBody } as unknown as QuotaAdapter,
   codex: { ...CODEX_CONFIG, Body: CodexQuotaBody } as unknown as QuotaAdapter,
   cursor: { ...CURSOR_CONFIG, Body: CursorQuotaBody } as unknown as QuotaAdapter,
+  'devin-cli': { ...DEVIN_CLI_CONFIG, Body: DevinCliQuotaBody } as unknown as QuotaAdapter,
   kimi: { ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter,
   'opencode-go': {
     ...OPENCODE_GO_CONFIG,

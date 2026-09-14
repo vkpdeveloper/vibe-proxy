@@ -73,6 +73,8 @@ type apiCallResponse struct {
 //     Example: {"Authorization":"Bearer $TOKEN$"}.
 //     Note: if you need to override the HTTP Host header, set header["Host"].
 //   - data (optional): Raw request body as string (useful for POST/PUT/PATCH).
+//     Supports the same "$TOKEN$" magic variable as header values; it is
+//     replaced with the selected credential's token before the request is sent.
 //
 // Proxy selection (highest priority first):
 //  1. Request proxy_url (when set, lower-priority proxy settings are ignored)
@@ -162,9 +164,28 @@ func (h *Handler) APICall(c *gin.Context) {
 		reqHeaders[key] = strings.ReplaceAll(value, "$TOKEN$", token)
 	}
 
+	requestData := body.Data
+	if strings.Contains(requestData, "$TOKEN$") {
+		if !tokenResolved {
+			token, tokenErr = h.resolveTokenForAuth(c.Request.Context(), auth, requestProxyURL)
+			tokenResolved = true
+		}
+		if auth != nil && token == "" {
+			if tokenErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "auth token refresh failed"})
+				return
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auth token not found"})
+			return
+		}
+		if token != "" {
+			requestData = strings.ReplaceAll(requestData, "$TOKEN$", token)
+		}
+	}
+
 	var requestBody io.Reader
-	if body.Data != "" {
-		requestBody = strings.NewReader(body.Data)
+	if requestData != "" {
+		requestBody = strings.NewReader(requestData)
 	}
 
 	req, errNewRequest := http.NewRequestWithContext(c.Request.Context(), method, urlStr, requestBody)

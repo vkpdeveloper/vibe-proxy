@@ -46,6 +46,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     if (quotaType === 'claude') return state.claudeQuota[file.name] as QuotaCardState | undefined;
     if (quotaType === 'codex') return state.codexQuota[file.name] as QuotaCardState | undefined;
     if (quotaType === 'cursor') return state.cursorQuota[file.name] as QuotaCardState | undefined;
+    if (quotaType === 'devin-cli')
+      return state.devinCliQuota[file.name] as QuotaCardState | undefined;
     if (quotaType === 'kimi') return state.kimiQuota[file.name] as QuotaCardState | undefined;
     if (quotaType === 'opencode-go')
       return state.openCodeGoQuota[file.name] as QuotaCardState | undefined;

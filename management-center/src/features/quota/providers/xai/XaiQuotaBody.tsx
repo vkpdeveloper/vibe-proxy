@@ -10,7 +10,12 @@ import { buildResetDisplay, formatQuotaResetTime, parseIsoToMs } from '@/utils/q
 import { useNow } from '@/hooks/useNow';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
-import { XAI_WEEKLY_ROW_ID, collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
+import {
+  XAI_GROK_BOT_ROW_ID,
+  XAI_WEEKLY_ROW_ID,
+  collectQuotaRowInstants,
+  pickUrgentRowId,
+} from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 
 const formatUsdFromCents = (cents: number | null): string => {
@@ -70,11 +75,23 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
   const locale = i18n.resolvedLanguage;
   // Only the weekly limit is a quota window; the monthly figure is a billing
   // cycle, so it is never the row that "recovers first".
-  const weeklySoon = useMemo(
-    () => pickUrgentRowId(collectQuotaRowInstants('xai', quota), now) === XAI_WEEKLY_ROW_ID,
+  const urgentRowId = useMemo(
+    () => pickUrgentRowId(collectQuotaRowInstants('xai', quota), now),
     [quota, now]
   );
+  const weeklySoon = urgentRowId === XAI_WEEKLY_ROW_ID;
+  const grokBotSoon = urgentRowId === XAI_GROK_BOT_ROW_ID;
   const billing = quota.billing;
+  const grokBot = quota.grokBot;
+  const grokBotUsed =
+    grokBot?.usedPercent == null ? null : Math.max(0, Math.min(100, grokBot.usedPercent));
+  const grokBotRemaining = grokBotUsed === null ? null : 100 - grokBotUsed;
+  const grokBotResetDisplay = buildResetDisplay(
+    null,
+    grokBot?.resetAtMs ?? null,
+    now,
+    locale
+  );
 
   if (!billing) {
     return <div className={classes.quotaMessage}>{t('xai_quota.empty_data')}</div>;
@@ -166,6 +183,32 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
             </div>
           </div>
           <QuotaMeter percent={weeklyRemaining} classes={classes} index={0} />
+        </div>
+      )}
+      {grokBot && (
+        <div
+          className={classes.quotaRow}
+          title={grokBotSoon ? t('quota_management.soonest_row_hint') : undefined}
+        >
+          <div className={classes.quotaRowHeader}>
+            <span className={classes.quotaLabel}>
+              <span className={classes.quotaModel}>{t('xai_quota.grok_bot_weekly')}</span>
+              <span className={classes.quotaDescription}>{t('xai_quota.grok_bot_desc')}</span>
+            </span>
+            <div className={classes.quotaMeta}>
+              <span className={classes.quotaPercent}>
+                {t('xai_quota.used_percent', { percent: formatXaiPercent(grokBotUsed) })}
+              </span>
+              {grokBotResetDisplay && (
+                <QuotaResetLabel
+                  display={grokBotResetDisplay}
+                  classes={classes}
+                  soon={grokBotSoon}
+                />
+              )}
+            </div>
+          </div>
+          <QuotaMeter percent={grokBotRemaining} classes={classes} index={0.5} />
         </div>
       )}
       {billing.productUsage.map((item, index) => {

@@ -50,6 +50,20 @@ The backend refreshes and stores the latest OpenCode Go snapshot on the same
 five-minute schedule as Cursor and xAI, so it is restored without a browser-side
 request after page reloads.
 
+### Devin CLI usage tracking
+
+Devin CLI usage is shown beside the other providers on the Quota Management page. The card shows the plan name, daily and weekly quota meters with their reset times, and any extra-usage balance. It is a tracker-only integration: the credential reads Devin's seat-management status and is never used to route proxy requests. The backend caches Devin CLI, Cursor, OpenCode Go, and xAI usage snapshots every five minutes; a manual refresh remains immediate.
+
+On the machine where Devin CLI is signed in, import its locally stored session token:
+
+```sh
+zsh scripts/import-devin-auth.zsh
+```
+
+The script reads `windsurf_api_key` (and a custom `api_server_url`, when configured) from `~/.local/share/devin/credentials.toml`, falling back to the Devin desktop app's `state.vscdb` on macOS. It writes an owner-only `data/auths/devin-cli.json` and never prints the token. When the bind-mounted auth directory is container-owned, it installs the file through the running `cli-proxy-api` Compose service rather than weakening directory permissions. You may pass a custom `credentials.toml` path as the first argument. Alternatively, paste the token under **Logins → Other login methods → Devin CLI**, which also accepts an optional `https://` API server URL.
+
+The seat-management endpoint is undocumented and may change. A `400`/`401` usually means the session token expired; remove the old `devin-cli.json` and import again after `devin login`.
+
 The `cloudflared` container uses the named tunnel `lame-proxy` and restarts automatically with Docker. Its secret credentials remain outside the repository at `~/.cloudflared/3111cade-e66f-4a23-b07c-1cdb408678c5.json` and are mounted read-only.
 
 If this host's Tailscale IPv4 address changes, update `BIND_ADDRESS` in `.env` (copy from `.env.example`) and recreate the stack:

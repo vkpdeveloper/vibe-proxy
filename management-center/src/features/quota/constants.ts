@@ -7,6 +7,7 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
   'codex',
   'cursor',
   'opencode-go',
+  'devin-cli',
   'xai',
   'kimi',
 ];

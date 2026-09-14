@@ -8,6 +8,7 @@ import type {
   ClaudeQuotaState,
   CodexQuotaState,
   CursorQuotaState,
+  DevinCliQuotaState,
   KimiQuotaState,
   OpenCodeGoQuotaState,
   XaiQuotaState,
@@ -21,6 +22,7 @@ interface QuotaStoreState {
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   cursorQuota: Record<string, CursorQuotaState>;
+  devinCliQuota: Record<string, DevinCliQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   openCodeGoQuota: Record<string, OpenCodeGoQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
@@ -28,6 +30,7 @@ interface QuotaStoreState {
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
+  setDevinCliQuota: (updater: QuotaUpdater<Record<string, DevinCliQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setOpenCodeGoQuota: (updater: QuotaUpdater<Record<string, OpenCodeGoQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
@@ -47,6 +50,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   claudeQuota: {},
   codexQuota: {},
   cursorQuota: {},
+  devinCliQuota: {},
   kimiQuota: {},
   openCodeGoQuota: {},
   xaiQuota: {},
@@ -65,6 +69,10 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   setCursorQuota: (updater) =>
     set((state) => ({
       cursorQuota: resolveUpdater(updater, state.cursorQuota),
+    })),
+  setDevinCliQuota: (updater) =>
+    set((state) => ({
+      devinCliQuota: resolveUpdater(updater, state.devinCliQuota),
     })),
   setKimiQuota: (updater) =>
     set((state) => ({
@@ -85,6 +93,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       claudeQuota: {},
       codexQuota: {},
       cursorQuota: {},
+      devinCliQuota: {},
       kimiQuota: {},
       openCodeGoQuota: {},
       xaiQuota: {},

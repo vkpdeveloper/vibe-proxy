@@ -39,6 +39,7 @@ import {
   hasStoredQuotaCapacity,
   hasStoredQuotaError,
   paginate,
+  resolveXaiGrokBotWindow,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
@@ -106,6 +107,7 @@ export function QuotaPage() {
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const cursorQuota = useQuotaStore((state) => state.cursorQuota);
+  const devinCliQuota = useQuotaStore((state) => state.devinCliQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const openCodeGoQuota = useQuotaStore((state) => state.openCodeGoQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
@@ -117,16 +119,21 @@ export function QuotaPage() {
         claude: claudeQuota,
         codex: codexQuota,
         cursor: cursorQuota,
+        'devin-cli': devinCliQuota,
         kimi: kimiQuota,
         'opencode-go': openCodeGoQuota,
         xai: xaiQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
-    [antigravityQuota, claudeQuota, codexQuota, cursorQuota, kimiQuota, openCodeGoQuota, xaiQuota]
-  );
-
-  const getQuota = useCallback(
-    (entry: QuotaFileEntry): QuotaCardState | undefined => quotaByType[entry.type][entry.file.name],
-    [quotaByType]
+    [
+      antigravityQuota,
+      claudeQuota,
+      codexQuota,
+      cursorQuota,
+      devinCliQuota,
+      kimiQuota,
+      openCodeGoQuota,
+      xaiQuota,
+    ]
   );
 
   /* ---------- 归类 / 过滤 / 排序 / 分页 ---------- */
@@ -139,6 +146,36 @@ export function QuotaPage() {
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
   const filteredEntries = useMemo(() => filterEntriesByTab(entries, tab), [entries, tab]);
+
+  /* Grok Bot usage lives on the Cursor seat API, so the xAI card borrows the
+     window from the Cursor credential (live fetch, then the stored snapshot).
+     It is attached to the first xAI entry only — the figure is account-level,
+     not per-credential, and repeating it on every xAI card would double it up
+     in the timeline too. */
+  const xaiGrokBot = useMemo(
+    () => resolveXaiGrokBotWindow(files, cursorQuota),
+    [files, cursorQuota]
+  );
+  const xaiGrokBotFileName = useMemo(
+    () => entries.find((entry) => entry.type === 'xai')?.file.name ?? null,
+    [entries]
+  );
+
+  const getQuota = useCallback(
+    (entry: QuotaFileEntry): QuotaCardState | undefined => {
+      const state = quotaByType[entry.type][entry.file.name];
+      if (
+        entry.type === 'xai' &&
+        entry.file.name === xaiGrokBotFileName &&
+        state &&
+        xaiGrokBot
+      ) {
+        return { ...state, grokBot: xaiGrokBot } as QuotaCardState;
+      }
+      return state;
+    },
+    [quotaByType, xaiGrokBot, xaiGrokBotFileName]
+  );
 
   const resolveNextRecovery = useCallback(
     (entry: QuotaFileEntry) => nextRecoveryMs(entry.type, getQuota(entry), sortNow),

@@ -13,6 +13,7 @@ export type AuthFileType =
   | 'claude'
   | 'codex'
   | 'cursor'
+  | 'devin-cli'
   | 'opencode-go'
   | 'antigravity'
   | 'xai'
@@ -82,6 +83,9 @@ export interface AuthFileItem {
   failureCount?: number;
   recent_requests?: RecentRequestBucket[];
   recentRequests?: RecentRequestBucket[];
+  /** Devin CLI tracker credentials may carry a custom Connect-RPC base URL. */
+  api_server_url?: string;
+  apiServerUrl?: string;
   quota_capacity?: QuotaCapacityState;
   quotaCapacity?: QuotaCapacityState;
   routing_selection?: RoutingSelectionState;

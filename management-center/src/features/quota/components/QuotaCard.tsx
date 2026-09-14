@@ -51,6 +51,10 @@ const STORED_WINDOW_DESCRIPTIONS: Partial<Record<QuotaFileEntry['type'], Record<
       'opencode-go-weekly': 'opencode_go_quota.weekly_desc',
       'opencode-go-monthly': 'opencode_go_quota.monthly_desc',
     },
+    'devin-cli': {
+      'devin-cli-daily': 'devin_cli_quota.daily_desc',
+      'devin-cli-weekly': 'devin_cli_quota.weekly_desc',
+    },
   };
 
 const parseTimestamp = (value?: string): number | null => {
