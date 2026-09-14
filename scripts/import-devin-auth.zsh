@@ -56,6 +56,22 @@ if [[ -z $api_key ]]; then
   exit 1
 fi
 
+# credentials.toml carries no email on Linux; ask GetUserStatus for the
+# account email so cards title by identity instead of the filename.
+if [[ -z $email ]] && command -v curl >/dev/null 2>&1; then
+  status_url="${api_server_url:-$default_api_server}/exa.seat_management_pb.SeatManagementService/GetUserStatus"
+  user_status=$(curl -fsS -m 10 -X POST "$status_url" \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -H 'Connect-Protocol-Version: 1' \
+    --data "$(jq -n --arg api_key "$api_key" \
+      '{metadata: {apiKey: $api_key, ideName: "devin", ideVersion: "1.108.2", extensionName: "devin", extensionVersion: "1.108.2", locale: "en"}}')" \
+    2>/dev/null || true)
+  if [[ -n $user_status ]]; then
+    email=$(jq -r '.userStatus.email | strings | select(length > 0)' <<< "$user_status" 2>/dev/null || true)
+  fi
+fi
+
 mkdir -p "$target_dir"
 target="$target_dir/devin-cli.json"
 if [[ -e $target ]]; then
