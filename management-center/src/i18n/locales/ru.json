@@ -582,7 +582,7 @@
     "fetch_all": "Получить все",
     "weekly_limit": "Недельный лимит",
     "grok_bot_weekly": "Grok Bot · Недельное использование",
-    "grok_bot_desc": "Лимит Grok Bot, включённый в план Cursor",
+    "grok_bot_desc": "Недельный лимит Grok Bot, оплачиваемый тарифом этого аккаунта",
     "monthly_credits": "Месячные кредиты",
     "used_percent": "Использовано {{percent}}",
     "reset_at": "Сброс {{time}}",

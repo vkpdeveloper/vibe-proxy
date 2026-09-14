@@ -257,92 +257,63 @@ describe('sortQuotaEntries', () => {
 });
 
 describe('resolveXaiGrokBotWindow', () => {
-  const cursorFile = (extra: Partial<AuthFileItem> = {}) =>
-    file('cursor-a.json', 'cursor', extra);
+  const xaiFile = (extra: Partial<AuthFileItem> = {}) =>
+    file('xai-andro@gmail.com.json', 'xai', extra);
 
-  test('prefers the live Cursor fetch over the stored snapshot', () => {
-    const files = [
-      cursorFile({
-        quota_capacity: {
-          provider: 'cursor',
-          supported: true,
-          windows: [
-            {
-              id: 'cursor-grok-bot',
-              label: 'Grok Bot',
-              used_percent: 50,
-              remaining_percent: 50,
-              reset_at: '2026-09-16T18:58:24.521Z',
-              known: true,
-              routing: false,
-            },
-          ],
-        },
-      }),
-    ];
-    const cursorQuota = {
-      'cursor-a.json': {
-        status: 'success',
-        windows: [{ id: 'grok-bot', usedPercent: 16.35, resetAtMs: 1_789_000_000_000 }],
+  test('reads the account own grok bot window from the stored snapshot', () => {
+    const f = xaiFile({
+      quota_capacity: {
+        provider: 'xai',
+        supported: true,
+        windows: [
+          {
+            id: 'xai-weekly',
+            label: 'Weekly credits',
+            used_percent: 7,
+            remaining_percent: 93,
+            known: true,
+            routing: true,
+          },
+          {
+            id: 'xai-grok-bot',
+            label: 'Grok Bot',
+            used_percent: 16,
+            remaining_percent: 84,
+            reset_at: '2026-09-16T18:58:24.521Z',
+            known: true,
+            routing: false,
+          },
+        ],
       },
-    } as never;
-
-    expect(resolveXaiGrokBotWindow(files, cursorQuota)).toEqual({
-      usedPercent: 16.35,
-      resetAtMs: 1_789_000_000_000,
     });
-  });
 
-  test('falls back to the backend-collected snapshot before the Cursor card loads', () => {
-    const files = [
-      cursorFile({
-        quota_capacity: {
-          provider: 'cursor',
-          supported: true,
-          windows: [
-            {
-              id: 'cursor-grok-bot',
-              label: 'Grok Bot',
-              used_percent: 16,
-              remaining_percent: 84,
-              reset_at: '2026-09-16T18:58:24.521Z',
-              known: true,
-              routing: false,
-            },
-          ],
-        },
-      }),
-    ];
-
-    expect(resolveXaiGrokBotWindow(files, {})).toEqual({
+    expect(resolveXaiGrokBotWindow(f)).toEqual({
       usedPercent: 16,
       resetAtMs: Date.parse('2026-09-16T18:58:24.521Z'),
     });
   });
 
-  test('ignores disabled Cursor credentials, other providers, and unknown windows', () => {
-    const files = [
-      cursorFile({ disabled: true, quota_capacity: { provider: 'cursor', supported: true } }),
-      file('xai.json', 'xai'),
-      cursorFile({
-        name: 'cursor-b.json',
-        quota_capacity: {
-          provider: 'cursor',
-          supported: true,
-          windows: [
-            {
-              id: 'cursor-grok-bot',
-              label: 'Grok Bot',
-              used_percent: 0,
-              remaining_percent: 0,
-              known: false,
-              routing: false,
-            },
-          ],
-        },
-      }),
-    ];
-    expect(resolveXaiGrokBotWindow(files, {})).toBeNull();
-    expect(resolveXaiGrokBotWindow([], {})).toBeNull();
+  test('returns null when the credential has no grok bot window', () => {
+    expect(resolveXaiGrokBotWindow(xaiFile())).toBeNull();
+    expect(
+      resolveXaiGrokBotWindow(
+        xaiFile({
+          quota_capacity: {
+            provider: 'xai',
+            supported: true,
+            windows: [
+              {
+                id: 'xai-grok-bot',
+                label: 'Grok Bot',
+                used_percent: 0,
+                remaining_percent: 0,
+                known: false,
+                routing: false,
+              },
+            ],
+          },
+        })
+      )
+    ).toBeNull();
   });
 });

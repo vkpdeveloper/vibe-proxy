@@ -368,7 +368,7 @@ describe('XaiQuotaBody', () => {
     periodHours: 168,
   };
 
-  test('renders the Grok Bot window borrowed from the Cursor credential', () => {
+  test('renders the account own Grok Bot window from the stored snapshot', () => {
     const quota: XaiQuotaState = {
       status: 'success',
       billing: xaiBilling,
@@ -378,7 +378,7 @@ describe('XaiQuotaBody', () => {
 
     expect(markup).toContain('Weekly limit');
     expect(markup).toContain('Grok Bot');
-    expect(markup).toContain('bundled with the Cursor plan');
+    expect(markup).toContain('funded by this account');
     expect(markup).toContain('Used 16%');
   });
 

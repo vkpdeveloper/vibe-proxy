@@ -147,34 +147,22 @@ export function QuotaPage() {
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
   const filteredEntries = useMemo(() => filterEntriesByTab(entries, tab), [entries, tab]);
 
-  /* Grok Bot usage lives on the Cursor seat API, so the xAI card borrows the
-     window from the Cursor credential (live fetch, then the stored snapshot).
-     It is attached to the first xAI entry only — the figure is account-level,
-     not per-credential, and repeating it on every xAI card would double it up
-     in the timeline too. */
-  const xaiGrokBot = useMemo(
-    () => resolveXaiGrokBotWindow(files, cursorQuota),
-    [files, cursorQuota]
-  );
-  const xaiGrokBotFileName = useMemo(
-    () => entries.find((entry) => entry.type === 'xai')?.file.name ?? null,
-    [entries]
-  );
-
+  /* Grok Bot usage is a per-account xAI allowance collected by the backend over
+     the computer-hub WebSocket. It lands on the credential's stored
+     quota_capacity snapshot (`xai-grok-bot`), so each xAI card merges in its
+     own window — distinct from the Cursor-plan Grok Bot meter on cursor cards. */
   const getQuota = useCallback(
     (entry: QuotaFileEntry): QuotaCardState | undefined => {
       const state = quotaByType[entry.type][entry.file.name];
-      if (
-        entry.type === 'xai' &&
-        entry.file.name === xaiGrokBotFileName &&
-        state &&
-        xaiGrokBot
-      ) {
-        return { ...state, grokBot: xaiGrokBot } as QuotaCardState;
+      if (entry.type === 'xai' && state) {
+        const grokBot = resolveXaiGrokBotWindow(entry.file);
+        if (grokBot) {
+          return { ...state, grokBot } as QuotaCardState;
+        }
       }
       return state;
     },
-    [quotaByType, xaiGrokBot, xaiGrokBotFileName]
+    [quotaByType]
   );
 
   const resolveNextRecovery = useCallback(

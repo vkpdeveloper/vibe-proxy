@@ -624,6 +624,23 @@ The two responses are merged. The UI renders weekly credit usage, every
 derives included and on-demand usage from the reported cents when needed and
 identifies SuperGrok plans from the monthly limit.
 
+### Grok Bot weekly allowance (backend-only)
+
+The account's own Grok Bot meter is not part of the billing API — it is
+exposed by the computer hub over WebSocket:
+
+```text
+wss://computer-hub.grok.com/v1/tools?role=bot_client
+```
+
+The collector opens the socket with the credential's `Authorization: Bearer`
+token plus the Grok CLI headers, sends the `protocol_version`/`bot_client`
+hello frame, and issues a single JSON-RPC `bot.usage` call. The result's
+`usagePercent` and `nextResetAtMs` become the `xai-grok-bot` window in the
+credential's `quota_capacity` snapshot. Browsers cannot send the auth header
+on a WS upgrade, so the quota card always reads this row from the stored
+snapshot rather than through the manual-refresh `api-call` relay.
+
 ## Source of truth
 
 The endpoint constants, request headers, and provider fetch functions are in:

@@ -583,7 +583,7 @@
     "fetch_all": "取得全部",
     "weekly_limit": "週限額",
     "grok_bot_weekly": "Grok Bot · 每週用量",
-    "grok_bot_desc": "Cursor 方案附帶的 Grok Bot 額度",
+    "grok_bot_desc": "此帳號方案提供的每週 Grok Bot 額度",
     "monthly_credits": "月度點數",
     "used_percent": "已用 {{percent}}",
     "reset_at": "重置 {{time}}",

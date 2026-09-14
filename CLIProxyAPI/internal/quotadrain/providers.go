@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
@@ -500,10 +501,96 @@ func fetchXAICapacity(ctx context.Context, manager *coreauth.Manager, auth *core
 		}
 		windows = append(windows, parseXAICapacity(payload, target.id, target.label, now)...)
 	}
+	// The account's own Grok Bot meter is only exposed over the computer-hub
+	// WebSocket (`bot.usage`); it is a separate allowance from the Cursor-plan
+	// Grok Bot window collected under "cursor".
+	windows = append(windows, fetchXAIGrokBotUsage(ctx, auth)...)
 	if len(windows) == 0 && lastErr != nil {
 		return nil, lastErr
 	}
 	return requireWindows(windows)
+}
+
+const xaiGrokBotHubURL = "wss://computer-hub.grok.com/v1/tools?role=bot_client"
+
+// fetchXAIGrokBotUsage queries the caller's weekly Grok Bot allowance from the
+// computer hub. The exchange is a one-shot handshake + JSON-RPC call, so the
+// whole round trip runs under a single bounded context.
+func fetchXAIGrokBotUsage(ctx context.Context, auth *coreauth.Auth) []coreauth.CapacityWindow {
+	token := authString(auth, "access_token", "accessToken", "token")
+	if token == "" {
+		return nil
+	}
+	header := http.Header{
+		"Authorization":         []string{"Bearer " + token},
+		"x-xai-token-auth":      []string{"xai-grok-cli"},
+		"x-grok-client-version": []string{"0.2.91"},
+		"Origin":                []string{"https://grok.com"},
+		"User-Agent":            []string{"grok-pager/0.2.91 grok-shell/0.2.91 (macos; aarch64)"},
+	}
+	if userID := xaiUserID(auth); userID != "" {
+		header.Set("x-userid", userID)
+	}
+	wsCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	conn, _, err := websocket.DefaultDialer.DialContext(wsCtx, xaiGrokBotHubURL, header)
+	if err != nil {
+		log.WithError(err).Debug("quota drain: xai grok bot hub dial failed")
+		return nil
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.WithError(err).Debug("quota drain: xai grok bot hub close failed")
+		}
+	}()
+	if deadline, ok := wsCtx.Deadline(); ok {
+		_ = conn.SetReadDeadline(deadline)
+	}
+	if err := conn.WriteJSON(map[string]any{"protocol_version": "1.0.0", "kind": "bot_client"}); err != nil {
+		return nil
+	}
+	var ack struct {
+		ConnectionID string `json:"connection_id"`
+	}
+	if err := conn.ReadJSON(&ack); err != nil || ack.ConnectionID == "" {
+		return nil
+	}
+	call := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "bot.usage",
+		"params":  map[string]any{},
+	}
+	if err := conn.WriteJSON(call); err != nil {
+		return nil
+	}
+	for {
+		var frame struct {
+			ID     int             `json:"id"`
+			Result json.RawMessage `json:"result"`
+		}
+		if err := conn.ReadJSON(&frame); err != nil {
+			return nil
+		}
+		if frame.ID != 1 || len(frame.Result) == 0 {
+			continue
+		}
+		var usage struct {
+			UsagePercent  *float64 `json:"usagePercent"`
+			NextResetAtMs *int64   `json:"nextResetAtMs"`
+			PlanLabel     string   `json:"planLabel"`
+		}
+		if err := json.Unmarshal(frame.Result, &usage); err != nil || usage.UsagePercent == nil {
+			return nil
+		}
+		var resetAt time.Time
+		if usage.NextResetAtMs != nil {
+			resetAt = time.UnixMilli(*usage.NextResetAtMs)
+		}
+		return []coreauth.CapacityWindow{
+			capacityWindow("xai-grok-bot", "Grok Bot · Weekly usage", *usage.UsagePercent, resetAt, false, "", *usage.UsagePercent >= 100),
+		}
+	}
 }
 
 func parseXAICapacity(payload map[string]any, id, label string, now time.Time) []coreauth.CapacityWindow {
