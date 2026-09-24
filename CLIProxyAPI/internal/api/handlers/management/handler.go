@@ -385,6 +385,19 @@ func (h *Handler) AuthenticateManagementKey(clientIP string, localClient bool, p
 		return false, http.StatusUnauthorized, "missing management key"
 	}
 
+	// MANAGEMENT_PASSWORD is authoritative: when it is set, it is the only key that
+	// opens management. The config secret-key and the local password are ignored, so
+	// neither a config edit nor a spoofed "local" client (X-Forwarded-For) can add
+	// another way in, such as a client API key.
+	if envSecret != "" {
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(envSecret)) != 1 {
+			fail()
+			return false, http.StatusUnauthorized, "invalid management key"
+		}
+		reset()
+		return true, 0, ""
+	}
+
 	if localClient {
 		if lp := h.localPassword; lp != "" {
 			if subtle.ConstantTimeCompare([]byte(provided), []byte(lp)) == 1 {
@@ -392,11 +405,6 @@ func (h *Handler) AuthenticateManagementKey(clientIP string, localClient bool, p
 				return true, 0, ""
 			}
 		}
-	}
-
-	if envSecret != "" && subtle.ConstantTimeCompare([]byte(provided), []byte(envSecret)) == 1 {
-		reset()
-		return true, 0, ""
 	}
 
 	if secretHash == "" || bcrypt.CompareHashAndPassword([]byte(secretHash), []byte(provided)) != nil {

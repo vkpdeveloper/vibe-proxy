@@ -11,7 +11,7 @@ This Compose stack runs the CLI Proxy API backend and its Management Center behi
 - Proxy API base URL: `http://dell.border-peacock.ts.net:8954/api`
 - Health check: `http://dell.border-peacock.ts.net:8954/healthz`
 
-The Management Center is configured to use `/api/v0/management` automatically. Enter the `MANAGEMENT_KEY` from `secrets.env` on first login. API clients should use the `PROXY_API_KEY` from the same file as a bearer token.
+The Management Center is configured to use `/api/v0/management` automatically. Log in with the `MANAGEMENT_KEY` from `secrets.env`; it is the only key that opens the dashboard. Compose passes it to the backend as `MANAGEMENT_PASSWORD`, which the backend treats as authoritative: the `remote-management.secret-key` in `data/config.yaml`, client API keys, and the local password are all rejected. The backend refuses to start if `MANAGEMENT_KEY` is missing. API clients should use the `PROXY_API_KEY` from the same file as a bearer token.
 
 ## Operations
 
@@ -22,7 +22,7 @@ docker compose logs -f
 docker compose down
 ```
 
-Persistent configuration, OAuth credentials, and logs live under `data/`. The backend hashes the management key in `data/config.yaml` on its first start; retain the original key in `secrets.env`.
+Persistent configuration, OAuth credentials, and logs live under `data/`. To change the dashboard key, update `MANAGEMENT_KEY` in `secrets.env` and recreate the `cli-proxy-api` container.
 
 ### Cursor usage tracking
 
