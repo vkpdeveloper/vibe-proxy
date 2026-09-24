@@ -1,4 +1,3 @@
-@use 'sass:color';
 @use './variables.scss' as *;
 
 .btn {
@@ -49,12 +48,12 @@
   }
 
   &.btn-danger {
-    background-color: $error-color;
-    border-color: $error-color;
+    background-color: var(--danger-solid, #{$error-color});
+    border-color: var(--danger-solid, #{$error-color});
     color: #fff;
 
     &:hover {
-      background-color: color.adjust($error-color, $lightness: -5%);
+      background-color: color-mix(in srgb, var(--danger-solid, #{$error-color}) 90%, #000);
     }
   }
 
@@ -75,11 +74,14 @@
 
 [data-theme='dark'] {
   .btn {
-    color: #fff;
+    color: var(--text-primary);
   }
 
-  .btn.btn-secondary,
-  .btn.btn-ghost {
+  .btn.btn-primary {
+    color: var(--primary-contrast);
+  }
+
+  .btn.btn-danger {
     color: #fff;
   }
 }

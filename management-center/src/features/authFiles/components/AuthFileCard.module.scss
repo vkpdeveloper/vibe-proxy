@@ -646,7 +646,7 @@
 
 .quotaDrainBadgeExhausted {
   color: var(--danger-color);
-  background: rgba($error-color, 0.08);
+  background: var(--destructive-10);
   border-color: color-mix(in srgb, var(--danger-color) 60%, transparent);
 }
 
@@ -663,9 +663,9 @@
 }
 
 :global([data-theme='dark']) .quotaDrainBadgeActive {
-  color: #ffd862;
-  background: rgba(226, 180, 50, 0.12);
-  border-color: rgba(226, 180, 50, 0.28);
+  color: var(--amber-text);
+  background: var(--amber-10);
+  border-color: var(--amber-30);
 }
 
 .quotaDrainSummary {

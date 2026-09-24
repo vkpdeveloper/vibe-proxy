@@ -162,82 +162,87 @@
   --accent-bg: var(--bg-tertiary);
 }
 
-// 深色主题（#191919）
+// 深色主题：Vercel dark（与 opencode vercel-dark 主题同源）
+// 纯黑页面 / #101010 面板 / #1f1f1f 元素；语义色取 Vercel 的
+// blue / green / pink / orange。
 [data-theme='dark'] {
-  // 极简暖灰：深色模式（提升对比度与层级）
-  --bg-secondary: #151412; // 页面背景
-  --bg-primary: #1d1b18; // 容器/卡片背景
-  --bg-tertiary: #262320; // hover/次级背景
-  --bg-hover: #2e2a26;
-  --bg-quinary: #191714;
-  --bg-error-light: rgba(198, 87, 70, 0.18);
-  --floating-surface: #2a2723;
-  --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
 
-  --text-primary: #f6f4f1;
-  --text-secondary: #c9c3bb;
-  --text-tertiary: #9c958d;
-  --text-quaternary: #6f6962;
+  --bg-secondary: #000000; // 页面背景
+  --bg-primary: #101010; // 容器/卡片背景
+  --bg-tertiary: #1a1a1a; // 次级背景（分段控件、代码块）
+  --bg-hover: #1f1f1f;
+  --bg-quinary: #0a0a0a;
+  --bg-error-light: rgba(247, 95, 143, 0.12);
+  --floating-surface: #101010;
+  --floating-shadow:
+    0 0 0 1px #1f1f1f,
+    0 16px 32px rgba(0, 0, 0, 0.6);
+
+  --text-primary: #ededed;
+  --text-secondary: #a1a1a1;
+  --text-tertiary: #8f8f8f;
+  --text-quaternary: #676767;
   --text-muted: var(--text-tertiary);
 
-  --border-color: #3a3530;
+  --border-color: #1f1f1f;
   --border-secondary: var(--border-color);
-  --border-primary: #4a453f;
-  --border-hover: #5a544d;
+  --border-primary: #2e2e2e;
+  --border-hover: #3e3e3e;
 
-  --primary-color: #8b8680;
-  --primary-hover: #9a948e;
-  --primary-active: #a6a099;
-  --primary-contrast: #ffffff;
+  --primary-color: #52a8ff;
+  --primary-hover: #6fb6ff;
+  --primary-active: #8cc5ff;
+  --primary-contrast: #000000;
 
-  --success-color: #10b981;
-  --quota-medium-color: #ffd862;
-  --warning-color: #c65746;
-  --error-color: #c65746;
+  --success-color: #62c073;
+  --quota-medium-color: #ff9907;
+  --warning-color: #f75f8f; // 本项目中 warning 与 error 同义
+  --error-color: #f75f8f;
   --danger-color: var(--error-color);
+  --danger-solid: #e5484d; // 实心危险按钮：白字可读的红
   --info-color: var(--primary-color);
 
-  --warning-bg: rgba(198, 87, 70, 0.22);
-  --warning-border: rgba(198, 87, 70, 0.45);
-  --warning-text: #f1b0a6;
+  --warning-bg: rgba(247, 95, 143, 0.12);
+  --warning-border: rgba(247, 95, 143, 0.4);
+  --warning-text: #ff8fb1;
 
-  --success-badge-bg: rgba(6, 78, 59, 0.3);
-  --success-badge-text: #6ee7b7;
-  --success-badge-border: #059669;
+  --success-badge-bg: rgba(98, 192, 115, 0.12);
+  --success-badge-text: #62c073;
+  --success-badge-border: rgba(98, 192, 115, 0.4);
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.24);
-  --failure-badge-text: #f1b0a6;
-  --failure-badge-border: rgba(198, 87, 70, 0.5);
+  --failure-badge-bg: rgba(247, 95, 143, 0.12);
+  --failure-badge-text: #ff8fb1;
+  --failure-badge-border: rgba(247, 95, 143, 0.4);
 
-  --count-badge-bg: rgba(139, 134, 128, 0.28);
-  --count-badge-text: var(--primary-active);
+  --count-badge-bg: #1f1f1f;
+  --count-badge-text: var(--text-primary);
 
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+  --shadow: 0 0 0 1px #1f1f1f;
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.6);
 
   --radius-md: 8px;
 
-  // Workbench tokens (Home parity, deeper amber for dark)
   --primary-8: color-mix(in srgb, var(--primary-color) 8%, transparent);
-  --primary-10: color-mix(in srgb, var(--primary-color) 10%, transparent);
-  --primary-30: color-mix(in srgb, var(--primary-color) 30%, transparent);
-  --amber-color: #f59e0b;
-  --amber-text: #fcd34d;
-  --amber-10: color-mix(in srgb, var(--amber-color) 14%, transparent);
+  --primary-10: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  --primary-30: color-mix(in srgb, var(--primary-color) 35%, transparent);
+  --amber-color: #ff9907;
+  --amber-text: #ffb54d;
+  --amber-10: color-mix(in srgb, var(--amber-color) 12%, transparent);
   --amber-30: color-mix(in srgb, var(--amber-color) 38%, transparent);
   --destructive-color: var(--error-color);
-  --destructive-10: color-mix(in srgb, var(--destructive-color) 14%, transparent);
+  --destructive-10: color-mix(in srgb, var(--destructive-color) 12%, transparent);
   --destructive-30: color-mix(in srgb, var(--destructive-color) 38%, transparent);
   --muted-bg: var(--bg-tertiary);
   --muted-foreground: var(--text-secondary);
-  --accent-bg: var(--bg-tertiary);
+  --accent-bg: var(--bg-hover);
 
-  --glass-border: color-mix(in srgb, var(--border-color) 55%, transparent);
+  --glass-bg: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+  --glass-bg-secondary: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+  --glass-border: var(--border-color);
 
-  // 深色卡面上 #10b981 亮度超出 OKLCH 0.48–0.67 区间，且与失败色的色盲分离度不足，
-  // 因此深色单独降一档。三套主题均已通过对比度/色盲/亮度校验。
-  --viz-success: #0fae78;
-  --viz-failure: #cf4b3a;
+  --viz-success: #62c073;
+  --viz-failure: #f75f8f;
 }
 
 @media (max-width: 768px),

@@ -60,8 +60,8 @@ const applyTheme = (resolved: AppliedTheme) => {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: 'auto',
-      resolvedTheme: 'light',
+      theme: 'dark',
+      resolvedTheme: 'dark',
 
       setTheme: (theme) => {
         const resolved = resolveTheme(theme);
@@ -100,6 +100,9 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: STORAGE_KEY_THEME,
+      // v1: Vercel dark became the app theme; move every saved preference onto it once.
+      version: 1,
+      migrate: (persisted) => ({ ...(persisted as ThemeState), theme: 'dark' }),
     }
   )
 );
