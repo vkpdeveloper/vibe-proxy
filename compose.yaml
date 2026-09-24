@@ -6,19 +6,15 @@ services:
       context: ./CLIProxyAPI
     image: vibe-proxy/cli-proxy-api:local
     restart: always
-    # MANAGEMENT_KEY from secrets.env is the only key that opens the dashboard: the
-    # backend treats MANAGEMENT_PASSWORD as authoritative and ignores the config
-    # secret-key. Refuse to start without it rather than fall back to the config hash.
+    # MANAGEMENT_KEY from secrets.env is the only key that opens the dashboard; the
+    # backend ignores the config secret-key while it is set. Refuse to start without
+    # it rather than fall back to the config hash.
     env_file:
       - ./secrets.env
     entrypoint:
       - sh
       - -c
-      - |
-        : "$${MANAGEMENT_KEY:?MANAGEMENT_KEY is missing from secrets.env}"
-        export MANAGEMENT_PASSWORD="$$MANAGEMENT_KEY"
-        unset MANAGEMENT_KEY PROXY_API_KEY
-        exec ./CLIProxyAPI
+      - ': "$${MANAGEMENT_KEY:?MANAGEMENT_KEY is missing from secrets.env}"; exec ./CLIProxyAPI'
     expose:
       - "8317"
     volumes:

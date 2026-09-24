@@ -23,7 +23,7 @@ func sumRecentRequestBuckets(buckets []coreauth.RecentRequestBucket) (int64, int
 }
 
 func TestGetAPIKeyUsage_GroupsByProviderAndAPIKey(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	manager := coreauth.NewManager(nil, nil, nil)
 	if _, err := manager.Register(context.Background(), &coreauth.Auth{
@@ -94,7 +94,7 @@ func TestGetAPIKeyUsage_GroupsByProviderAndAPIKey(t *testing.T) {
 }
 
 func TestGetAPIKeyUsage_GroupsOpenAICompatibleByCompatName(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	manager := coreauth.NewManager(nil, nil, nil)
 	if _, err := manager.Register(context.Background(), &coreauth.Auth{

@@ -1515,7 +1515,7 @@ func TestCodexAlphaSearchRecordsRequestLog(t *testing.T) {
 }
 
 func TestManagementResponseExposesPluginSupportHeaderForCORS(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 
 	server := newTestServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/v0/management/config", nil)
@@ -1545,7 +1545,7 @@ func TestManagementResponseExposesPluginSupportHeaderForCORS(t *testing.T) {
 }
 
 func TestOAuthCallbackRouteSkipsManagementKeyMiddleware(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 
 	server := newTestServer(t)
 	state := "server-plugin-oauth-state"
@@ -1593,7 +1593,7 @@ func TestNewServerWithoutPluginHostLeavesHandlerInterceptorsDisabled(t *testing.
 }
 
 func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 
 	prevQueueEnabled := redisqueue.Enabled()
 	redisqueue.SetEnabled(false)
@@ -1655,7 +1655,7 @@ func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {
 }
 
 func TestManagementPluginsRouteRegistered(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 
 	server := newTestServer(t)
 	enabled := true
@@ -1753,7 +1753,7 @@ func TestVideosRoutesKeepXAINativeAndExposeOpenAIPrefix(t *testing.T) {
 }
 
 func TestHomeEnabledHidesManagementEndpointsAndControlPanel(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 
 	server := newTestServer(t)
 	server.cfg.Home.Enabled = true
@@ -1779,7 +1779,7 @@ func TestHomeEnabledHidesManagementEndpointsAndControlPanel(t *testing.T) {
 }
 
 func TestExampleAPIKeySafeModeShowsWarningAndKeepsManagement(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+	t.Setenv("MANAGEMENT_KEY", "test-management-key")
 	staticDir := t.TempDir()
 	t.Setenv("MANAGEMENT_STATIC_PATH", staticDir)
 	if err := os.WriteFile(filepath.Join(staticDir, "management.html"), []byte("<html>management app</html>"), 0o600); err != nil {

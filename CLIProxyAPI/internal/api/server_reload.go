@@ -138,7 +138,7 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	if s.envManagementSecret {
 		s.registerManagementRoutes()
 		if s.managementRoutesEnabled.CompareAndSwap(false, true) {
-			log.Info("management routes enabled via MANAGEMENT_PASSWORD")
+			log.Info("management routes enabled via MANAGEMENT_KEY")
 		} else {
 			s.managementRoutesEnabled.Store(true)
 		}

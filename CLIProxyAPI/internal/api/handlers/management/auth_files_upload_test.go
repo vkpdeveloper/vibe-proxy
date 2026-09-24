@@ -15,7 +15,7 @@ import (
 )
 
 func TestUploadAuthFile_PreservesPriorityAttributes(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 	gin.SetMode(gin.TestMode)
 
 	authDir := t.TempDir()
@@ -70,7 +70,7 @@ func TestUploadAuthFile_PreservesPriorityAttributes(t *testing.T) {
 }
 
 func TestUploadAuthFile_InvokesPostAuthPersistHook(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 	gin.SetMode(gin.TestMode)
 
 	authDir := t.TempDir()

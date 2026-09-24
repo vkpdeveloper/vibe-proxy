@@ -18,7 +18,7 @@ import (
 )
 
 func TestPatchAuthFileStatusInvokesPostAuthPersistHook(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "codex-test.json"
@@ -91,7 +91,7 @@ func TestPatchAuthFileStatusInvokesPostAuthPersistHook(t *testing.T) {
 }
 
 func TestPatchAuthFileStatusRestoresModelsViaSyncHook(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "codex-models.json"
@@ -199,7 +199,7 @@ func TestPatchAuthFileStatusRestoresModelsViaSyncHook(t *testing.T) {
 }
 
 func TestPatchPluginVirtualSourceStatusInvokesPostAuthPersistHook(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "source-sync.json"
@@ -271,7 +271,7 @@ func TestPatchPluginVirtualSourceStatusInvokesPostAuthPersistHook(t *testing.T) 
 }
 
 func TestPatchAuthFileStatusHookErrorReturns500(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "codex-hook-err.json"
@@ -315,7 +315,7 @@ func TestPatchAuthFileStatusHookErrorReturns500(t *testing.T) {
 }
 
 func TestPatchPluginVirtualSourceStatusHookErrorReturnsError(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "source-hook-err.json"

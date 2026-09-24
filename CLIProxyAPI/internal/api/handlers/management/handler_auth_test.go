@@ -59,7 +59,7 @@ func TestAuthenticateManagementKey_EnvSecretIsTheOnlyKey(t *testing.T) {
 			}
 			allowed, status, msg := h.AuthenticateManagementKey(ip, tc.local, tc.key)
 			if allowed {
-				t.Fatalf("%s opened management while MANAGEMENT_PASSWORD is set", tc.name)
+				t.Fatalf("%s opened management while MANAGEMENT_KEY is set", tc.name)
 			}
 			if status != http.StatusUnauthorized || msg != "invalid management key" {
 				t.Fatalf("unexpected denial: status=%d msg=%q", status, msg)

@@ -13,7 +13,7 @@ import (
 )
 
 func TestDownloadAuthFile_ReturnsFile(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "download-user.json"
@@ -38,7 +38,7 @@ func TestDownloadAuthFile_ReturnsFile(t *testing.T) {
 }
 
 func TestDownloadAuthFile_RejectsPathSeparators(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: t.TempDir()}, nil)
 

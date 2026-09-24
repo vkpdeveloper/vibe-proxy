@@ -31,6 +31,10 @@ type attemptInfo struct {
 	lastActivity time.Time // track last activity for cleanup
 }
 
+// ManagementKeyEnv names the environment variable holding the management key.
+// When it is set, it is the only key that opens management.
+const ManagementKeyEnv = "MANAGEMENT_KEY"
+
 // attemptCleanupInterval controls how often stale IP entries are purged
 const attemptCleanupInterval = 1 * time.Hour
 
@@ -72,7 +76,7 @@ type configReloadSnapshot struct {
 
 // NewHandler creates a new management handler instance.
 func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Manager) *Handler {
-	envSecret, _ := os.LookupEnv("MANAGEMENT_PASSWORD")
+	envSecret, _ := os.LookupEnv(ManagementKeyEnv)
 	envSecret = strings.TrimSpace(envSecret)
 
 	h := &Handler{
@@ -385,7 +389,7 @@ func (h *Handler) AuthenticateManagementKey(clientIP string, localClient bool, p
 		return false, http.StatusUnauthorized, "missing management key"
 	}
 
-	// MANAGEMENT_PASSWORD is authoritative: when it is set, it is the only key that
+	// MANAGEMENT_KEY is authoritative: when it is set, it is the only key that
 	// opens management. The config secret-key and the local password are ignored, so
 	// neither a config edit nor a spoofed "local" client (X-Forwarded-For) can add
 	// another way in, such as a client API key.

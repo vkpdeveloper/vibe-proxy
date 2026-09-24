@@ -18,7 +18,7 @@ import (
 )
 
 func TestPatchAuthFileFields_MergeHeadersAndDeleteEmptyValues(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	store := &memoryAuthStore{}
 	manager := coreauth.NewManager(store, nil, nil)
@@ -112,7 +112,7 @@ func TestPatchAuthFileFields_MergeHeadersAndDeleteEmptyValues(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_HeadersEmptyMapIsNoop(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	store := &memoryAuthStore{}
 	manager := coreauth.NewManager(store, nil, nil)
@@ -166,7 +166,7 @@ func TestPatchAuthFileFields_HeadersEmptyMapIsNoop(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_WebsocketsFalseIsUpdate(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	store := &memoryAuthStore{}
 	manager := coreauth.NewManager(store, nil, nil)
@@ -214,7 +214,7 @@ func TestPatchAuthFileFields_WebsocketsFalseIsUpdate(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_ArbitraryFieldsPersistToFile(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "generic.json"
@@ -279,7 +279,7 @@ func TestPatchAuthFileFields_ArbitraryFieldsPersistToFile(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_WeightPersistsAndSyncsRuntime(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "weighted.json"
@@ -372,7 +372,7 @@ func TestPatchAuthFileFields_RejectsInvalidWeights(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_RequestRetryRoundTrip(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "request-retry.json"
@@ -601,7 +601,7 @@ func TestSetSourceAuthFileDisabledNormalizesLegacyMetadata(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_SyncsPlanTypeAndInvokesHook(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "codex-plan-patch.json"
@@ -664,7 +664,7 @@ func TestPatchAuthFileFields_SyncsPlanTypeAndInvokesHook(t *testing.T) {
 }
 
 func TestPatchAuthFileFields_ClearsPlanTypeWhenRemoved(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "")
+	t.Setenv("MANAGEMENT_KEY", "")
 
 	authDir := t.TempDir()
 	fileName := "codex-clear-plan.json"
