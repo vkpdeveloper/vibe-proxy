@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconAlertTriangle,
@@ -13,6 +15,8 @@ import {
   IconRefreshCw,
   IconTrash2,
 } from '@/components/ui/icons';
+import { Meter } from '@/features/dashboard/components/Meter';
+import { useRevealGroup } from '@/hooks/motion';
 import {
   clientApiKeysApi,
   type ClientApiKey,
@@ -63,6 +67,7 @@ function formatLimit(value: number, suffix: string): string {
 
 export function ApiKeysPage() {
   const connected = useAuthStore((state) => state.connectionStatus === 'connected');
+  const revealRef = useRevealGroup<HTMLDivElement>();
   const { showNotification, showConfirmation } = useNotificationStore();
   const [keys, setKeys] = useState<ClientApiKey[]>([]);
   const [options, setOptions] = useState<ClientApiKeyOptions>(emptyOptions);
@@ -219,187 +224,240 @@ export function ApiKeysPage() {
   };
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={revealRef}>
       <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>ACCESS CONTROL</span>
-          <h1>Client API keys</h1>
-          <p>
-            Issue scoped credentials, cap daily spend, and decide exactly which providers and models
-            each key can use.
+        <div className={styles.copy}>
+          <h1 className={styles.title} data-reveal>
+            Client API keys
+          </h1>
+          <p className={styles.meta} data-reveal>
+            <span>
+              {keys.length} {keys.length === 1 ? 'key' : 'keys'}
+            </span>
+            <span className={styles.metaDot} aria-hidden="true">
+              ·
+            </span>
+            <span className={activeKeys > 0 ? styles.metaActive : styles.metaMuted}>
+              {activeKeys} enabled
+            </span>
+            {blockedKeys > 0 && (
+              <>
+                <span className={styles.metaDot} aria-hidden="true">
+                  ·
+                </span>
+                <span className={styles.metaProblem}>{blockedKeys} blocked</span>
+              </>
+            )}
           </p>
         </div>
-        <div className={styles.headerActions}>
+        <div className={styles.actions} data-reveal>
           <button
-            className={styles.refreshButton}
+            className={styles.ghostAction}
             type="button"
             onClick={() => void load()}
             disabled={loading}
           >
-            <IconRefreshCw size={17} className={loading ? styles.spinning : undefined} />
+            <IconRefreshCw size={14} className={loading ? styles.spinning : undefined} />
             Refresh
           </button>
-          <button className={styles.createButton} type="button" onClick={openCreate}>
-            <IconPlus size={18} />
+          <button className={styles.primaryAction} type="button" onClick={openCreate}>
+            <IconPlus size={15} />
             Generate key
           </button>
         </div>
       </header>
 
       {error && (
-        <div className={styles.error}>
-          <IconAlertTriangle size={18} />
-          {error}
+        <div className={styles.errorBanner} role="alert">
+          <IconAlertTriangle size={15} />
+          <span>{error}</span>
         </div>
       )}
 
-      <section className={styles.summaryGrid} aria-label="API key summary">
-        <article>
-          <span>Total keys</span>
-          <strong>{keys.length}</strong>
-          <small>{activeKeys} currently enabled</small>
+      <section className={styles.statsRow} aria-label="API key summary" data-reveal>
+        <article
+          className={styles.statTile}
+          style={
+            keys.length > 0
+              ? ({ '--tile-accent': 'var(--viz-success)' } as CSSProperties)
+              : undefined
+          }
+        >
+          <span className={styles.statLabel}>Total keys</span>
+          <strong className={styles.statValue}>{keys.length}</strong>
+          <span className={styles.statHint}>{activeKeys} currently enabled</span>
         </article>
-        <article>
-          <span>Spend today</span>
-          <strong>{money.format(totalToday)}</strong>
-          <small>Resets at 00:00 UTC</small>
+        <article
+          className={styles.statTile}
+          style={{ '--tile-accent': 'var(--text-primary)' } as CSSProperties}
+        >
+          <span className={styles.statLabel}>Spend today</span>
+          <strong className={styles.statValue}>{money.format(totalToday)}</strong>
+          <span className={styles.statHint}>Resets at 00:00 UTC</span>
         </article>
-        <article>
-          <span>Blocked now</span>
-          <strong>{blockedKeys}</strong>
-          <small>Disabled or at a configured limit</small>
+        <article
+          className={styles.statTile}
+          style={
+            blockedKeys > 0
+              ? ({ '--tile-accent': 'var(--viz-failure)' } as CSSProperties)
+              : undefined
+          }
+        >
+          <span className={styles.statLabel}>Blocked now</span>
+          <strong className={styles.statValue}>{blockedKeys}</strong>
+          <span className={styles.statHint}>Disabled or at a configured limit</span>
         </article>
       </section>
 
-      <section className={styles.keyList} aria-busy={loading}>
+      <section aria-busy={loading}>
         {loading && keys.length === 0 ? (
-          <div className={styles.loadingCard}>
-            <span />
-            <span />
-            <span />
+          <div className={styles.grid} aria-hidden="true">
+            {Array.from({ length: 2 }, (_, index) => (
+              <Skeleton key={index} height={280} rounded={14} />
+            ))}
           </div>
         ) : !loading && keys.length === 0 ? (
-          <div className={styles.emptyState}>
-            <span>
-              <IconKey size={24} />
-            </span>
-            <h2>No client keys yet</h2>
-            <p>Generate a key and choose the providers, models, and limits it can use.</p>
-            <Button onClick={openCreate}>
-              <IconPlus size={17} /> Generate your first key
-            </Button>
-          </div>
+          <EmptyState
+            title="No client keys yet"
+            description="Generate a key and choose the providers, models, and limits it can use."
+            action={
+              <Button size="sm" onClick={openCreate}>
+                <IconPlus size={14} /> Generate your first key
+              </Button>
+            }
+          />
         ) : (
-          keys.map((key) => {
-            const progress =
-              key.daily_limit_usd > 0
-                ? Math.min(100, (key.today_usd / key.daily_limit_usd) * 100)
-                : 0;
-            return (
-              <article className={styles.keyCard} key={key.id}>
-                <div className={styles.keyTopline}>
-                  <div className={styles.keyIdentity}>
-                    <span className={styles.keyIcon}>
-                      <IconKey size={18} />
+          <div className={styles.grid}>
+            {keys.map((key) => {
+              const progress =
+                key.daily_limit_usd > 0
+                  ? Math.min(100, (key.today_usd / key.daily_limit_usd) * 100)
+                  : 0;
+              return (
+                <article
+                  className={`${styles.card} ${key.blocked ? styles.cardBlocked : ''}`}
+                  key={key.id}
+                >
+                  <div className={styles.head}>
+                    <span className={styles.avatar} aria-hidden="true">
+                      <IconKey size={16} />
                     </span>
-                    <div>
+                    <div className={styles.identity}>
                       <div className={styles.nameLine}>
-                        <h2>{key.name}</h2>
-                        {!key.managed && <span className={styles.legacyBadge}>Unrestricted</span>}
-                        {key.blocked ? (
-                          <span className={styles.blockedBadge}>Blocked</span>
+                        <h2 className={styles.name}>{key.name}</h2>
+                        {!key.managed && <span className={styles.typeBadge}>Unrestricted</span>}
+                      </div>
+                      <code className={styles.maskedKey}>{key.masked_key}</code>
+                    </div>
+                    {key.blocked ? (
+                      <span className={`${styles.stateBadge} ${styles.stateBlocked}`}>
+                        <span className={styles.stateDot} />
+                        Blocked
+                      </span>
+                    ) : (
+                      <span className={`${styles.stateBadge} ${styles.stateActive}`}>
+                        <span className={styles.stateDot} />
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  <dl className={styles.usageGrid}>
+                    <div>
+                      <dt>Today</dt>
+                      <dd>{money.format(key.today_usd)}</dd>
+                    </div>
+                    <div>
+                      <dt>Requests</dt>
+                      <dd>{compact.format(key.today_requests)}</dd>
+                    </div>
+                    <div>
+                      <dt>Tokens</dt>
+                      <dd>{compact.format(key.today_tokens)}</dd>
+                    </div>
+                    <div>
+                      <dt>Rate</dt>
+                      <dd>{formatLimit(key.requests_per_minute, 'rpm')}</dd>
+                    </div>
+                  </dl>
+
+                  {key.daily_limit_usd > 0 && (
+                    <div className={styles.budget}>
+                      <div className={styles.budgetHead}>
+                        <span className={styles.label}>Daily budget</span>
+                        <strong>
+                          {money.format(key.today_usd)} / {money.format(key.daily_limit_usd)}
+                        </strong>
+                      </div>
+                      <Meter
+                        value={progress}
+                        tone={progress >= 100 ? 'critical' : progress >= 80 ? 'warning' : 'good'}
+                        ariaLabel={`${key.name} daily budget used`}
+                      />
+                    </div>
+                  )}
+
+                  <div className={styles.scopeRow}>
+                    <div>
+                      <span className={styles.label}>Providers</span>
+                      <div className={styles.pills}>
+                        {key.allowed_providers.length ? (
+                          key.allowed_providers.map((provider) => (
+                            <span className={styles.pill} key={provider}>
+                              {provider}
+                            </span>
+                          ))
                         ) : (
-                          <span className={styles.activeBadge}>Active</span>
+                          <span className={styles.pill}>All providers</span>
                         )}
                       </div>
-                      <code>{key.masked_key}</code>
+                    </div>
+                    <div>
+                      <span className={styles.label}>Models</span>
+                      <p>
+                        {key.allowed_models.length
+                          ? `${key.allowed_models.length} selected model${key.allowed_models.length === 1 ? '' : 's'}`
+                          : 'All models in selected providers'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className={styles.label}>Daily caps</span>
+                      <p>
+                        {formatLimit(key.daily_request_limit, 'requests')} ·{' '}
+                        {formatLimit(key.daily_token_limit, 'tokens')}
+                      </p>
                     </div>
                   </div>
-                  <div className={styles.cardActions}>
-                    <button
-                      type="button"
+
+                  <footer className={styles.cardActions}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => openEdit(key)}
                       aria-label={`Edit ${key.name}`}
                     >
-                      <IconPencil size={17} /> Edit
-                    </button>
-                    <button type="button" onClick={() => rotate(key)}>
+                      <IconPencil size={14} />
+                      Edit
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => rotate(key)}>
+                      <IconRefreshCw size={14} />
                       Rotate
-                    </button>
-                    <button
-                      className={styles.deleteButton}
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      className={styles.iconButton}
                       onClick={() => remove(key)}
                       aria-label={`Delete ${key.name}`}
+                      title={`Delete ${key.name}`}
                     >
-                      <IconTrash2 size={17} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.usageGrid}>
-                  <div>
-                    <span>Today</span>
-                    <strong>{money.format(key.today_usd)}</strong>
-                  </div>
-                  <div>
-                    <span>Requests</span>
-                    <strong>{compact.format(key.today_requests)}</strong>
-                  </div>
-                  <div>
-                    <span>Tokens</span>
-                    <strong>{compact.format(key.today_tokens)}</strong>
-                  </div>
-                  <div>
-                    <span>Rate</span>
-                    <strong>{formatLimit(key.requests_per_minute, 'rpm')}</strong>
-                  </div>
-                </div>
-
-                {key.daily_limit_usd > 0 && (
-                  <div className={styles.budget}>
-                    <div>
-                      <span>Daily budget</span>
-                      <strong>
-                        {money.format(key.today_usd)} / {money.format(key.daily_limit_usd)}
-                      </strong>
-                    </div>
-                    <span className={styles.budgetTrack}>
-                      <span style={{ width: `${progress}%` }} />
-                    </span>
-                  </div>
-                )}
-
-                <div className={styles.scopeRow}>
-                  <div>
-                    <span>Providers</span>
-                    <div>
-                      {key.allowed_providers.length ? (
-                        key.allowed_providers.map((provider) => <em key={provider}>{provider}</em>)
-                      ) : (
-                        <em>All providers</em>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <span>Models</span>
-                    <p>
-                      {key.allowed_models.length
-                        ? `${key.allowed_models.length} selected model${key.allowed_models.length === 1 ? '' : 's'}`
-                        : 'All models in selected providers'}
-                    </p>
-                  </div>
-                  <div>
-                    <span>Daily caps</span>
-                    <p>
-                      {formatLimit(key.daily_request_limit, 'requests')} ·{' '}
-                      {formatLimit(key.daily_token_limit, 'tokens')}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            );
-          })
+                      <IconTrash2 size={15} />
+                    </Button>
+                  </footer>
+                </article>
+              );
+            })}
+          </div>
         )}
       </section>
 
