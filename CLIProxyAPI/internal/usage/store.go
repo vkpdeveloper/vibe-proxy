@@ -272,6 +272,7 @@ func (s *Store) load() error {
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
 	line := 0
+	repriced := 0
 	for scanner.Scan() {
 		line++
 		raw := strings.TrimSpace(scanner.Text())
@@ -289,11 +290,20 @@ func (s *Store) load() error {
 		if _, exists := s.ids[event.ID]; exists {
 			continue
 		}
+		if !event.Failed && !event.Cost.Priced {
+			if cost := s.price(event); cost.Priced {
+				event.Cost = cost
+				repriced++
+			}
+		}
 		s.events = append(s.events, event)
 		s.ids[event.ID] = struct{}{}
 	}
 	if errScan := scanner.Err(); errScan != nil {
 		return fmt.Errorf("scan usage history: %w", errScan)
+	}
+	if repriced > 0 {
+		log.WithField("count", repriced).Info("usage: repriced historical events against current pricing catalog")
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package usage
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"os"
 	"path/filepath"
@@ -200,6 +201,51 @@ Status: 200
 	}
 	if got := reloaded.Report(nil, nil).Totals.Requests; got != 1 {
 		t.Fatalf("reimported totals request count = %d, want 1", got)
+	}
+}
+
+func TestStoreRepricesUnpricedHistoryOnLoad(t *testing.T) {
+	dir := t.TempDir()
+	usageDir := filepath.Join(dir, "usage")
+	if errMkdir := os.MkdirAll(usageDir, 0o750); errMkdir != nil {
+		t.Fatal(errMkdir)
+	}
+	writeHistory := func(events ...Event) {
+		var raw []byte
+		for _, event := range events {
+			line, errMarshal := json.Marshal(event)
+			if errMarshal != nil {
+				t.Fatal(errMarshal)
+			}
+			raw = append(raw, line...)
+			raw = append(raw, '\n')
+		}
+		if errWrite := os.WriteFile(filepath.Join(usageDir, eventsFileName), raw, 0o600); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+	}
+	writeHistory(
+		Event{Timestamp: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC), Provider: "codex", Model: "gpt-6-astra", Origin: "live",
+			Tokens: TokenDetail{InputTokens: 100_000, OutputTokens: 100_000, CacheReadTokens: 10_000, CacheCreationTokens: 10_000, TotalTokens: 200_000}},
+		Event{Timestamp: time.Date(2026, 9, 7, 12, 1, 0, 0, time.UTC), Provider: "codex", Model: "unlisted-model", Origin: "live",
+			Tokens: TokenDetail{InputTokens: 100, OutputTokens: 100, TotalTokens: 200}},
+		Event{Timestamp: time.Date(2026, 9, 7, 12, 2, 0, 0, time.UTC), Provider: "codex", Model: "gpt-6-astra", Origin: "live", Failed: true,
+			Tokens: TokenDetail{InputTokens: 100, OutputTokens: 100, TotalTokens: 200}},
+	)
+
+	store, errStore := NewStore(usageDir, "", true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	report := store.Report(nil, nil)
+	if report.Totals.PricedRequests != 1 || report.Totals.UnpricedRequests != 1 {
+		t.Fatalf("priced/unpriced = %d/%d, want 1/1", report.Totals.PricedRequests, report.Totals.UnpricedRequests)
+	}
+	if math.Abs(report.Totals.EstimatedUSD-5.935) > 1e-9 {
+		t.Fatalf("estimated cost = %.8f, want 5.935", report.Totals.EstimatedUSD)
+	}
+	if len(report.UnpricedModels) != 1 || report.UnpricedModels[0].Model != "unlisted-model" {
+		t.Fatalf("unpriced models = %+v, want only unlisted-model", report.UnpricedModels)
 	}
 }
 
