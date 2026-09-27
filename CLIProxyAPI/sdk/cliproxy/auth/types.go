@@ -234,6 +234,9 @@ type CapacityWindow struct {
 	Known            bool      `json:"known"`
 	HardExhausted    bool      `json:"hard_exhausted,omitempty"`
 	Routing          bool      `json:"routing"`
+	// PeriodSeconds is the full length of the rolling window (for example 5h or 7d)
+	// when the provider reports it. Zero means unknown.
+	PeriodSeconds int64 `json:"period_seconds,omitempty"`
 }
 
 // RoutingSelectionState describes a recent runtime routing choice.

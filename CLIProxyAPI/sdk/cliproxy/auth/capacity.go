@@ -15,7 +15,24 @@ type capacityRank struct {
 	remaining float64
 	resetAt   time.Time
 	windows   []capacityWindowRank
+	// urgency is the remaining percent per hour of the tightest budget window
+	// (a window of at least budgetWindowMinPeriod). It measures how quickly the
+	// quota must be spent before it resets unused; higher drains first.
+	urgencyKnown bool
+	urgency      float64
+	// budgetResetAt is the latest reset among budget windows. The provider pin
+	// uses it to notice weekly rollovers.
+	budgetResetAt time.Time
 }
+
+// budgetWindowMinPeriod separates long budget windows (weekly) from short
+// burst windows (5h). Burst windows only gate eligibility; budget windows rank.
+const budgetWindowMinPeriod = 24 * time.Hour
+
+// minUrgencyHorizon keeps urgency finite for windows that are about to reset.
+const minUrgencyHorizon = time.Hour
+
+const capacityUrgencyEpsilon = 1e-9
 
 type capacityWindowRank struct {
 	remaining float64
@@ -67,6 +84,23 @@ func quotaCapacityRank(auth *Auth, model string, now time.Time) capacityRank {
 		remaining := normalizedCapacityPercent(window.RemainingPercent)
 		rank.known = true
 		rank.windows = append(rank.windows, capacityWindowRank{remaining: remaining, resetAt: window.ResetAt})
+		if period := time.Duration(window.PeriodSeconds) * time.Second; period >= budgetWindowMinPeriod {
+			horizon := period
+			if !window.ResetAt.IsZero() {
+				horizon = window.ResetAt.Sub(now)
+				if window.ResetAt.After(rank.budgetResetAt) {
+					rank.budgetResetAt = window.ResetAt
+				}
+			}
+			if horizon < minUrgencyHorizon {
+				horizon = minUrgencyHorizon
+			}
+			urgency := remaining / horizon.Hours()
+			if !rank.urgencyKnown || urgency < rank.urgency {
+				rank.urgency = urgency
+			}
+			rank.urgencyKnown = true
+		}
 		if window.HardExhausted {
 			rank.exhausted = true
 			if resetBefore(window.ResetAt, rank.resetAt) {
@@ -106,6 +140,11 @@ func quotaRankLess(left, right capacityRank) bool {
 	if !left.known {
 		return false
 	}
+	// Spend the weekly budget that would otherwise expire soonest first. Burst
+	// windows (5h) do not rank; they only exclude a credential once exhausted.
+	if left.urgencyKnown && right.urgencyKnown && math.Abs(left.urgency-right.urgency) > capacityUrgencyEpsilon {
+		return left.urgency > right.urgency
+	}
 	commonWindows := min(len(left.windows), len(right.windows))
 	for index := 0; index < commonWindows; index++ {
 		if capacityWindowRanksEqual(left.windows[index], right.windows[index]) {
@@ -127,6 +166,9 @@ func quotaRanksEqual(left, right capacityRank) bool {
 	}
 	if !left.known {
 		return true
+	}
+	if left.urgencyKnown && right.urgencyKnown && math.Abs(left.urgency-right.urgency) > capacityUrgencyEpsilon {
+		return false
 	}
 	if len(left.windows) != len(right.windows) {
 		return false

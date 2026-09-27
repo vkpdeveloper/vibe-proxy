@@ -376,20 +376,23 @@ func parseClaudeCapacity(payload map[string]any, now time.Time) ([]coreauth.Capa
 			label = strings.TrimSpace(label + " · " + display)
 		}
 		routing := kind == "session" || kind == "weekly_all" || (kind == "weekly_scoped" && scopeModel != "")
-		windows = append(windows, capacityWindow(fmt.Sprintf("claude-limit-%d", index), label, used, parseAbsoluteTime(value(limit, "resets_at", "resetsAt"), now), routing, scopeModel, used >= 100))
+		window := capacityWindow(fmt.Sprintf("claude-limit-%d", index), label, used, parseAbsoluteTime(value(limit, "resets_at", "resetsAt"), now), routing, scopeModel, used >= 100)
+		window.PeriodSeconds = claudeWindowPeriodSeconds(kind)
+		windows = append(windows, window)
 	}
 	if len(windows) == 0 {
 		legacy := []struct {
 			key     string
 			label   string
 			routing bool
+			period  int64
 		}{
-			{"five_hour", "5 hour", true},
-			{"seven_day", "7 day", true},
-			{"seven_day_oauth_apps", "7 day OAuth apps", false},
-			{"seven_day_opus", "7 day Opus", false},
-			{"seven_day_sonnet", "7 day Sonnet", false},
-			{"seven_day_cowork", "7 day Cowork", false},
+			{"five_hour", "5 hour", true, claudeSessionPeriodSeconds},
+			{"seven_day", "7 day", true, claudeWeeklyPeriodSeconds},
+			{"seven_day_oauth_apps", "7 day OAuth apps", false, claudeWeeklyPeriodSeconds},
+			{"seven_day_opus", "7 day Opus", false, claudeWeeklyPeriodSeconds},
+			{"seven_day_sonnet", "7 day Sonnet", false, claudeWeeklyPeriodSeconds},
+			{"seven_day_cowork", "7 day Cowork", false, claudeWeeklyPeriodSeconds},
 		}
 		for _, item := range legacy {
 			window := objectValue(value(payload, item.key))
@@ -397,10 +400,29 @@ func parseClaudeCapacity(payload map[string]any, now time.Time) ([]coreauth.Capa
 			if !known {
 				continue
 			}
-			windows = append(windows, capacityWindow("claude-"+item.key, item.label, used, parseAbsoluteTime(value(window, "resets_at", "resetsAt"), now), item.routing, "", used >= 100))
+			parsed := capacityWindow("claude-"+item.key, item.label, used, parseAbsoluteTime(value(window, "resets_at", "resetsAt"), now), item.routing, "", used >= 100)
+			parsed.PeriodSeconds = item.period
+			windows = append(windows, parsed)
 		}
 	}
 	return requireWindows(windows)
+}
+
+const (
+	claudeSessionPeriodSeconds = int64(5 * 60 * 60)
+	claudeWeeklyPeriodSeconds  = int64(7 * 24 * 60 * 60)
+)
+
+// claudeWindowPeriodSeconds maps a Claude usage limit kind to its rolling window length.
+func claudeWindowPeriodSeconds(kind string) int64 {
+	switch {
+	case kind == "session":
+		return claudeSessionPeriodSeconds
+	case strings.HasPrefix(kind, "weekly"):
+		return claudeWeeklyPeriodSeconds
+	default:
+		return 0
+	}
 }
 
 func parseCodexCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
@@ -427,7 +449,11 @@ func parseCodexCapacity(payload map[string]any, now time.Time) ([]coreauth.Capac
 				continue
 			}
 			resetAt := windowResetAt(window, now)
-			windows = append(windows, capacityWindow(prefix+"-"+spec.name, label+" "+spec.name, used, resetAt, routing, "", reached || used >= 100))
+			parsed := capacityWindow(prefix+"-"+spec.name, label+" "+spec.name, used, resetAt, routing, "", reached || used >= 100)
+			if seconds, ok := numberValue(value(window, "limit_window_seconds", "limitWindowSeconds")); ok && seconds > 0 {
+				parsed.PeriodSeconds = int64(seconds)
+			}
+			windows = append(windows, parsed)
 		}
 	}
 	appendRateInfo("codex", "Codex", objectValue(value(payload, "rate_limit", "rateLimit")), true)

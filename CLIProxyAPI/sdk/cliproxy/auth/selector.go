@@ -71,12 +71,16 @@ func weightedSelectorStateModel(ctx context.Context, availabilityModel string) s
 // rolling-window subscription caps (e.g. chat message limits).
 type FillFirstSelector struct{}
 
-// QuotaDrainSelector drains the lowest remaining fresh quota first. Provider
-// choice is kept independent: mixed-provider inputs rotate providers before
-// quota ranking is applied within the chosen provider.
+// QuotaDrainSelector spends the quota that would otherwise expire unused first:
+// the credential whose weekly budget has the most remaining per hour until reset
+// wins, while an exhausted 5h window only excludes a credential. Each
+// provider/model keeps a pin on its choice until that credential drops out or
+// the pool changes. Provider choice is kept independent: mixed-provider inputs
+// rotate providers before quota ranking is applied within the chosen provider.
 type QuotaDrainSelector struct {
 	mu      sync.Mutex
 	cursors map[string]int
+	pins    map[string]*quotaDrainPin
 	maxKeys int
 }
 
@@ -905,36 +909,55 @@ func (s *QuotaDrainSelector) pickWithinProvider(provider, model string, auths []
 	if len(auths) == 0 {
 		return nil
 	}
-	type rankedAuth struct {
-		auth *Auth
-		rank capacityRank
-	}
-	ranked := make([]rankedAuth, 0, len(auths))
+	sorted := make([]*Auth, 0, len(auths))
+	candidates := make([]quotaPinCandidate, 0, len(auths))
 	for _, auth := range auths {
 		rank := quotaCapacityRank(auth, model, now)
 		if rank.known && rank.exhausted {
 			continue
 		}
-		ranked = append(ranked, rankedAuth{auth: auth, rank: rank})
+		sorted = append(sorted, auth)
+		candidates = append(candidates, quotaPinCandidate{id: auth.ID, rank: rank, allowed: true})
 	}
-	if len(ranked) == 0 {
+	if len(candidates) == 0 {
 		return nil
 	}
-	sort.SliceStable(ranked, func(i, j int) bool {
-		if quotaRanksEqual(ranked[i].rank, ranked[j].rank) {
-			return ranked[i].auth.ID < ranked[j].auth.ID
-		}
-		return quotaRankLess(ranked[i].rank, ranked[j].rank)
-	})
-	best := ranked[0].rank
-	tieCount := 1
-	for tieCount < len(ranked) && quotaRanksEqual(best, ranked[tieCount].rank) {
-		tieCount++
+	byID := make([]int, len(candidates))
+	for index := range byID {
+		byID[index] = index
 	}
+	sort.SliceStable(byID, func(i, j int) bool { return candidates[byID[i]].id < candidates[byID[j]].id })
 
 	key := strings.ToLower(strings.TrimSpace(provider)) + ":" + canonicalModelKey(model)
-	index := s.nextCursorIndex(key, tieCount)
-	return ranked[index].auth
+	offset := s.nextCursorIndex(key, len(byID))
+	order := append(append(make([]int, 0, len(byID)), byID[offset:]...), byID[:offset]...)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	picked := pickQuotaPinned(s.pinLocked(key), candidates, order)
+	if picked < 0 {
+		return nil
+	}
+	return sorted[picked]
+}
+
+func (s *QuotaDrainSelector) pinLocked(key string) *quotaDrainPin {
+	if s.pins == nil {
+		s.pins = make(map[string]*quotaDrainPin)
+	}
+	pin := s.pins[key]
+	if pin == nil {
+		limit := s.maxKeys
+		if limit <= 0 {
+			limit = 4096
+		}
+		if len(s.pins) >= limit {
+			s.pins = make(map[string]*quotaDrainPin)
+		}
+		pin = &quotaDrainPin{}
+		s.pins[key] = pin
+	}
+	return pin
 }
 
 func (s *QuotaDrainSelector) nextCursorIndex(key string, modulo int) int {

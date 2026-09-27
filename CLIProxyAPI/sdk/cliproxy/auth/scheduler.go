@@ -51,6 +51,9 @@ type authScheduler struct {
 	authGenerations     map[string]scheduledGenerationMeta
 	mixedCursors        map[string]int
 	mixedWeightedStates map[string]*smoothWeightedState
+	// quotaPins survive rebuilds so quota-drain stickiness is not lost when the
+	// auth snapshot is reloaded. Keyed by provider, then model.
+	quotaPins map[string]map[string]*quotaDrainPin
 }
 
 // providerScheduler stores auth metadata and model shards for a single provider.
@@ -58,6 +61,7 @@ type providerScheduler struct {
 	providerKey string
 	auths       map[string]*scheduledAuthMeta
 	modelShards map[string]*modelScheduler
+	quotaPins   map[string]*quotaDrainPin
 }
 
 // scheduledAuthMeta stores the immutable scheduling fields derived from an auth snapshot.
@@ -78,6 +82,7 @@ type modelScheduler struct {
 	priorityOrder   []int
 	readyByPriority map[int]*readyBucket
 	blocked         cooldownQueue
+	quotaPin        *quotaDrainPin
 }
 
 // scheduledAuth stores the runtime scheduling state for a single auth inside a model shard.
@@ -161,6 +166,7 @@ func newAuthScheduler(selector Selector) *authScheduler {
 		authGenerations:     make(map[string]scheduledGenerationMeta),
 		mixedCursors:        make(map[string]int),
 		mixedWeightedStates: make(map[string]*smoothWeightedState),
+		quotaPins:           make(map[string]map[string]*quotaDrainPin),
 	}
 }
 
@@ -190,6 +196,11 @@ func (s *authScheduler) setSelector(selector Selector) {
 	s.strategy = selectorStrategy(selector)
 	clear(s.mixedCursors)
 	clear(s.mixedWeightedStates)
+	for _, pins := range s.quotaPins {
+		for _, pin := range pins {
+			*pin = quotaDrainPin{}
+		}
+	}
 }
 
 // isSchedulableAuth determines whether an auth can be scheduled by a provider scheduler,
@@ -1072,10 +1083,19 @@ func (s *authScheduler) ensureProviderLocked(providerKey string) *providerSchedu
 	}
 	providerState := s.providers[providerKey]
 	if providerState == nil {
+		if s.quotaPins == nil {
+			s.quotaPins = make(map[string]map[string]*quotaDrainPin)
+		}
+		pins := s.quotaPins[providerKey]
+		if pins == nil {
+			pins = make(map[string]*quotaDrainPin)
+			s.quotaPins[providerKey] = pins
+		}
 		providerState = &providerScheduler{
 			providerKey: providerKey,
 			auths:       make(map[string]*scheduledAuthMeta),
 			modelShards: make(map[string]*modelScheduler),
+			quotaPins:   pins,
 		}
 		s.providers[providerKey] = providerState
 	}
@@ -1222,6 +1242,7 @@ func (p *providerScheduler) ensureModelLocked(modelKey string, now time.Time) *m
 		modelKey:        modelKey,
 		entries:         make(map[string]*scheduledAuth),
 		readyByPriority: make(map[int]*readyBucket),
+		quotaPin:        p.quotaPinLocked(modelKey),
 	}
 	for _, meta := range p.auths {
 		if meta == nil || !meta.supportsModel(modelKey) {
@@ -1231,6 +1252,19 @@ func (p *providerScheduler) ensureModelLocked(modelKey string, now time.Time) *m
 	}
 	p.modelShards[modelKey] = shard
 	return shard
+}
+
+// quotaPinLocked returns the provider's persistent quota-drain pin for modelKey.
+func (p *providerScheduler) quotaPinLocked(modelKey string) *quotaDrainPin {
+	if p.quotaPins == nil {
+		p.quotaPins = make(map[string]*quotaDrainPin)
+	}
+	pin := p.quotaPins[modelKey]
+	if pin == nil {
+		pin = &quotaDrainPin{}
+		p.quotaPins[modelKey] = pin
+	}
+	return pin
 }
 
 // supportsModel reports whether the auth metadata currently supports modelKey.
@@ -1455,7 +1489,7 @@ func (m *modelScheduler) pickReadyAtPriorityLocked(preferWebsocket bool, priorit
 	case schedulerStrategyFillFirst:
 		picked = view.pickFirst(predicate)
 	case schedulerStrategyQuotaDrain:
-		picked = view.pickQuotaDrain(m.modelKey, predicate)
+		picked = view.pickQuotaDrain(m.modelKey, predicate, m.quotaPin)
 	case schedulerStrategyWeightedRoundRobin:
 		picked = view.pickWeighted(predicate)
 	default:
@@ -1891,18 +1925,16 @@ func pickSmoothWeightedScheduled(entries []*scheduledAuth, current map[string]in
 	return picked
 }
 
-func (v *readyView) pickQuotaDrain(model string, predicate func(*scheduledAuth) bool) *scheduledAuth {
+func (v *readyView) pickQuotaDrain(model string, predicate func(*scheduledAuth) bool, pin *quotaDrainPin) *scheduledAuth {
 	if len(v.flat) == 0 {
 		return nil
 	}
 	now := time.Now()
-	bestRank := capacityRank{}
-	hasBest := false
-	eligible := make(map[int]struct{})
-	for index, entry := range v.flat {
-		if predicate != nil && !predicate(entry) {
-			continue
-		}
+	candidates := make([]quotaPinCandidate, 0, len(v.flat))
+	entries := make([]*scheduledAuth, 0, len(v.flat))
+	start := scheduledSuccessorIndex(v.flat, v.lastPicked)
+	for offset := 0; offset < len(v.flat); offset++ {
+		entry := v.flat[(start+offset)%len(v.flat)]
 		if entry == nil || entry.auth == nil {
 			continue
 		}
@@ -1910,34 +1942,23 @@ func (v *readyView) pickQuotaDrain(model string, predicate func(*scheduledAuth) 
 		if rank.known && rank.exhausted {
 			continue
 		}
-		if !hasBest || quotaRankLess(rank, bestRank) {
-			bestRank = rank
-			hasBest = true
-			clear(eligible)
-			eligible[index] = struct{}{}
-			continue
-		}
-		if quotaRanksEqual(rank, bestRank) {
-			eligible[index] = struct{}{}
-		}
+		candidates = append(candidates, quotaPinCandidate{
+			id:      entry.auth.ID,
+			rank:    rank,
+			allowed: predicate == nil || predicate(entry),
+		})
+		entries = append(entries, entry)
 	}
-	if !hasBest || len(eligible) == 0 {
+	order := make([]int, len(candidates))
+	for index := range order {
+		order[index] = index
+	}
+	picked := pickQuotaPinned(pin, candidates, order)
+	if picked < 0 {
 		return nil
 	}
-	start := scheduledSuccessorIndex(v.flat, v.lastPicked)
-	for offset := 0; offset < len(v.flat); offset++ {
-		index := (start + offset) % len(v.flat)
-		if _, ok := eligible[index]; !ok {
-			continue
-		}
-		entry := v.flat[index]
-		if entry == nil || entry.auth == nil {
-			continue
-		}
-		v.lastPicked = entry.auth.ID
-		return entry
-	}
-	return nil
+	v.lastPicked = entries[picked].auth.ID
+	return entries[picked]
 }
 
 func (v *readyView) hasQuotaDrainCandidate(model string, predicate func(*scheduledAuth) bool) bool {

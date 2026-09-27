@@ -82,6 +82,9 @@ func TestParseClaudeCapacity_DynamicScopes(t *testing.T) {
 	if windows[2].Routing {
 		t.Fatalf("scope-less weekly_scoped window Routing = true, want false")
 	}
+	if windows[0].PeriodSeconds != 5*60*60 || windows[1].PeriodSeconds != 7*24*60*60 {
+		t.Fatalf("periods = %d/%d, want 5h session and 7d weekly", windows[0].PeriodSeconds, windows[1].PeriodSeconds)
+	}
 }
 
 func TestParseCodexCapacity_OnlyGeneralRateLimitRoutes(t *testing.T) {
