@@ -27,6 +27,10 @@ export function isCursorFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'cursor';
 }
 
+export function isDevinFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'devin';
+}
+
 export function isDevinCliFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'devin-cli';
 }

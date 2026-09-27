@@ -13,7 +13,9 @@ import type {
   CodexQuotaState,
   CursorQuotaState,
   DevinCliQuotaState,
+  DevinQuotaState,
   KimiQuotaState,
+  MetaQuotaState,
   OpenCodeGoQuotaState,
   XaiQuotaState,
 } from '@/types';
@@ -21,7 +23,8 @@ import type {
 export type QuotaUpdater<T> = T | ((prev: T) => T);
 
 export type QuotaProviderType =
-  'antigravity' | 'claude' | 'codex' | 'cursor' | 'devin-cli' | 'kimi' | 'opencode-go' | 'xai';
+  | 'antigravity' | 'claude' | 'codex' | 'cursor' | 'devin-cli' | 'devin'
+  | 'kimi' | 'meta' | 'opencode-go' | 'xai';
 
 /** useQuotaStore 的结构契约（storeSelector/storeSetter 依赖）。 */
 export interface QuotaStore {
@@ -30,7 +33,9 @@ export interface QuotaStore {
   codexQuota: Record<string, CodexQuotaState>;
   cursorQuota: Record<string, CursorQuotaState>;
   devinCliQuota: Record<string, DevinCliQuotaState>;
+  devinQuota: Record<string, DevinQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
+  metaQuota: Record<string, MetaQuotaState>;
   openCodeGoQuota: Record<string, OpenCodeGoQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
@@ -38,10 +43,12 @@ export interface QuotaStore {
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
   setDevinCliQuota: (updater: QuotaUpdater<Record<string, DevinCliQuotaState>>) => void;
+  setDevinQuota: (updater: QuotaUpdater<Record<string, DevinQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
+  setMetaQuota: (updater: QuotaUpdater<Record<string, MetaQuotaState>>) => void;
   setOpenCodeGoQuota: (updater: QuotaUpdater<Record<string, OpenCodeGoQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
-  clearQuotaCache: () => void;
+  clearQuotaCache: (names?: string[]) => void;
 }
 
 export interface QuotaProviderData<TState, TData> {

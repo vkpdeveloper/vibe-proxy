@@ -16,11 +16,9 @@ import {
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { AuthFileItem, QuotaCapacityState, QuotaCapacityWindow } from '@/types';
-import { resolveAuthProvider } from '@/utils/quota';
 import { statusBarDataFromRecentRequests } from '@/utils/recentRequests';
 import { formatDateTimeValue, formatFileSize } from '@/utils/format';
 import {
-  QUOTA_PROVIDER_TYPES,
   formatModified,
   getAuthFileIcon,
   getAuthFileStatusMessage,
@@ -32,12 +30,14 @@ import {
   isThemeSurfaceIconProvider,
   normalizeProviderKey,
   supportsAuthFileManualRefresh,
-  type QuotaProviderType,
+  type AuthFileQuotaFilter,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
+import { resolveAuthFileQuotaType } from '@/features/authFiles/logic';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
+import { AuthFileCooldownSection } from './AuthFileCooldownSection';
 import styles from './AuthFileCard.module.scss';
 
 const MIN_MEANINGFUL_DATE_MS = Date.UTC(2000, 0, 1);
@@ -103,7 +103,7 @@ export type AuthFileCardProps = {
   deleting: string | null;
   statusUpdating: Record<string, boolean>;
   manualRefreshing: Record<string, boolean>;
-  quotaFilterType: QuotaProviderType | null;
+  quotaFilterType: AuthFileQuotaFilter;
   statusBarCache: Map<string, AuthFileStatusBarData>;
   /** 首屏一次性级联入场的延迟；null/undefined 表示不做入场动画。 */
   entranceDelayMs?: number | null;
@@ -114,12 +114,6 @@ export type AuthFileCardProps = {
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onToggleSelect: (name: string) => void;
-};
-
-const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
-  const provider = resolveAuthProvider(file);
-  if (!QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)) return null;
-  return provider as QuotaProviderType;
 };
 
 export function AuthFileCard(props: AuthFileCardProps) {
@@ -151,14 +145,12 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const showModelsButton = !isRuntimeOnly || isAistudio;
   const showManualRefreshButton = !isRuntimeOnly && supportsAuthFileManualRefresh(providerKey);
   const isManualRefreshing = manualRefreshing[file.name] === true;
-  const typeColor = getTypeColor(providerKey, resolvedTheme);
   const typeLabel = getTypeLabel(t, providerKey);
+  const typeColor = getTypeColor(providerKey, resolvedTheme);
   const providerIcon = getAuthFileIcon(providerKey, resolvedTheme);
-  // 与 AI 提供商界面一致：Kimi 图标底座随主题切换颜色
   const useThemeSurfaceIcon = isThemeSurfaceIconProvider(providerKey);
 
-  const quotaType =
-    quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
+  const quotaType = resolveAuthFileQuotaType(file, quotaFilterType);
   const showQuotaLayout = Boolean(quotaType) && !isRuntimeOnly && !compact;
 
   const successCount = file.successCount ?? 0;
@@ -261,10 +253,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
             checked={selected}
             onChange={() => onToggleSelect(file.name)}
             className={styles.selection}
-            aria-label={
-              selected ? t('auth_files.batch_deselect') : t('auth_files.batch_select_all')
-            }
-            title={selected ? t('auth_files.batch_deselect') : t('auth_files.batch_select_all')}
+            ariaLabel={t('auth_files.card_select', { name: file.name })}
+            title={t('auth_files.card_select', { name: file.name })}
           />
         )}
         <div
@@ -330,6 +320,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
             )}
           </span>
         </div>
+        {isRuntimeOnly && (
+          <span className={styles.runtimeLabel}>{t('auth_files.type_virtual')}</span>
+        )}
       </header>
 
       {identity.secondary && (
@@ -351,9 +344,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
         </div>
       )}
 
+      <AuthFileCooldownSection snapshot={file.cooldownSnapshot} />
+
       <div className={styles.health}>
         <div className={styles.healthHead}>
-          <span className={styles.healthLabel}>{t('auth_files.health_status_label')}</span>
+          <span className={styles.healthLabel}>{t('auth_files.card_requests')}</span>
           <span className={styles.healthCounts}>
             <span
               className={`${styles.countOk} ${successCount > 0 ? styles.countLive : ''}`}
@@ -394,7 +389,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
             <span className={styles.metaDivider} aria-hidden="true">
               ·
             </span>
-            <span className={styles.metaWeight} title={t('auth_files.weight_hint')}>
+            <span className={styles.metaWeight} title={t('auth_files.weight_tooltip')}>
               <span className={styles.metaMetricLabel}>{t('auth_files.weight_display')}</span>
               <span>{weightValue}</span>
             </span>
@@ -501,7 +496,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
           <div className={styles.toggleWrap}>
             <span className={styles.toggleLabel}>{t('auth_files.status_toggle_label')}</span>
             <ToggleSwitch
-              ariaLabel={t('auth_files.status_toggle_label')}
+              ariaLabel={t('auth_files.card_toggle', { name: file.name })}
               checked={!file.disabled}
               disabled={disableControls || statusUpdating[file.name] === true || isManualRefreshing}
               onChange={(value) => onToggleStatus(file, value)}

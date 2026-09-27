@@ -34,6 +34,14 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
     dark: { bg: '#252525', text: '#f5f5f5', border: '1px solid #484848' },
   },
+  devin: {
+    light: { bg: '#e8f4ff', text: '#155e9b' },
+    dark: { bg: '#123b5d', text: '#8dc9f5' },
+  },
+  meta: {
+    light: { bg: '#ecf7ff', text: '#075985' },
+    dark: { bg: '#143449', text: '#9bd8f6' },
+  },
   'opencode-go': {
     light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
     dark: { bg: '#252525', text: '#f7f7f7', border: '1px solid #484848' },
@@ -135,6 +143,7 @@ export const CLAUDE_USAGE_WINDOW_KEYS = [
 
 // Codex API configuration
 export const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage';
+export const CODEX_SUBSCRIPTION_URL = 'https://chatgpt.com/backend-api/subscriptions';
 export const CODEX_RATE_LIMIT_RESET_CREDITS_URL =
   'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits';
 export const CODEX_RATE_LIMIT_RESET_CREDITS_CONSUME_URL =

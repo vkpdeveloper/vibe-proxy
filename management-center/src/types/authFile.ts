@@ -14,6 +14,8 @@ export type AuthFileType =
   | 'codex'
   | 'cursor'
   | 'devin-cli'
+  | 'devin'
+  | 'meta'
   | 'opencode-go'
   | 'antigravity'
   | 'xai'
@@ -49,6 +51,22 @@ export interface RoutingSelectionState {
   model?: string;
   selected_at: string;
   expires_at: string;
+}
+
+export interface AuthFileCooldown {
+  scope: 'model' | 'credential';
+  modelKey?: string;
+  reason: string;
+  retryAt: string;
+  remainingSeconds: number;
+  backoffLevel?: number;
+  httpStatus?: number;
+}
+
+export interface AuthFileCooldownSnapshot {
+  observedAt?: string;
+  receivedAtMs: number;
+  records: AuthFileCooldown[] | null;
 }
 
 export interface AuthFileItem {
@@ -90,10 +108,13 @@ export interface AuthFileItem {
   quotaCapacity?: QuotaCapacityState;
   routing_selection?: RoutingSelectionState;
   routingSelection?: RoutingSelectionState;
+  cooldownSnapshot?: AuthFileCooldownSnapshot;
   [key: string]: unknown;
 }
 
 export interface AuthFilesResponse {
   files: AuthFileItem[];
   total?: number;
+  observed_at?: unknown;
+  observedAt?: string;
 }

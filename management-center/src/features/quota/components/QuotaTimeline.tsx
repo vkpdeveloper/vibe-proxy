@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import { formatRelativeInstant, TYPE_COLORS } from '@/utils/quota';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { useNow } from '@/hooks/useNow';
 import type { ResolvedTheme, ThemeColors } from '@/types';
 import {
@@ -96,7 +97,7 @@ export function QuotaTimeline({
         const identity = deriveAuthFileIdentity(entry.file);
         const displayIdentity = identity.kind === 'fileName' ? entry.file.name : identity.primary;
         return {
-          name: entry.file.name,
+          name: getQuotaCacheKey(entry.file),
           displayName: displayNameFor(displayIdentity),
           privateEmail: identity.kind === 'email',
           provider: entry.type,
@@ -363,7 +364,8 @@ function Lane({ lane, span, now, mode, cells, nowPercent, resolvedTheme }: LaneP
         <div className={styles.laneLimits}>
           {lane.limits.map((limit) => (
             <span key={limit.label} className={styles.laneLimit}>
-              {limit.label} <b>{limit.remaining}%</b>
+              {lane.provider === 'meta' ? t(limit.label) : limit.label}{' '}
+              <b>{limit.remaining}%</b>
             </span>
           ))}
         </div>

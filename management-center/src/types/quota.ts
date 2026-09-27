@@ -322,6 +322,29 @@ export interface CursorQuotaState {
   errorStatus?: number;
 }
 
+export interface DevinQuotaWindow {
+  id: 'daily' | 'weekly';
+  label?: string;
+  remainingPercent: number | null;
+  resetAtMs: number | null;
+  periodHours: number;
+}
+
+/** Only quota observations, never the credential-bearing refresh response. */
+export interface DevinQuotaData {
+  windows: DevinQuotaWindow[];
+  observedAtMs: number | null;
+  plan: string | null;
+  planStartMs: number | null;
+  planEndMs: number | null;
+}
+
+export interface DevinQuotaState extends DevinQuotaData {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error?: string;
+  errorStatus?: number;
+}
+
 // Devin CLI seat-management API payload and normalized state
 export interface DevinCliPlanInfoPayload {
   planName?: string;
@@ -413,6 +436,29 @@ export interface OpenCodeGoQuotaWindow {
 export interface OpenCodeGoQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: OpenCodeGoQuotaWindow[];
+  error?: string;
+  errorStatus?: number;
+}
+
+/** A whitelisted quota observation from Meta's Muse key endpoint. */
+export interface MetaQuotaWindow {
+  id: 'window' | 'weekly';
+  usedPercent: number | null;
+  /** Reset instant as Unix seconds, matching the upstream contract. */
+  resetAt?: number;
+  durationMinutes?: number;
+}
+
+/** Contains quota/display fields only; credential-bearing response fields are discarded. */
+export interface MetaQuotaData {
+  planName?: string;
+  isSubscriptionActive?: boolean;
+  windows: MetaQuotaWindow[];
+}
+
+export interface MetaQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  data?: MetaQuotaData;
   error?: string;
   errorStatus?: number;
 }

@@ -15,6 +15,8 @@ import { ANTIGRAVITY_CONFIG } from './antigravity/data';
 import { AntigravityQuotaBody } from './antigravity/AntigravityQuotaBody';
 import { CLAUDE_CONFIG } from './claude/data';
 import { ClaudeQuotaBody } from './claude/ClaudeQuotaBody';
+import { DEVIN_CONFIG } from './devin/data';
+import { DevinQuotaBody } from './devin/DevinQuotaBody';
 import { CODEX_CONFIG } from './codex/data';
 import { CodexQuotaBody } from './codex/CodexQuotaBody';
 import { CURSOR_CONFIG } from './cursor/data';
@@ -23,6 +25,8 @@ import { DEVIN_CLI_CONFIG } from './devinCli/data';
 import { DevinCliQuotaBody } from './devinCli/DevinCliQuotaBody';
 import { KIMI_CONFIG } from './kimi/data';
 import { KimiQuotaBody } from './kimi/KimiQuotaBody';
+import { META_CONFIG } from './meta/data';
+import { MetaQuotaBody } from './meta/MetaQuotaBody';
 import { OPENCODE_GO_CONFIG } from './opencodeGo/data';
 import { OpenCodeGoQuotaBody } from './opencodeGo/OpenCodeGoQuotaBody';
 import { XAI_CONFIG } from './xai/data';
@@ -59,7 +63,9 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
   codex: { ...CODEX_CONFIG, Body: CodexQuotaBody } as unknown as QuotaAdapter,
   cursor: { ...CURSOR_CONFIG, Body: CursorQuotaBody } as unknown as QuotaAdapter,
   'devin-cli': { ...DEVIN_CLI_CONFIG, Body: DevinCliQuotaBody } as unknown as QuotaAdapter,
+  devin: { ...DEVIN_CONFIG, Body: DevinQuotaBody } as unknown as QuotaAdapter,
   kimi: { ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter,
+  meta: { ...META_CONFIG, Body: MetaQuotaBody } as unknown as QuotaAdapter,
   'opencode-go': {
     ...OPENCODE_GO_CONFIG,
     Body: OpenCodeGoQuotaBody,
