@@ -14,11 +14,12 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	. "github.com/router-for-me/CLIProxyAPI/v7/internal/constant"
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
-	responsesconverter "github.com/router-for-me/CLIProxyAPI/v7/internal/translator/openai/openai/responses"
-	"github.com/router-for-me/CLIProxyAPI/v7/sdk/api/handlers"
+	codexmodels "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/models"
+	. "github.com/router-for-me/CLIProxyAPI/v8/internal/constant"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	responsesconverter "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/openai/openai/responses"
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -61,13 +62,23 @@ func (h *OpenAIAPIHandler) Models() []map[string]any {
 func (h *OpenAIAPIHandler) OpenAIModels(c *gin.Context) {
 	if _, ok := c.Request.URL.Query()["client_version"]; ok {
 		clientVersion := c.Query("client_version")
+		modelResponse := h.codexClientModelsResponse(clientVersion)
 		if handlers.HasManagedClientPolicy(c.Request.Context()) {
 			models := handlers.FilterModelsForClientPolicy(handlers.RequestContext(c), h.Models())
 			optimizeMultiAgentV2 := h != nil && h.Cfg != nil && h.Cfg.CodexOptimizeMultiAgentV2
-			h.WriteModelListResponse(c, h.HandlerType(), CodexClientModelsResponseForClient(models, clientVersion, optimizeMultiAgentV2))
+			modelResponse = CodexClientModelsResponseForClient(models, clientVersion, optimizeMultiAgentV2)
+		}
+		body, errMarshal := codexmodels.MarshalCompact(modelResponse)
+		if errMarshal != nil {
+			c.JSON(http.StatusInternalServerError, handlers.ErrorResponse{
+				Error: handlers.ErrorDetail{
+					Message: fmt.Sprintf("Failed to encode model list: %v", errMarshal),
+					Type:    "server_error",
+				},
+			})
 			return
 		}
-		h.WriteModelListResponse(c, h.HandlerType(), h.codexClientModelsResponse(clientVersion))
+		h.WriteModelListResponse(c, h.HandlerType(), body)
 		return
 	}
 
