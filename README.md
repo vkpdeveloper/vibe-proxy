@@ -22,6 +22,15 @@ docker compose logs -f
 docker compose down
 ```
 
+The user systemd service starts this stack at boot, including `cloudflared`, and
+recreates the containers if Docker left an old network attachment behind. Docker
+also restarts each container if it exits. The service detects the current Tailscale
+IPv4 address at startup. To restart the full stack manually:
+
+```sh
+systemctl --user restart vibe-proxy.service
+```
+
 Persistent configuration, OAuth credentials, and logs live under `data/`. To change the dashboard key, update `MANAGEMENT_KEY` in `secrets.env` and recreate the `cli-proxy-api` container.
 
 ### Cursor usage tracking
@@ -66,7 +75,9 @@ The seat-management endpoint is undocumented and may change. A `400`/`401` usual
 
 The `cloudflared` container uses the named tunnel `lame-proxy` and restarts automatically with Docker. Its secret credentials remain outside the repository at `~/.cloudflared/3111cade-e66f-4a23-b07c-1cdb408678c5.json` and are mounted read-only.
 
-If this host's Tailscale IPv4 address changes, update `BIND_ADDRESS` in `.env` (copy from `.env.example`) and recreate the stack:
+The systemd service detects Tailscale IPv4 address changes when it starts. If
+you run Compose directly after an address change, update `BIND_ADDRESS` in `.env`
+(copy from `.env.example`) and recreate the stack:
 
 ```sh
 tailscale ip -4

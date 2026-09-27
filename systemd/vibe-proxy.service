@@ -1,0 +1,15 @@
+[Unit]
+Description=Vibe Proxy and Cloudflare Tunnel
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/vaibhav/Developer/docker/vibe-proxy
+EnvironmentFile=-/home/vaibhav/Developer/docker/vibe-proxy/.env
+ExecStart=/home/vaibhav/Developer/docker/vibe-proxy/scripts/start-stack.sh
+Restart=on-failure
+RestartSec=15s
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target
