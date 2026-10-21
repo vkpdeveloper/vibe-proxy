@@ -39,7 +39,24 @@ type staticModelsJSON struct {
 
 // GetClaudeModels returns the standard Claude model definitions.
 func GetClaudeModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Claude)
+	models := cloneModelInfos(getModels().Claude)
+	// Sonnet 5.5 is available upstream before the shared remote catalog includes it.
+	// Keep this fallback until that catalog catches up, without duplicating its entry.
+	for _, model := range models {
+		if model.ID == "claude-sonnet-5-5" {
+			return models
+		}
+	}
+	return append(models, &ModelInfo{
+		ID:                  "claude-sonnet-5-5",
+		Object:              "model",
+		Created:             1790553600,
+		OwnedBy:             "anthropic",
+		Type:                "claude",
+		DisplayName:         "Claude Sonnet 5.5",
+		ContextLength:       1000000,
+		MaxCompletionTokens: 128000,
+	})
 }
 
 // GetGeminiModels returns the standard Gemini model definitions.
