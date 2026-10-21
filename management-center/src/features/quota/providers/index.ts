@@ -29,6 +29,8 @@ import { META_CONFIG } from './meta/data';
 import { MetaQuotaBody } from './meta/MetaQuotaBody';
 import { OPENCODE_GO_CONFIG } from './opencodeGo/data';
 import { OpenCodeGoQuotaBody } from './opencodeGo/OpenCodeGoQuotaBody';
+import { PLUGIN_CONFIG } from './plugin/data';
+import { PluginQuotaBody } from './plugin/PluginQuotaBody';
 import { XAI_CONFIG } from './xai/data';
 import { XaiQuotaBody } from './xai/XaiQuotaBody';
 
@@ -44,6 +46,7 @@ export interface QuotaAdapter {
   i18nPrefix: string;
   filterFn: (file: AuthFileItem) => boolean;
   fetchQuota: (file: AuthFileItem, t: TFunction) => Promise<unknown>;
+  enrichQuota?: (file: AuthFileItem, data: unknown, t: TFunction) => Promise<unknown>;
   resetQuota?: (file: AuthFileItem, t: TFunction) => Promise<unknown>;
   canResetQuota?: (quota: QuotaCardState) => boolean;
   storeSelector: (state: QuotaStore) => Record<string, QuotaCardState>;
@@ -70,6 +73,7 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
     ...OPENCODE_GO_CONFIG,
     Body: OpenCodeGoQuotaBody,
   } as unknown as QuotaAdapter,
+  plugin: { ...PLUGIN_CONFIG, Body: PluginQuotaBody } as unknown as QuotaAdapter,
   xai: { ...XAI_CONFIG, Body: XaiQuotaBody } as unknown as QuotaAdapter,
 };
 

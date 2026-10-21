@@ -138,6 +138,7 @@ export function QuotaPage() {
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const metaQuota = useQuotaStore((state) => state.metaQuota);
   const openCodeGoQuota = useQuotaStore((state) => state.openCodeGoQuota);
+  const pluginQuota = useQuotaStore((state) => state.pluginQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
 
   const quotaByType = useMemo<Record<QuotaProviderType, Record<string, QuotaCardState>>>(
@@ -152,6 +153,7 @@ export function QuotaPage() {
         kimi: kimiQuota,
         meta: metaQuota,
         'opencode-go': openCodeGoQuota,
+        plugin: pluginQuota,
         xai: xaiQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
     [
@@ -164,6 +166,7 @@ export function QuotaPage() {
       kimiQuota,
       metaQuota,
       openCodeGoQuota,
+      pluginQuota,
       xaiQuota,
     ]
   );

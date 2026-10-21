@@ -53,6 +53,11 @@ interface WindowLike {
   resetAtMs?: number | null;
 }
 
+interface DollarWindowLike {
+  key: string;
+  resetsAt?: string | null;
+}
+
 interface ResetCreditLike {
   id?: string;
   status?: string;
@@ -102,6 +107,17 @@ export function collectQuotaRowInstants(
     provider === 'opencode-go'
   ) {
     const windows = collectRows((quota as { windows?: WindowLike[] }).windows ?? [], 'window');
+    if (provider === 'claude') {
+      // Dollar balances render separately from plan meters, but their resets
+      // still return capacity and must participate in recovery sorting.
+      const balances = ((quota as { dollarWindows?: DollarWindowLike[] }).dollarWindows ?? [])
+        .map((balance): QuotaRowInstant | null => {
+          const atMs = parseIsoToMs(balance.resetsAt);
+          return atMs === null ? null : { rowId: balance.key, atMs, kind: 'window' };
+        })
+        .filter((instant): instant is QuotaRowInstant => instant !== null);
+      return [...windows, ...balances];
+    }
     if (provider !== 'codex') return windows;
 
     const credits = (
@@ -138,7 +154,7 @@ export function collectQuotaRowInstants(
     return instants;
   }
 
-  if (provider === 'antigravity') {
+  if (provider === 'antigravity' || provider === 'plugin') {
     // Buckets live inside groups; the grouping is a display concern here.
     const buckets = ((quota as { groups?: { buckets?: WindowLike[] }[] }).groups ?? []).flatMap(
       (group) => group.buckets ?? []

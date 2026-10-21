@@ -480,24 +480,13 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
       // length; weekly is what `periodType` already told us.
       periodHours: billing.periodHours ?? 24 * 7,
       remaining,
-      // Per-product usage is the closest analogue to the other providers'
-      // per-window breakdown.
-      limits: [
-        ...(billing.productUsage ?? [])
-          .map((entry) => ({
-            label: entry.product ?? '',
-            remaining:
-              typeof entry.usagePercent === 'number'
-                ? clampPercent(100 - entry.usagePercent)
-                : null,
-          }))
-          .filter((limit): limit is TimelineLimit => limit.remaining !== null),
-        ...grokBotLimit,
-      ],
+      // Products contribute to the shared weekly usage, not independent limits;
+      // the Grok Bot meter is a separate allowance, so it stays a lane limit.
+      limits: [...grokBotLimit],
     };
   }
 
-  if (provider === 'antigravity') {
+  if (provider === 'antigravity' || provider === 'plugin') {
     // Buckets live one level down, inside groups, and the groups are a display
     // concern the chart doesn't care about — flatten them.
     const buckets = ((quota as { groups?: { buckets?: AntigravityBucketLike[] }[] }).groups ?? [])
