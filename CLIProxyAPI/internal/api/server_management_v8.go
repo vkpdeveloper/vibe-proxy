@@ -40,6 +40,14 @@ func (s *Server) registerManagementV8Routes() {
 	v8.GET("/observability/usage/api-keys", s.mgmt.GetAPIKeyUsage)
 	v8.GET("/observability/usage/queue", s.mgmt.GetUsageQueue)
 
+	// Fork routes for client API key policies and the persistent usage ledger.
+	v8.GET("/client-api-keys", s.mgmt.GetClientAPIKeys)
+	v8.POST("/client-api-keys", s.mgmt.CreateClientAPIKey)
+	v8.PUT("/client-api-keys/:id", s.mgmt.UpdateClientAPIKey)
+	v8.POST("/client-api-keys/:id/rotate", s.mgmt.RotateClientAPIKey)
+	v8.DELETE("/client-api-keys/:id", s.mgmt.DeleteClientAPIKey)
+	v8.GET("/usage-costs", s.mgmt.GetUsageCosts)
+
 	v8.GET("/credentials", s.mgmt.ListAuthFiles)
 	v8.POST("/credentials", s.mgmt.UploadAuthFileV8)
 	v8.DELETE("/credentials", s.mgmt.DeleteAuthFileV8)
