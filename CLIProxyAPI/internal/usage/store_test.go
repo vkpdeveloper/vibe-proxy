@@ -204,7 +204,7 @@ Status: 200
 	}
 }
 
-func TestStoreRepricesUnpricedHistoryOnLoad(t *testing.T) {
+func TestStoreRepricesHistoryOnLoad(t *testing.T) {
 	dir := t.TempDir()
 	usageDir := filepath.Join(dir, "usage")
 	if errMkdir := os.MkdirAll(usageDir, 0o750); errMkdir != nil {
@@ -231,6 +231,10 @@ func TestStoreRepricesUnpricedHistoryOnLoad(t *testing.T) {
 			Tokens: TokenDetail{InputTokens: 100, OutputTokens: 100, TotalTokens: 200}},
 		Event{Timestamp: time.Date(2026, 9, 7, 12, 2, 0, 0, time.UTC), Provider: "codex", Model: "gpt-6-astra", Origin: "live", Failed: true,
 			Tokens: TokenDetail{InputTokens: 100, OutputTokens: 100, TotalTokens: 200}},
+		// Priced before claude-opus-5-5 had its own rule, at the Opus 5 rate of $5/$25.
+		Event{Timestamp: time.Date(2026, 9, 7, 12, 3, 0, 0, time.UTC), Provider: "claude", Model: "claude-opus-5-5", Origin: "live",
+			Tokens: TokenDetail{InputTokens: 1_000_000, OutputTokens: 1_000_000, TotalTokens: 2_000_000},
+			Cost:   CostDetail{InputUSD: 5, OutputUSD: 25, TotalUSD: 30, Priced: true, RuleID: "anthropic-claude-opus-5"}},
 	)
 
 	store, errStore := NewStore(usageDir, "", true)
@@ -238,14 +242,45 @@ func TestStoreRepricesUnpricedHistoryOnLoad(t *testing.T) {
 		t.Fatalf("NewStore() error = %v", errStore)
 	}
 	report := store.Report(nil, nil)
-	if report.Totals.PricedRequests != 1 || report.Totals.UnpricedRequests != 1 {
-		t.Fatalf("priced/unpriced = %d/%d, want 1/1", report.Totals.PricedRequests, report.Totals.UnpricedRequests)
+	if report.Totals.PricedRequests != 2 || report.Totals.UnpricedRequests != 1 {
+		t.Fatalf("priced/unpriced = %d/%d, want 2/1", report.Totals.PricedRequests, report.Totals.UnpricedRequests)
 	}
-	if math.Abs(report.Totals.EstimatedUSD-5.935) > 1e-9 {
-		t.Fatalf("estimated cost = %.8f, want 5.935", report.Totals.EstimatedUSD)
+	// gpt-6-astra $5.935 + claude-opus-5-5 repriced to $4 input + $20 output.
+	if math.Abs(report.Totals.EstimatedUSD-29.935) > 1e-9 {
+		t.Fatalf("estimated cost = %.8f, want 29.935", report.Totals.EstimatedUSD)
 	}
 	if len(report.UnpricedModels) != 1 || report.UnpricedModels[0].Model != "unlisted-model" {
 		t.Fatalf("unpriced models = %+v, want only unlisted-model", report.UnpricedModels)
+	}
+}
+
+func TestStorePricesCurrentCodexAndClaudeModels(t *testing.T) {
+	store, errStore := NewStore(filepath.Join(t.TempDir(), "usage"), "", true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	// 100k input stays under the 272k long-context threshold.
+	short := TokenDetail{InputTokens: 100_000, OutputTokens: 1_000_000}
+	for _, tc := range []struct {
+		model  string
+		tokens TokenDetail
+		rule   string
+		want   float64
+	}{
+		{"gpt-6-sol", short, "openai-gpt-6-sol", 10.2},
+		{"gpt-6-luna", short, "openai-gpt-6-luna", 0.51},
+		{"gpt-6.1-sol", short, "openai-gpt-6.1-sol", 10.2},
+		{"gpt-5.5", TokenDetail{InputTokens: 300_000, OutputTokens: 1_000_000}, "openai-gpt-5.5", 48},
+		{"claude-fable-5-1", TokenDetail{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheReadTokens: 1_000_000}, "anthropic-claude-fable-5.1", 60.25},
+		{"claude-opus-5-5", TokenDetail{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheReadTokens: 1_000_000, CacheCreationTokens: 1_000_000}, "anthropic-claude-opus-5.5", 29.2},
+		{"claude-sonnet-5-5", TokenDetail{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheReadTokens: 1_000_000}, "anthropic-claude-sonnet-5.5", 12.1},
+		{"claude-haiku-5-5", TokenDetail{InputTokens: 50_000, OutputTokens: 1_000_000, CacheReadTokens: 50_000}, "anthropic-claude-haiku-5.5", 0.5055},
+		{"claude-haiku-5-5", TokenDetail{InputTokens: 50_000, OutputTokens: 1_000_000, CacheReadTokens: 60_000}, "anthropic-claude-haiku-5.5", 2.528},
+	} {
+		cost := store.price(Event{Provider: "x", Model: tc.model, Tokens: tc.tokens})
+		if cost.RuleID != tc.rule || math.Abs(cost.TotalUSD-tc.want) > 1e-9 {
+			t.Errorf("%s %+v: rule=%q cost=%.6f, want %q %.6f", tc.model, tc.tokens, cost.RuleID, cost.TotalUSD, tc.rule, tc.want)
+		}
 	}
 }
 

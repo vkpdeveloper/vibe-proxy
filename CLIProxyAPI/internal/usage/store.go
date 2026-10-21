@@ -290,8 +290,10 @@ func (s *Store) load() error {
 		if _, exists := s.ids[event.ID]; exists {
 			continue
 		}
-		if !event.Failed && !event.Cost.Priced {
-			if cost := s.price(event); cost.Priced {
+		// Estimates always reflect the current catalog, so a corrected or newly
+		// added rate also applies to history recorded before the change.
+		if !event.Failed {
+			if cost := s.price(event); cost.Priced && cost != event.Cost {
 				event.Cost = cost
 				repriced++
 			}
