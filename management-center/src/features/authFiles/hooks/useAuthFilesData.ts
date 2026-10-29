@@ -4,7 +4,9 @@ import { apiClient, authFilesApi } from '@/services/api';
 import type { AuthFileRefreshResult } from '@/services/api/authFiles';
 import { getAuthFileRefreshKey } from '@/features/authFiles/manualRefresh';
 import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
-import { useNotificationStore } from '@/stores';
+import { useConfigStore, useNotificationStore } from '@/stores';
+import { canPreferAccount, nextAccountPriority } from '@/features/authFiles/accountPreference';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { AuthFileItem } from '@/types';
 import { formatFileSize } from '@/utils/format';
 import { MAX_AUTH_FILE_SIZE } from '@/utils/constants';
@@ -50,6 +52,8 @@ export type UseAuthFilesDataResult = {
   deletingAll: boolean;
   statusUpdating: Record<string, boolean>;
   manualRefreshing: Record<string, boolean>;
+  preferringAccount: string | null;
+  handlePreferAccount: (item: AuthFileItem) => Promise<void>;
   refreshingAllCredentials: boolean;
   refreshResults: AuthFileRefreshResult[] | null;
   closeRefreshResults: () => void;
@@ -89,6 +93,8 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [manualRefreshing, setManualRefreshing] = useState<Record<string, boolean>>({});
+  const [preferringAccount, setPreferringAccount] = useState<string | null>(null);
+  const preferAccountPendingRef = useRef(false);
   const [refreshingAllCredentials, setRefreshingAllCredentials] = useState(false);
   const [refreshResults, setRefreshResults] = useState<AuthFileRefreshResult[] | null>(null);
   const refreshAllPendingRef = useRef(false);
@@ -238,6 +244,53 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
       }
     },
     [t]
+  );
+
+  const handlePreferAccount = useCallback(
+    async (item: AuthFileItem) => {
+      if (preferAccountPendingRef.current || item.disabled || !canPreferAccount(item)) return;
+      const revision = apiClient.getConnectionRevision();
+      const isCurrent = () => revision === apiClient.getConnectionRevision();
+      preferAccountPendingRef.current = true;
+      setPreferringAccount(getQuotaCacheKey(item));
+      try {
+        // Read every account, including other pages, before promoting this one.
+        const [config, response] = await Promise.all([
+          useConfigStore.getState().fetchConfig(),
+          authFilesApi.list(),
+        ]);
+        if (!isCurrent()) return;
+        if (config.routingStrategy !== 'quota-drain') {
+          throw new Error(t('auth_files.prefer_requires_quota_drain'));
+        }
+        const current = response.files.find(
+          (file) => getQuotaCacheKey(file) === getQuotaCacheKey(item)
+        );
+        if (!current || current.disabled || !canPreferAccount(current)) {
+          throw new Error(t('auth_files.prefer_unavailable'));
+        }
+        const priority = nextAccountPriority(current, response.files);
+        await authFilesApi.patchFields(current.name, { priority });
+        if (!isCurrent()) return;
+        invalidateInFlightLoads();
+        setFiles(response.files.map((file) => (file === current ? { ...file, priority } : file)));
+        onFilesMutatedRef.current?.([current.name]);
+        notifyAuthFilesChanged();
+        showNotification(
+          t('auth_files.prefer_success', { name: current.email || current.name }),
+          'success'
+        );
+        await loadFiles({ background: true });
+      } catch (err: unknown) {
+        if (!isCurrent()) return;
+        const message = err instanceof Error ? t(err.message) : '';
+        showNotification(t('auth_files.prefer_failed', { message }), 'error');
+      } finally {
+        preferAccountPendingRef.current = false;
+        setPreferringAccount(null);
+      }
+    },
+    [invalidateInFlightLoads, loadFiles, showNotification, t]
   );
 
   const handleUploadClick = useCallback(() => {
@@ -954,6 +1007,8 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
     deletingAll,
     statusUpdating,
     manualRefreshing,
+    preferringAccount,
+    handlePreferAccount,
     refreshingAllCredentials,
     refreshResults,
     closeRefreshResults,

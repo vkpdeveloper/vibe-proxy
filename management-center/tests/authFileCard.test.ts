@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-// The quota host binds CSS-module classes at import time, which Bun cannot render.
-// Keep these source contracts small; browser checks cover the actual card interactions.
+// The row binds CSS-module classes at import time, which Bun cannot render.
+// Keep these source contracts small; browser checks cover the actual row.
 const source = readFileSync(
   new URL('../src/features/authFiles/components/AuthFileCard.tsx', import.meta.url),
   'utf8'
@@ -12,62 +12,27 @@ const styles = readFileSync(
   'utf8'
 );
 
-describe('auth file card presentation contract', () => {
-  test('shows provider identity and quota routing without exposing email text directly', () => {
-    expect(source).toContain('getAuthFileIcon');
-    expect(source).toContain('stateBadge');
+describe('auth file row contract', () => {
+  test('leads with the blurred account, never the file name', () => {
     expect(source).toContain('<EmailPrivacyText text={identity.primary} />');
-    expect(source).toContain('{identity.secondary}');
-    expect(source).toContain('routingSelection');
-    expect(source).toContain('<AuthFileCooldownSection\n        snapshot={file.cooldownSnapshot}');
+    expect(source).not.toContain('file.name}</');
+    expect(source).not.toContain('identity.secondary');
   });
 
-  test('uses one footer toggle and credential-specific accessible names', () => {
-    const header = source.split('<header')[1].split('</header>')[0];
-    const footer = source.split('<footer')[1].split('</footer>')[0];
+  test('has one enable toggle named after the account', () => {
     expect(source.match(/<ToggleSwitch/g)).toHaveLength(1);
-    expect(header).not.toContain('<ToggleSwitch');
-    expect(header).toContain("ariaLabel={t('auth_files.card_select', { name: file.name })}");
-    expect(header).not.toContain('aria-label=');
-    expect(footer).toContain('<ToggleSwitch');
-    expect(footer).toContain("t('auth_files.card_toggle', { name: file.name })");
-    expect(footer).toContain('checked={!file.disabled}');
-    expect(footer).toContain('statusUpdating[getAuthFileRefreshKey(file)] === true ||');
-    expect(footer).toContain('isManualRefreshing');
-    expect(footer).toContain('!isRuntimeOnly &&');
+    expect(source).toContain("t('auth_files.card_toggle', { name: identity.primary })");
+    expect(source).toContain('checked={!file.disabled}');
   });
 
-  test('dims disabled card content but keeps the re-enable controls clear', () => {
-    expect(source).toContain("file.disabled === true ? styles.cardDisabled : ''");
-    expect(styles).toMatch(/\.cardDisabled\s*>\s*:not\(\.actions\)\s*\{\s*opacity:\s*0\.68;/);
-    expect(styles).not.toMatch(/\.cardDisabled\s*\{[^}]*opacity:/);
+  test('dims a disabled row but keeps its controls clear', () => {
+    expect(source).toContain("file.disabled === true ? styles.rowDisabled : ''");
+    expect(styles).toMatch(/\.rowDisabled\s*>\s*:not\(\.actions\)\s*\{\s*opacity:/);
   });
 
-  test('uses a plain-text weight tooltip while preserving the details link', () => {
-    expect(source).toContain("title={t('auth_files.weight_tooltip')}");
-    expect(source).not.toContain("title={t('auth_files.weight_hint')}");
-    const detailsSource = readFileSync(
-      new URL('../src/features/authFiles/components/AuthFileDetailsSheet.tsx', import.meta.url),
-      'utf8'
-    );
-    expect(detailsSource).toContain('i18nKey="auth_files.weight_hint"');
-
-    for (const locale of ['en', 'zh-CN', 'zh-TW', 'ru']) {
-      const { auth_files: messages } = JSON.parse(
-        readFileSync(new URL(`../src/i18n/locales/${locale}.json`, import.meta.url), 'utf8')
-      ) as { auth_files: Record<string, string> };
-      expect(messages.weight_tooltip).toBeTruthy();
-      expect(messages.weight_tooltip).not.toMatch(/<[^>]+>/);
-      expect(messages.weight_hint).toContain('<settingsLink>');
-      expect(messages.weight_hint).toContain('</settingsLink>');
-      expect(messages.weight_tooltip).toBe(messages.weight_hint.replace(/<\/?settingsLink>/g, ''));
-    }
-  });
-
-  test('retains individual management actions and warning detail', () => {
+  test('keeps the per-credential actions', () => {
     for (const handler of [
       'onShowModels(file)',
-      'onDownload(file.name)',
       'onManualRefresh(file)',
       'onCooldownReset(file)',
       'onOpenPrefixProxyEditor(file)',
@@ -75,8 +40,5 @@ describe('auth file card presentation contract', () => {
     ]) {
       expect(source).toContain(handler);
     }
-    expect(source).toContain('rawStatusMessage && hasStatusWarning');
-    expect(source).toContain('showManualRefreshButton');
-    expect(source).toContain('file.disabled ||');
   });
 });

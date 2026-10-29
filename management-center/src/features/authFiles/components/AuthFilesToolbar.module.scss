@@ -104,108 +104,6 @@
   min-width: 120px;
 }
 
-/* ---------- 显示设置 ---------- */
-
-.display {
-  position: relative;
-}
-
-.displayButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: $radius-full;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  transition:
-    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out);
-
-  &:active {
-    transform: scale(0.96);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 1px;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .displayButton:hover {
-    color: var(--text-primary);
-    border-color: var(--border-hover);
-  }
-}
-
-.displayButtonActive {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  background: var(--bg-primary);
-}
-
-.popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: $z-dropdown;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 216px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--floating-surface);
-  box-shadow: var(--floating-shadow);
-  transform-origin: top right;
-  animation: toolbar-popover-in var(--dur-hover, 200ms) var(--ease-out-strong, ease-out) both;
-}
-
-@keyframes toolbar-popover-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
-
-.popoverRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.pageSizeInput {
-  width: 64px;
-  height: 30px;
-  padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-family: $font-mono;
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-
-  &:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-10);
-  }
-}
-
 /* ---------- 删除筛选结果（工具栏右端的 ghost danger） ---------- */
 
 .deleteAction {
@@ -277,18 +175,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .segment,
-  .displayButton,
   .deleteAction {
     transition: none;
   }
 
   .segment:active,
-  .displayButton:active,
   .deleteAction:active:not(:disabled) {
     transform: none;
-  }
-
-  .popover {
-    animation: none;
   }
 }

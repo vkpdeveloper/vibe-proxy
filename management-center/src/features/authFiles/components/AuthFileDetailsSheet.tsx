@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type MouseEvent } from 'react';
+import { useCallback, type MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Sheet } from '@/components/ui/Sheet';
@@ -24,26 +24,11 @@ import { AuthFilePolicyFields } from './AuthFilePolicyFields';
 import { credentialPolicyError, readCredentialPolicy } from '../credentialPolicy';
 import styles from './AuthFileDetailsSheet.module.scss';
 
-/** API 边界归一化补写的派生字段——INFO 视图里只展示后端原始形状，避免重复噪音。 */
-const DERIVED_INFO_KEYS = [
-  'successCount',
-  'failureCount',
-  'recentRequests',
-  'runtimeOnly',
-  'authIndex',
-  'statusMessage',
-  'modified',
-  // 'email' 不在此列：后端原始键名与 camelCase 同形，删掉会藏起真实数据。
-  'projectId',
-];
-
 export type AuthFileDetailsSheetProps = {
   disableControls: boolean;
   editor: PrefixProxyEditorState | null;
-  updatedText: string;
   dirty: boolean;
   onClose: () => void;
-  onCopyText: (text: string) => void | Promise<void>;
   onSave: () => void;
   onChange: (field: PrefixProxyEditorField, value: PrefixProxyEditorFieldValue) => void;
 };
@@ -55,8 +40,7 @@ export type AuthFileDetailsSheetProps = {
 export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { disableControls, editor, updatedText, dirty, onClose, onCopyText, onSave, onChange } =
-    props;
+  const { disableControls, editor, dirty, onClose, onSave, onChange } = props;
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
 
   const confirmClose = useCallback((): boolean | Promise<boolean> => {
@@ -92,34 +76,6 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
     [confirmClose, editor?.saving, navigate]
   );
 
-  const formatJsonText = (text: string) => {
-    if (!text) return '';
-    try {
-      return JSON.stringify(JSON.parse(text), null, 2);
-    } catch {
-      return text;
-    }
-  };
-  const previewText = formatJsonText(updatedText);
-  const invalidContentPreview = editor?.invalidContentPreview ?? '';
-  const fileInfoText = editor?.fileInfoText ?? '';
-  const displayInfoText = useMemo(() => {
-    if (!fileInfoText) return '';
-    try {
-      const parsed = JSON.parse(fileInfoText) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const record = parsed as Record<string, unknown>;
-        DERIVED_INFO_KEYS.forEach((key) => {
-          delete record[key];
-        });
-        return JSON.stringify(record, null, 2);
-      }
-    } catch {
-      /* 非 JSON 原样展示 */
-    }
-    return fileInfoText;
-  }, [fileInfoText]);
-
   return (
     <Sheet
       open={Boolean(editor)}
@@ -139,16 +95,6 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
             disabled={editor?.saving === true}
           >
             {dirty ? t('common.cancel') : t('common.close')}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (!updatedText) return;
-              void onCopyText(updatedText);
-            }}
-            disabled={editor?.saving === true || !updatedText}
-          >
-            {t('common.copy')}
           </Button>
           <Button
             onClick={onSave}
@@ -178,22 +124,11 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
           ) : (
             <>
               {editor.error && <div className={styles.error}>{editor.error}</div>}
-              <div className={styles.jsonWrapper}>
-                <label className={styles.label}>{t('auth_files.prefix_proxy_info_label')}</label>
-                <textarea className={styles.textarea} rows={8} readOnly value={displayInfoText} />
-              </div>
-              <div className={styles.jsonWrapper}>
-                <label className={styles.label}>
-                  {editor.json
-                    ? t('auth_files.prefix_proxy_source_label')
-                    : t('auth_files.prefix_proxy_invalid_content_label')}
-                </label>
-                {editor.json ? (
-                  <textarea className={styles.textarea} rows={10} readOnly value={previewText} />
-                ) : (
-                  <pre className={styles.invalidPreview}>{invalidContentPreview}</pre>
-                )}
-              </div>
+              {!editor.json && (
+                <div className={styles.error}>
+                  {t('auth_files.prefix_proxy_invalid_content_label')}
+                </div>
+              )}
               {editor.json && (
                 <div className={styles.fields}>
                   <Input

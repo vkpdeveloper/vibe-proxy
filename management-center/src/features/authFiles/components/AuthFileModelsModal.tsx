@@ -2,14 +2,13 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
-import { isModelExcluded } from '@/features/authFiles/constants';
+import { getTypeLabel, isModelExcluded, normalizeProviderKey } from '@/features/authFiles/constants';
+import { namedModels } from '@/features/authFiles/modelNames';
 import styles from './AuthFileModelsModal.module.scss';
 
 export type AuthFileModelsModalProps = {
   open: boolean;
-  fileName: string;
   fileType: string;
   loading: boolean;
   error: 'unsupported' | null;
@@ -21,17 +20,13 @@ export type AuthFileModelsModalProps = {
 
 export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
   const { t } = useTranslation();
-  const { open, fileName, fileType, loading, error, models, excluded, onClose, onCopyText } = props;
+  const { open, fileType, loading, error, models, excluded, onClose, onCopyText } = props;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={
-        <EmailPrivacyText
-          text={t('auth_files.models_title', { defaultValue: '支持的模型' }) + ` - ${fileName}`}
-        />
-      }
+      title={`${t('auth_files.models_title')} · ${getTypeLabel(t, normalizeProviderKey(fileType))}`}
       footer={
         <Button variant="secondary" onClick={onClose}>
           {t('common.close')}
@@ -58,7 +53,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
         />
       ) : (
         <div className={styles.list}>
-          {models.map((model) => {
+          {namedModels(models).map((model) => {
             const excludedModel = isModelExcluded(model.id, fileType, excluded);
             return (
               <div
@@ -75,11 +70,8 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
                     : t('common.copy', { defaultValue: '点击复制' })
                 }
               >
+                <span className={styles.modelName}>{model.name}</span>
                 <span className={styles.modelId}>{model.id}</span>
-                {model.display_name && model.display_name !== model.id && (
-                  <span className={styles.modelDisplayName}>{model.display_name}</span>
-                )}
-                {model.type && <span className={styles.modelType}>{model.type}</span>}
                 {excludedModel && (
                   <span className={styles.excludedBadge}>
                     {t('auth_files.models_excluded_badge', { defaultValue: '已禁用' })}

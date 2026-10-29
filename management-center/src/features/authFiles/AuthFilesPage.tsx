@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useInterval } from '@/hooks/useInterval';
@@ -11,19 +11,16 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
-  QUOTA_PROVIDER_TYPES,
-  clampCardPageSize,
   getTypeLabel,
   isProblemAuthFile,
   isRuntimeOnlyAuthFile,
   normalizeProviderKey,
-  type AuthFileQuotaFilter,
-  type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { AuthFileCard } from '@/features/authFiles/components/AuthFileCard';
 import { AuthFileDetailsSheet } from '@/features/authFiles/components/AuthFileDetailsSheet';
 import { getAuthFileRefreshKey } from '@/features/authFiles/manualRefresh';
+import { canPreferAccount, isPreferredAccount } from '@/features/authFiles/accountPreference';
 import { AuthFileRefreshResults } from '@/features/authFiles/components/AuthFileRefreshResults';
 import { AuthFileModelsModal } from '@/features/authFiles/components/AuthFileModelsModal';
 import { AuthFilesToolbar } from '@/features/authFiles/components/AuthFilesToolbar';
@@ -32,7 +29,6 @@ import { OAuthExcludedCard } from '@/features/authFiles/components/OAuthExcluded
 import { OAuthModelAliasCard } from '@/features/authFiles/components/OAuthModelAliasCard';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { VaultHeader } from '@/features/authFiles/components/VaultHeader';
-import { VaultPulse } from '@/features/authFiles/components/VaultPulse';
 import { invalidateAuthFileDerivedCaches } from '@/features/authFiles/cacheInvalidation';
 import {
   buildWildcardSearch,
@@ -43,25 +39,19 @@ import { useAuthFilesData } from '@/features/authFiles/hooks/useAuthFilesData';
 import { useAuthFilesModels } from '@/features/authFiles/hooks/useAuthFilesModels';
 import { useAuthFilesOauth } from '@/features/authFiles/hooks/useAuthFilesOauth';
 import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
-import { useAuthFilesStatusBarCache } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import {
   isAuthFilesStatusFilterMode,
   isAuthFilesSortMode,
   readAuthFilesUiState,
-  readPersistedAuthFilesCompactMode,
   writeAuthFilesUiState,
-  writePersistedAuthFilesCompactMode,
   type AuthFilesStatusFilterMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
-import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
+import { useAuthStore, useConfigStore, useNotificationStore, useThemeStore } from '@/stores';
 import styles from './AuthFilesPage.module.scss';
 
-const DEFAULT_REGULAR_PAGE_SIZE = 9;
-const DEFAULT_COMPACT_PAGE_SIZE = 12;
-const SKELETON_CARD_COUNT = 6;
-/** 首屏卡片级联入场总预算，与 useRevealGroup 同一 360ms 语汇。 */
-const CARD_ENTRANCE_BUDGET_MS = 360;
+const PAGE_SIZE = 50;
+const SKELETON_ROW_COUNT = 5;
 
 const resolveStatusFilterMode = (
   problemOnly: boolean,
@@ -81,6 +71,9 @@ export function AuthFilesPage() {
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const quotaDrainRouting = useConfigStore(
+    (state) => state.config?.routingStrategy === 'quota-drain'
+  );
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
@@ -88,14 +81,8 @@ export function AuthFilesPage() {
 
   const [filter, setFilter] = useState<'all' | string>('all');
   const [statusFilterMode, setStatusFilterMode] = useState<AuthFilesStatusFilterMode>('all');
-  const [compactMode, setCompactMode] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSizeByMode, setPageSizeByMode] = useState({
-    regular: DEFAULT_REGULAR_PAGE_SIZE,
-    compact: DEFAULT_COMPACT_PAGE_SIZE,
-  });
-  const [pageSizeInput, setPageSizeInput] = useState('9');
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
@@ -104,7 +91,6 @@ export function AuthFilesPage() {
     modelsModalOpen,
     modelsLoading,
     modelsList,
-    modelsFileName,
     modelsFileType,
     modelsError,
     showModels,
@@ -129,6 +115,8 @@ export function AuthFilesPage() {
     deletingAll,
     statusUpdating,
     manualRefreshing,
+    preferringAccount,
+    handlePreferAccount,
     refreshingAllCredentials,
     refreshResults,
     closeRefreshResults,
@@ -141,7 +129,6 @@ export function AuthFilesPage() {
     handleFileChange,
     handleDelete,
     handleDeleteAll,
-    handleDownload,
     handleManualRefresh,
     handleCooldownReset,
     handleStatusToggle,
@@ -153,8 +140,6 @@ export function AuthFilesPage() {
     batchSetStatus,
     batchDelete,
   } = useAuthFilesData({ onFilesMutated: invalidateDerivedCaches });
-
-  const statusBarCache = useAuthFilesStatusBarCache(files);
 
   const {
     excluded,
@@ -175,7 +160,6 @@ export function AuthFilesPage() {
 
   const {
     prefixProxyEditor,
-    prefixProxyUpdatedText,
     prefixProxyDirty,
     openPrefixProxyEditor,
     closePrefixProxyEditor,
@@ -189,14 +173,6 @@ export function AuthFilesPage() {
 
   const disableControls = connectionStatus !== 'connected' || refreshingAllCredentials;
   const normalizedFilter = normalizeProviderKey(String(filter));
-  const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
-    normalizedFilter as QuotaProviderType
-  )
-    ? (normalizedFilter as QuotaProviderType)
-    : null;
-  const activeQuotaFilter: AuthFileQuotaFilter =
-    normalizedFilter === 'all' ? 'all' : (quotaFilterType ?? normalizedFilter) || null;
-  const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
   const problemOnly = statusFilterMode === 'problem';
   const disabledOnly = statusFilterMode === 'disabled';
   const enabledOnly = statusFilterMode === 'enabled';
@@ -204,11 +180,6 @@ export function AuthFilesPage() {
   /* ---------- uiState 水合与持久化（localStorage key/形状与旧版完全一致） ---------- */
 
   useEffect(() => {
-    const persistedCompactMode = readPersistedAuthFilesCompactMode();
-    if (typeof persistedCompactMode === 'boolean') {
-      setCompactMode(persistedCompactMode);
-    }
-
     const persisted = readAuthFilesUiState();
     if (persisted) {
       if (typeof persisted.filter === 'string' && persisted.filter.trim()) {
@@ -227,31 +198,12 @@ export function AuthFilesPage() {
           resolveStatusFilterMode(persisted.problemOnly === true, persisted.disabledOnly === true)
         );
       }
-      if (typeof persistedCompactMode !== 'boolean' && typeof persisted.compactMode === 'boolean') {
-        setCompactMode(persisted.compactMode);
-      }
       if (typeof persisted.search === 'string') {
         setSearch(persisted.search);
       }
       if (typeof persisted.page === 'number' && Number.isFinite(persisted.page)) {
         setPage(Math.max(1, Math.round(persisted.page)));
       }
-      const legacyPageSize =
-        typeof persisted.pageSize === 'number' && Number.isFinite(persisted.pageSize)
-          ? clampCardPageSize(persisted.pageSize)
-          : null;
-      const regularPageSize =
-        typeof persisted.regularPageSize === 'number' && Number.isFinite(persisted.regularPageSize)
-          ? clampCardPageSize(persisted.regularPageSize)
-          : (legacyPageSize ?? DEFAULT_REGULAR_PAGE_SIZE);
-      const compactPageSize =
-        typeof persisted.compactPageSize === 'number' && Number.isFinite(persisted.compactPageSize)
-          ? clampCardPageSize(persisted.compactPageSize)
-          : (legacyPageSize ?? DEFAULT_COMPACT_PAGE_SIZE);
-      setPageSizeByMode({
-        regular: regularPageSize,
-        compact: compactPageSize,
-      });
       if (isAuthFilesSortMode(persisted.sortMode)) {
         setSortMode(persisted.sortMode);
       }
@@ -268,84 +220,20 @@ export function AuthFilesPage() {
       statusFilterMode,
       problemOnly,
       disabledOnly,
-      compactMode,
       search,
       page,
-      pageSize,
-      regularPageSize: pageSizeByMode.regular,
-      compactPageSize: pageSizeByMode.compact,
       sortMode,
     });
-    writePersistedAuthFilesCompactMode(compactMode);
   }, [
-    compactMode,
     disabledOnly,
     filter,
     page,
-    pageSize,
-    pageSizeByMode,
     problemOnly,
     search,
     sortMode,
     statusFilterMode,
     uiStateHydrated,
   ]);
-
-  useEffect(() => {
-    setPageSizeInput(String(pageSize));
-  }, [pageSize]);
-
-  const setCurrentModePageSize = useCallback(
-    (next: number) => {
-      setPageSizeByMode((current) =>
-        compactMode ? { ...current, compact: next } : { ...current, regular: next }
-      );
-    },
-    [compactMode]
-  );
-
-  const commitPageSizeInput = useCallback(
-    (rawValue: string) => {
-      const trimmed = rawValue.trim();
-      if (!trimmed) {
-        setPageSizeInput(String(pageSize));
-        return;
-      }
-
-      const value = Number(trimmed);
-      if (!Number.isFinite(value)) {
-        setPageSizeInput(String(pageSize));
-        return;
-      }
-
-      const next = clampCardPageSize(value);
-      setCurrentModePageSize(next);
-      setPageSizeInput(String(next));
-      setPage(1);
-    },
-    [pageSize, setCurrentModePageSize]
-  );
-
-  const handlePageSizeChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const rawValue = event.currentTarget.value;
-      setPageSizeInput(rawValue);
-
-      const trimmed = rawValue.trim();
-      if (!trimmed) return;
-
-      const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed)) return;
-
-      const rounded = Math.round(parsed);
-      // 超出 [MIN, MAX] 时不提交（clamp 后不等于原值即越界）
-      if (clampCardPageSize(rounded) !== rounded) return;
-
-      setCurrentModePageSize(rounded);
-      setPage(1);
-    },
-    [setCurrentModePageSize]
-  );
 
   const handleSortModeChange = useCallback(
     (value: string) => {
@@ -453,10 +341,10 @@ export function AuthFilesPage() {
 
   const sorted = useMemo(() => sortAuthFiles(filtered, sortMode), [filtered, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const pageItems = useMemo(() => sorted.slice(start, start + pageSize), [pageSize, sorted, start]);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = useMemo(() => sorted.slice(start, start + PAGE_SIZE), [sorted, start]);
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]
@@ -484,24 +372,6 @@ export function AuthFilesPage() {
 
   const activeCount = useMemo(() => files.filter((file) => file.disabled !== true).length, [files]);
   const problemCount = useMemo(() => files.filter(isProblemAuthFile).length, [files]);
-
-  /* ---------- 首屏卡片一次性级联入场 ----------
-   * 首批数据渲染后立即翻转 cardsAnimated；已挂载的卡片在挂载时捕获过
-   * 自己的延迟（AuthFileCard 内 useState 初始化），不受后续 null 影响，
-   * 而过滤/翻页/轮询新挂载的卡片拿到 null——不重播。 */
-
-  const [cardsAnimated, setCardsAnimated] = useState(false);
-  const enableCardEntrance = !cardsAnimated && isCurrentLayer && !loading && pageItems.length > 0;
-  useEffect(() => {
-    if (enableCardEntrance) {
-      setCardsAnimated(true);
-    }
-  }, [enableCardEntrance]);
-  const cardEntranceDelay = (index: number): number | null => {
-    if (!enableCardEntrance) return null;
-    if (pageItems.length <= 1) return 0;
-    return Math.round((index / (pageItems.length - 1)) * CARD_ENTRANCE_BUDGET_MS);
-  };
 
   /* ---------- 杂项 ---------- */
 
@@ -576,14 +446,6 @@ export function AuthFilesPage() {
   const isFirstRunEmpty = !loading && files.length === 0 && !error;
   const isNoResults = !loading && files.length > 0 && pageItems.length === 0;
 
-  const gridClasses = [
-    styles.grid,
-    compactMode ? styles.gridCompact : '',
-    activeQuotaFilter ? styles.gridQuota : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   return (
     <div className={styles.page}>
       <VaultHeader
@@ -610,8 +472,6 @@ export function AuthFilesPage() {
         onChange={handleFileChange}
       />
 
-      <VaultPulse files={files} statusBarCache={statusBarCache} />
-
       <section className={styles.workbench} aria-label={t('auth_files.title_section')}>
         <ProviderTabs
           types={existingTypes}
@@ -636,11 +496,6 @@ export function AuthFilesPage() {
           sortMode={sortMode}
           sortOptions={sortOptions}
           onSortModeChange={handleSortModeChange}
-          pageSizeInput={pageSizeInput}
-          onPageSizeInputChange={handlePageSizeChange}
-          onPageSizeCommit={commitPageSizeInput}
-          compactMode={compactMode}
-          onCompactModeChange={setCompactMode}
           deleteLabel={deleteAllButtonLabel}
           deleteDisabled={disableControls || loading || deletingAll || files.length === 0}
           deleteLoading={deletingAll}
@@ -665,9 +520,9 @@ export function AuthFilesPage() {
         )}
 
         {loading ? (
-          <div className={gridClasses} aria-hidden="true">
-            {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-              <Skeleton key={index} height={206} rounded={14} />
+          <div className={styles.list} aria-hidden="true">
+            {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+              <Skeleton key={index} height={44} className={styles.skeletonRow} />
             ))}
           </div>
         ) : isFirstRunEmpty ? (
@@ -700,24 +555,24 @@ export function AuthFilesPage() {
             }
           />
         ) : (
-          <div className={gridClasses}>
-            {pageItems.map((file, index) => (
+          <div className={styles.list}>
+            {pageItems.map((file) => (
               <AuthFileCard
                 key={getQuotaCacheKey(file)}
                 file={file}
-                compact={compactMode}
                 selected={selectedFiles.has(file.name)}
                 resolvedTheme={resolvedTheme}
                 disableControls={disableControls}
                 deleting={deleting}
                 statusUpdating={statusUpdating}
                 manualRefreshing={manualRefreshing}
+                showAccountPreference={quotaDrainRouting && canPreferAccount(file)}
+                accountPreferred={isPreferredAccount(file, files)}
+                accountPreferenceUpdating={preferringAccount !== null}
+                accountPreferenceLoading={preferringAccount === getQuotaCacheKey(file)}
+                onPreferAccount={handlePreferAccount}
                 cooldownResetting={cooldownResetting}
-                quotaFilterType={activeQuotaFilter}
-                statusBarCache={statusBarCache}
-                entranceDelayMs={cardEntranceDelay(index)}
                 onShowModels={showModels}
-                onDownload={handleDownload}
                 onManualRefresh={handleManualRefresh}
                 onCooldownReset={handleCooldownReset}
                 onOpenPrefixProxyEditor={openPrefixProxyEditor}
@@ -729,7 +584,7 @@ export function AuthFilesPage() {
           </div>
         )}
 
-        {!loading && sorted.length > pageSize && (
+        {!loading && sorted.length > PAGE_SIZE && (
           <div className={styles.pagination}>
             <Button
               variant="secondary"
@@ -790,7 +645,6 @@ export function AuthFilesPage() {
 
       <AuthFileModelsModal
         open={modelsModalOpen}
-        fileName={modelsFileName}
         fileType={modelsFileType}
         loading={modelsLoading}
         error={modelsError}
@@ -803,10 +657,8 @@ export function AuthFilesPage() {
       <AuthFileDetailsSheet
         disableControls={disableControls}
         editor={prefixProxyEditor}
-        updatedText={prefixProxyUpdatedText}
         dirty={prefixProxyDirty}
         onClose={closePrefixProxyEditor}
-        onCopyText={copyTextWithNotification}
         onSave={handlePrefixProxySave}
         onChange={handlePrefixProxyChange}
       />

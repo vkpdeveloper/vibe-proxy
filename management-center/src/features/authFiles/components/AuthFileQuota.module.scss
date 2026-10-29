@@ -186,13 +186,13 @@ button.quotaMessageAction {
 /* ---------- 进度条（QuotaProgressBar 注入，Meter 风 6px 轨道） ---------- */
 
 .quotaBar {
-  height: 6px;
-  border-radius: $radius-full;
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  position: relative;
+  height: 8px;
   overflow: hidden;
 }
 
 .quotaBarFill {
+  position: relative;
   height: 100%;
   border-radius: $radius-full;
   transition: width 360ms var(--ease-out-strong, ease);

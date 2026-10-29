@@ -43,6 +43,14 @@ export interface QuotaCapacityState {
   last_attempt_at?: string;
   last_error?: string;
   windows?: QuotaCapacityWindow[];
+  /** Anthropic's raw cedar_ember block, parsed by the reset-grant UI. */
+  reset_grants?: unknown;
+}
+
+/** The dashboard's last full quota card for a credential, saved on the server. */
+export interface QuotaDetailsSnapshot {
+  saved_at: string;
+  data: unknown;
 }
 
 export interface RoutingSelectionState {
@@ -113,6 +121,7 @@ export interface AuthFileItem {
   apiServerUrl?: string;
   quota_capacity?: QuotaCapacityState;
   quotaCapacity?: QuotaCapacityState;
+  quota_details?: QuotaDetailsSnapshot;
   routing_selection?: RoutingSelectionState;
   routingSelection?: RoutingSelectionState;
   cooldownSnapshot?: AuthFileCooldownSnapshot;

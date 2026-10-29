@@ -551,6 +551,11 @@ export const authFilesApi = {
       )
     ),
 
+  saveQuotaDetails: (lookup: AuthFileLookup, data: unknown) =>
+    apiClient.put<{ saved_at: string }>('/credentials/quota-details', data, {
+      params: { name: lookup.name, auth_index: lookup.authIndex },
+    }),
+
   setStatus: (name: string, disabled: boolean, authIndex?: string) =>
     apiClient.patch<AuthFileStatusResponse>('/credentials/status', {
       name,

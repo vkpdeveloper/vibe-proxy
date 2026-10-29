@@ -76,8 +76,6 @@ export const OAUTH_PROVIDER_PRESETS = [
 
 const OAUTH_PROVIDER_EXCLUDES = new Set(['all', 'unknown', 'empty']);
 
-export const MIN_CARD_PAGE_SIZE = 3;
-export const MAX_CARD_PAGE_SIZE = 30;
 
 export const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
 export const TRUTHY_TEXT_VALUES = new Set(['true', '1', 'yes', 'y', 'on']);
@@ -116,9 +114,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   qwen: iconQwen,
   vertex: iconVertex,
 };
-
-export const clampCardPageSize = (value: number) =>
-  Math.min(MAX_CARD_PAGE_SIZE, Math.max(MIN_CARD_PAGE_SIZE, Math.round(value)));
 
 export const normalizeProviderKey = normalizeOAuthProviderKey;
 
