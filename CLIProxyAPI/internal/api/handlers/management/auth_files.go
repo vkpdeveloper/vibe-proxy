@@ -693,6 +693,9 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 	if auth.Capacity.Supported || !auth.Capacity.LastAttemptAt.IsZero() {
 		entry["quota_capacity"] = auth.Capacity
 	}
+	if details, ok := h.quotaDetailsFor(auth.ID); ok {
+		entry["quota_details"] = details
+	}
 	if auth.RoutingSelection.Active(now) {
 		entry["routing_selection"] = auth.RoutingSelection
 	}

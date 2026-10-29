@@ -333,6 +333,9 @@ type CapacityState struct {
 	LastAttemptAt time.Time        `json:"last_attempt_at,omitempty,omitzero"`
 	LastError     string           `json:"last_error,omitempty"`
 	Windows       []CapacityWindow `json:"windows,omitempty"`
+	// ResetGrants is Anthropic's raw cedar_ember block, read in the same usage
+	// call as the windows so the dashboard never has to poll Anthropic itself.
+	ResetGrants json.RawMessage `json:"reset_grants,omitempty"`
 }
 
 // CapacityWindow is one provider quota window normalized for display and routing.

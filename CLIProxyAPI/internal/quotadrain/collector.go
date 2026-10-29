@@ -2,6 +2,7 @@ package quotadrain
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -257,7 +258,14 @@ func (c *Collector) collectAuth(ctx context.Context, auth *coreauth.Auth, staleA
 	}
 	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
 	attemptedAt := time.Now().UTC()
-	windows, err := fetchProviderCapacity(ctx, c.manager, auth, provider, attemptedAt)
+	var windows []coreauth.CapacityWindow
+	var resetGrants json.RawMessage
+	var err error
+	if provider == "claude" {
+		windows, resetGrants, err = fetchClaudeCapacity(ctx, c.manager, auth, attemptedAt)
+	} else {
+		windows, err = fetchProviderCapacity(ctx, c.manager, auth, provider, attemptedAt)
+	}
 	state := auth.Capacity
 	state.Provider = provider
 	state.Supported = true
@@ -274,6 +282,7 @@ func (c *Collector) collectAuth(ctx context.Context, auth *coreauth.Auth, staleA
 	state.StaleAt = attemptedAt.Add(staleAfter)
 	state.LastError = ""
 	state.Windows = windows
+	state.ResetGrants = resetGrants
 	c.manager.UpdateCapacity(auth.ID, state)
 }
 

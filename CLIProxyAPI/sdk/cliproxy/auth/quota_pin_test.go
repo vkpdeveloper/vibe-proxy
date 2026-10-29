@@ -123,6 +123,61 @@ func TestSchedulerQuotaDrain_RerankOnWeeklyRollover(t *testing.T) {
 	}
 }
 
+func TestQuotaDrain_ManualPriorityOverridesPinUntilExhausted(t *testing.T) {
+	for _, schedulerPath := range []bool{false, true} {
+		name := "selector"
+		if schedulerPath {
+			name = "scheduler"
+		}
+		t.Run(name, func(t *testing.T) {
+			now := time.Now()
+			social, kuru := quotaPinTestAccounts(now)
+			selector := &QuotaDrainSelector{}
+			scheduler := newSchedulerForTest(selector, social, kuru)
+			pick := func() string {
+				t.Helper()
+				if schedulerPath {
+					return pickClaude(t, scheduler, nil)
+				}
+				got, err := selector.Pick(context.Background(), "claude", "", cliproxyexecutor.Options{}, []*Auth{social, kuru})
+				if err != nil || got == nil {
+					t.Fatalf("Pick() = %#v, %v", got, err)
+				}
+				return got.ID
+			}
+			if got := pick(); got != "kuru" {
+				t.Fatalf("initial pick = %q, want kuru", got)
+			}
+			// A manual choice immediately overrides the existing automatic pin.
+			social.Attributes = map[string]string{"priority": "1"}
+			scheduler.upsertAuth(social)
+			for range 3 {
+				if got := pick(); got != "social" {
+					t.Fatalf("manual pick = %q, want social", got)
+				}
+			}
+			// Session exhaustion falls through to the other account without edits.
+			social.Capacity = quotaPinTestWindows(now, 0, now.Add(time.Hour), 96, now.Add(170*time.Hour))
+			scheduler.upsertAuth(social)
+			if got := pick(); got != "kuru" {
+				t.Fatalf("exhausted manual pick = %q, want kuru", got)
+			}
+			// The persisted preference applies again after quota recovery.
+			social.Capacity = quotaPinTestWindows(now, 100, now.Add(5*time.Hour), 96, now.Add(170*time.Hour))
+			scheduler.upsertAuth(social)
+			if got := pick(); got != "social" {
+				t.Fatalf("recovered manual pick = %q, want social", got)
+			}
+			// A later manual choice supersedes the previous preference.
+			kuru.Attributes = map[string]string{"priority": "2"}
+			scheduler.upsertAuth(kuru)
+			if got := pick(); got != "kuru" {
+				t.Fatalf("new manual pick = %q, want kuru", got)
+			}
+		})
+	}
+}
+
 func TestQuotaDrainSelector_PinsUntilSessionExhaustedThenReturnsOnRecovery(t *testing.T) {
 	now := time.Now()
 	social, kuru := quotaPinTestAccounts(now)

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,19 +51,25 @@ func TestCodexAccountIDAcceptsPaddedJWTEncoding(t *testing.T) {
 	}
 }
 
-func TestParseClaudeCapacity_DynamicScopes(t *testing.T) {
+func TestParseClaudeCapacity_MatchesDashboardWindows(t *testing.T) {
 	now := time.Now().UTC()
+	resetAt := now.Add(time.Hour).Format(time.RFC3339)
 	payload := map[string]any{
+		"five_hour":        map[string]any{"utilization": 82.5, "resets_at": resetAt},
+		"seven_day":        map[string]any{"utilization": 13.0, "resets_at": resetAt},
+		"seven_day_sonnet": nil,
+		// A dollar balance is shown as an amount, never as a meter.
+		"iguana_necktie": map[string]any{"utilization": 97.0, "limit_dollars": 250.0, "used_dollars": 243.0},
 		"limits": []any{
-			map[string]any{"kind": "session", "percent": 82.5, "resets_at": now.Add(time.Hour).Format(time.RFC3339)},
+			map[string]any{"kind": "session", "percent": 82.5},
 			map[string]any{
 				"kind":      "weekly_scoped",
 				"percent":   100.0,
-				"resets_at": now.Add(2 * time.Hour).Format(time.RFC3339),
-				"scope":     map[string]any{"model": map[string]any{"id": "claude-opus", "display_name": "Opus"}},
+				"resets_at": resetAt,
+				"scope":     map[string]any{"model": map[string]any{"id": "claude-fable-5", "display_name": "Fable"}},
 				"is_active": true,
 			},
-			map[string]any{"kind": "weekly_scoped", "percent": 20.0},
+			map[string]any{"kind": "weekly_scoped", "percent": 20.0, "scope": map[string]any{"model": map[string]any{"display_name": "Opus"}}},
 		},
 	}
 
@@ -70,20 +77,38 @@ func TestParseClaudeCapacity_DynamicScopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseClaudeCapacity() error = %v", err)
 	}
-	if len(windows) != 3 {
-		t.Fatalf("len(windows) = %d, want 3", len(windows))
+	ids := make([]string, 0, len(windows))
+	for _, window := range windows {
+		ids = append(ids, window.ID)
 	}
-	if !windows[0].Routing || windows[0].RemainingPercent != 17.5 {
-		t.Fatalf("session window = %#v, want routing with 17.5 remaining", windows[0])
+	if strings.Join(ids, ",") != "five-hour,seven-day,seven-day-fable" {
+		t.Fatalf("window ids = %v, want the dashboard rows five-hour, seven-day, seven-day-fable", ids)
 	}
-	if !windows[1].Routing || windows[1].ScopeModel != "claude-opus" || !windows[1].HardExhausted {
-		t.Fatalf("scoped window = %#v, want routed exhausted claude-opus", windows[1])
+	if !windows[0].Routing || windows[0].RemainingPercent != 17.5 || windows[0].PeriodSeconds != 5*60*60 {
+		t.Fatalf("five-hour window = %#v, want routing 5h window with 17.5 remaining", windows[0])
 	}
-	if windows[2].Routing {
-		t.Fatalf("scope-less weekly_scoped window Routing = true, want false")
+	if !windows[1].Routing || windows[1].PeriodSeconds != 7*24*60*60 {
+		t.Fatalf("seven-day window = %#v, want routing weekly window", windows[1])
 	}
-	if windows[0].PeriodSeconds != 5*60*60 || windows[1].PeriodSeconds != 7*24*60*60 {
-		t.Fatalf("periods = %d/%d, want 5h session and 7d weekly", windows[0].PeriodSeconds, windows[1].PeriodSeconds)
+	if fable := windows[2]; !fable.Routing || fable.ScopeModel != "claude-fable-5" || !fable.HardExhausted {
+		t.Fatalf("fable window = %#v, want routed exhausted claude-fable-5", fable)
+	}
+}
+
+func TestParseClaudeCapacity_UnscopedFableIsDisplayOnly(t *testing.T) {
+	payload := map[string]any{
+		"seven_day": map[string]any{"utilization": 10.0},
+		"limits": []any{map[string]any{
+			"kind": "weekly_scoped", "percent": 0.0,
+			"scope": map[string]any{"model": map[string]any{"id": nil, "display_name": "Fable"}},
+		}},
+	}
+	windows, err := parseClaudeCapacity(payload, time.Now())
+	if err != nil {
+		t.Fatalf("parseClaudeCapacity() error = %v", err)
+	}
+	if len(windows) != 2 || windows[1].ID != "seven-day-fable" || windows[1].Routing {
+		t.Fatalf("windows = %#v, want display-only seven-day-fable", windows)
 	}
 }
 
@@ -117,8 +142,12 @@ func TestParseCodexCapacity_OnlyGeneralRateLimitRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseCodexCapacity() error = %v", err)
 	}
-	if len(windows) != 4 {
-		t.Fatalf("len(windows) = %d, want 4", len(windows))
+	ids := make([]string, 0, len(windows))
+	for _, window := range windows {
+		ids = append(ids, window.ID)
+	}
+	if strings.Join(ids, ",") != "five-hour,weekly,code-review-five-hour,other-five-hour-0" {
+		t.Fatalf("window ids = %v, want dashboard Codex row ids", ids)
 	}
 	if !windows[0].Routing || !windows[1].Routing {
 		t.Fatalf("general rate windows should route: %#v", windows[:2])
@@ -167,7 +196,7 @@ func TestParseCursorCapacity_FallsBackToLegacyAggregate(t *testing.T) {
 		"planUsage": map[string]any{"totalPercentUsed": 25.0},
 	}, time.Now().UTC())
 
-	if len(windows) != 1 || windows[0].ID != "cursor-included" || windows[0].RemainingPercent != 75 {
+	if len(windows) != 1 || windows[0].ID != "plan" || windows[0].RemainingPercent != 75 {
 		t.Fatalf("windows = %#v, want legacy aggregate with 75%% remaining", windows)
 	}
 }
@@ -180,7 +209,7 @@ func TestParseCursorSandCapacity_StoresSeparateWeeklyUsage(t *testing.T) {
 		"nextResetTimestampUtc": resetAt.Format(time.RFC3339),
 	}, now)
 
-	if len(windows) != 1 || windows[0].ID != "cursor-grok-bot" || windows[0].RemainingPercent != 91 {
+	if len(windows) != 1 || windows[0].ID != "grok-bot" || windows[0].RemainingPercent != 91 {
 		t.Fatalf("windows = %#v, want Grok Bot with 91%% remaining", windows)
 	}
 	if windows[0].Routing {
@@ -206,10 +235,10 @@ func TestParseOpenCodeGoCapacity_StoresThreeDisplayOnlyWindows(t *testing.T) {
 	if len(windows) != 3 {
 		t.Fatalf("len(windows) = %d, want 3", len(windows))
 	}
-	if windows[0].ID != "opencode-go-rolling" || windows[0].RemainingPercent != 75 {
+	if windows[0].ID != "rolling" || windows[0].RemainingPercent != 75 {
 		t.Fatalf("rolling window = %#v, want 75%% remaining", windows[0])
 	}
-	if windows[1].ID != "opencode-go-weekly" || windows[1].RemainingPercent != 60 {
+	if windows[1].ID != "weekly" || windows[1].RemainingPercent != 60 {
 		t.Fatalf("weekly window = %#v, want 60%% remaining", windows[1])
 	}
 	if !windows[2].HardExhausted || windows[2].RemainingPercent != 0 {
@@ -231,7 +260,7 @@ func TestParseXAICapacity_PreservesUnmeteredBillingPeriod(t *testing.T) {
 			"monthlyLimit":  map[string]any{"val": 0.0},
 			"used":          map[string]any{"val": 0.0},
 		},
-	}, "xai-weekly", "Weekly credits", now)
+	}, "weekly", "Weekly credits", now)
 
 	if len(windows) != 1 {
 		t.Fatalf("len(windows) = %d, want 1", len(windows))
@@ -313,13 +342,13 @@ func TestParseDevinCliCapacity_FlipsRemainingPercentToUsed(t *testing.T) {
 	if len(windows) != 2 {
 		t.Fatalf("len(windows) = %d, want 2", len(windows))
 	}
-	if windows[0].ID != "devin-cli-daily" || windows[0].UsedPercent != 25 || windows[0].RemainingPercent != 75 {
+	if windows[0].ID != "daily" || windows[0].UsedPercent != 25 || windows[0].RemainingPercent != 75 {
 		t.Fatalf("daily window = %#v, want 75%% remaining", windows[0])
 	}
 	if !windows[0].ResetAt.Equal(dailyReset) {
 		t.Fatalf("daily ResetAt = %s, want %s", windows[0].ResetAt, dailyReset)
 	}
-	if windows[1].ID != "devin-cli-weekly" || windows[1].UsedPercent != 60 {
+	if windows[1].ID != "weekly" || windows[1].UsedPercent != 60 {
 		t.Fatalf("weekly window = %#v, want 60%% used", windows[1])
 	}
 	if !windows[1].ResetAt.Equal(weeklyReset) {
@@ -350,7 +379,7 @@ func TestParseDevinCliCapacity_HiddenDailyFillsWeekly(t *testing.T) {
 	if len(windows) != 1 {
 		t.Fatalf("len(windows) = %d, want 1", len(windows))
 	}
-	if windows[0].ID != "devin-cli-weekly" || windows[0].UsedPercent != 70 {
+	if windows[0].ID != "weekly" || windows[0].UsedPercent != 70 {
 		t.Fatalf("weekly-from-daily window = %#v, want 70%% used", windows[0])
 	}
 }

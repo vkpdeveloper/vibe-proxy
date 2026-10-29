@@ -29,15 +29,6 @@ var antigravityQuotaURLs = []string{
 
 func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth *coreauth.Auth, provider string, now time.Time) ([]coreauth.CapacityWindow, error) {
 	switch provider {
-	case "claude":
-		payload, err := requestJSON(ctx, manager, auth, http.MethodGet, "https://api.anthropic.com/api/oauth/usage", nil, http.Header{
-			"Content-Type":   []string{"application/json"},
-			"anthropic-beta": []string{"oauth-2025-04-20"},
-		})
-		if err != nil {
-			return nil, err
-		}
-		return parseClaudeCapacity(payload, now)
 	case "codex":
 		headers := http.Header{
 			"Content-Type": []string{"application/json"},
@@ -76,6 +67,34 @@ func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth 
 	default:
 		return nil, fmt.Errorf("unsupported quota provider %q", provider)
 	}
+}
+
+// fetchClaudeCapacity reads the usage windows and the reset grants in one call.
+func fetchClaudeCapacity(ctx context.Context, manager *coreauth.Manager, auth *coreauth.Auth, now time.Time) ([]coreauth.CapacityWindow, json.RawMessage, error) {
+	payload, err := requestJSON(ctx, manager, auth, http.MethodGet, "https://api.anthropic.com/api/oauth/usage?cedar_ember=1", nil, http.Header{
+		"Content-Type":   []string{"application/json"},
+		"anthropic-beta": []string{"oauth-2025-04-20"},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	windows, err := parseClaudeCapacity(payload, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	return windows, claudeResetGrants(payload), nil
+}
+
+func claudeResetGrants(payload map[string]any) json.RawMessage {
+	block, ok := payload["cedar_ember"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	raw, err := json.Marshal(block)
+	if err != nil {
+		return nil
+	}
+	return raw
 }
 
 const cursorDashboardAPIBase = "https://api2.cursor.sh/aiserver.v1.DashboardService"
@@ -187,7 +206,7 @@ func parseCursorPeriodCapacity(payload map[string]any, now time.Time) []coreauth
 	appendPercent("cursor-models", "Cursor Models", value(usage, "autoPercentUsed", "auto_percent_used"))
 	appendPercent("other-models", "Other Models", value(usage, "apiPercentUsed", "api_percent_used"))
 	if len(windows) == 0 {
-		appendPercent("cursor-included", "Overall included usage", value(usage, "totalPercentUsed", "total_percent_used"))
+		appendPercent("plan", "Overall included usage", value(usage, "totalPercentUsed", "total_percent_used"))
 	}
 	return windows
 }
@@ -202,7 +221,7 @@ func parseCursorSandCapacity(payload map[string]any, now time.Time) []coreauth.C
 	}
 	resetAt := parseAbsoluteTime(value(payload, "nextResetTimestampUtc", "next_reset_timestamp_utc"), now)
 	return []coreauth.CapacityWindow{
-		capacityWindow("cursor-grok-bot", "Grok Bot · Weekly usage", used, resetAt, false, "", used >= 100),
+		capacityWindow("grok-bot", "Grok Bot · Weekly usage", used, resetAt, false, "", used >= 100),
 	}
 }
 
@@ -281,15 +300,15 @@ func parseDevinCliCapacity(payload map[string]any, now time.Time) ([]coreauth.Ca
 		windows = append(windows, capacityWindow(id, label, used, resetAt, false, "", remaining <= 0))
 	}
 	if !hideDaily && dailyKnown {
-		appendRemaining("devin-cli-daily", "Daily quota", dailyRemaining, dailyReset)
+		appendRemaining("daily", "Daily quota", dailyRemaining, dailyReset)
 	}
 	if weeklyKnown {
-		appendRemaining("devin-cli-weekly", "Weekly quota", weeklyRemaining, weeklyReset)
+		appendRemaining("weekly", "Weekly quota", weeklyRemaining, weeklyReset)
 	} else if hideDaily && dailyKnown {
 		// Plans that hide the daily meter and report no weekly quota still have a
 		// real daily allowance; surface it in the weekly row so the card stays
 		// meaningful (mirrors openusage's Devin fallback).
-		appendRemaining("devin-cli-weekly", "Weekly quota", dailyRemaining, weeklyReset)
+		appendRemaining("weekly", "Weekly quota", dailyRemaining, weeklyReset)
 	}
 	return requireWindows(windows)
 }
@@ -313,7 +332,7 @@ func parseOpenCodeGoCapacity(payload map[string]any, now time.Time) ([]coreauth.
 		}
 		resetAt := parseAbsoluteTime(value(window, "resetsAt", "resets_at"), now)
 		rateLimited := strings.EqualFold(stringValue(value(window, "status")), "rate-limited")
-		windows = append(windows, capacityWindow("opencode-go-"+spec.key, spec.label, used, resetAt, false, "", rateLimited || used >= 100))
+		windows = append(windows, capacityWindow(spec.key, spec.label, used, resetAt, false, "", rateLimited || used >= 100))
 	}
 	return requireWindows(windows)
 }
@@ -355,57 +374,99 @@ func requestJSON(ctx context.Context, manager *coreauth.Manager, auth *coreauth.
 	return payload, nil
 }
 
+// claudeUsageWindows mirrors CLAUDE_USAGE_WINDOW_KEYS in the management
+// center. Window ids and labels must stay identical to the dashboard rows so a
+// stored snapshot, the live card, and quota-drain routing all describe the same
+// windows.
+var claudeUsageWindows = []struct {
+	key     string
+	id      string
+	label   string
+	routing bool
+	period  int64
+}{
+	{"five_hour", "five-hour", "5-hour limit", true, claudeSessionPeriodSeconds},
+	{"seven_day", "seven-day", "7-day limit", true, claudeWeeklyPeriodSeconds},
+	{"seven_day_oauth_apps", "seven-day-oauth-apps", "7-day OAuth apps", false, claudeWeeklyPeriodSeconds},
+	{"seven_day_opus", "seven-day-opus", "7-day Opus", false, claudeWeeklyPeriodSeconds},
+	{"seven_day_sonnet", "seven-day-sonnet", "7-day Sonnet", false, claudeWeeklyPeriodSeconds},
+	{"seven_day_cowork", "seven-day-cowork", "7-day Cowork", false, claudeWeeklyPeriodSeconds},
+}
+
+const (
+	claudeFableWindowID    = "seven-day-fable"
+	claudeFableWindowLabel = "7-day Fable 5"
+)
+
+// parseClaudeCapacity mirrors buildClaudeQuotaWindows in the management center.
 func parseClaudeCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
-	windows := make([]coreauth.CapacityWindow, 0)
-	limits := arrayValue(value(payload, "limits"))
-	for index, raw := range limits {
-		limit := objectValue(raw)
-		used, known := numberValue(value(limit, "percent", "utilization"))
+	windows := make([]coreauth.CapacityWindow, 0, len(claudeUsageWindows)+1)
+	for _, item := range claudeUsageWindows {
+		window := objectValue(value(payload, item.key))
+		used, known := numberValue(value(window, "utilization"))
 		if !known {
 			continue
 		}
-		kind := strings.ToLower(stringValue(value(limit, "kind")))
-		group := strings.ToLower(stringValue(value(limit, "group")))
-		scope := objectValue(value(limit, "scope"))
-		scopeModel := stringValue(value(objectValue(value(scope, "model")), "id"))
-		label := kind
-		if label == "" {
-			label = group
-		}
-		if display := stringValue(value(objectValue(value(scope, "model")), "display_name", "displayName")); display != "" {
-			label = strings.TrimSpace(label + " · " + display)
-		}
-		routing := kind == "session" || kind == "weekly_all" || (kind == "weekly_scoped" && scopeModel != "")
-		window := capacityWindow(fmt.Sprintf("claude-limit-%d", index), label, used, parseAbsoluteTime(value(limit, "resets_at", "resetsAt"), now), routing, scopeModel, used >= 100)
-		window.PeriodSeconds = claudeWindowPeriodSeconds(kind)
-		windows = append(windows, window)
+		parsed := capacityWindow(item.id, item.label, used, parseAbsoluteTime(value(window, "resets_at", "resetsAt"), now), item.routing, "", used >= 100)
+		parsed.PeriodSeconds = item.period
+		windows = append(windows, parsed)
 	}
-	if len(windows) == 0 {
-		legacy := []struct {
-			key     string
-			label   string
-			routing bool
-			period  int64
-		}{
-			{"five_hour", "5 hour", true, claudeSessionPeriodSeconds},
-			{"seven_day", "7 day", true, claudeWeeklyPeriodSeconds},
-			{"seven_day_oauth_apps", "7 day OAuth apps", false, claudeWeeklyPeriodSeconds},
-			{"seven_day_opus", "7 day Opus", false, claudeWeeklyPeriodSeconds},
-			{"seven_day_sonnet", "7 day Sonnet", false, claudeWeeklyPeriodSeconds},
-			{"seven_day_cowork", "7 day Cowork", false, claudeWeeklyPeriodSeconds},
-		}
-		for _, item := range legacy {
-			window := objectValue(value(payload, item.key))
-			used, known := numberValue(value(window, "utilization"))
-			if !known {
-				continue
-			}
-			parsed := capacityWindow("claude-"+item.key, item.label, used, parseAbsoluteTime(value(window, "resets_at", "resetsAt"), now), item.routing, "", used >= 100)
-			parsed.PeriodSeconds = item.period
+
+	fable := findClaudeFableLimit(payload)
+	legacyFable := objectValue(value(payload, "iguana_necktie"))
+	switch {
+	case fable != nil:
+		used, _ := numberValue(value(fable, "percent"))
+		// The limit only constrains routing when Claude names the scoped model.
+		scopeModel := stringValue(value(objectValue(value(objectValue(value(fable, "scope")), "model")), "id"))
+		parsed := capacityWindow(claudeFableWindowID, claudeFableWindowLabel, used, parseAbsoluteTime(value(fable, "resets_at", "resetsAt"), now), scopeModel != "", scopeModel, used >= 100)
+		parsed.PeriodSeconds = claudeWeeklyPeriodSeconds
+		windows = append(windows, parsed)
+	case len(legacyFable) > 0 && !claudeDollarWindow(legacyFable):
+		// Older payloads report Fable under iguana_necktie. A dollar-denominated
+		// iguana_necktie is a credit balance, which the card shows as an amount
+		// rather than a meter.
+		if used, known := numberValue(value(legacyFable, "utilization")); known {
+			parsed := capacityWindow(claudeFableWindowID, claudeFableWindowLabel, used, parseAbsoluteTime(value(legacyFable, "resets_at", "resetsAt"), now), false, "", used >= 100)
+			parsed.PeriodSeconds = claudeWeeklyPeriodSeconds
 			windows = append(windows, parsed)
 		}
 	}
 	return requireWindows(windows)
+}
+
+// findClaudeFableLimit returns the weekly_scoped Fable limit, preferring the active one.
+func findClaudeFableLimit(payload map[string]any) map[string]any {
+	var first map[string]any
+	for _, raw := range arrayValue(value(payload, "limits")) {
+		limit := objectValue(raw)
+		if !strings.EqualFold(strings.TrimSpace(stringValue(value(limit, "kind"))), "weekly_scoped") {
+			continue
+		}
+		model := strings.ToLower(strings.TrimSpace(stringValue(value(objectValue(value(objectValue(value(limit, "scope")), "model")), "display_name", "displayName"))))
+		if model != "fable" && model != "fable 5" {
+			continue
+		}
+		if _, known := numberValue(value(limit, "percent")); !known {
+			continue
+		}
+		if boolValue(value(limit, "is_active", "isActive")) {
+			return limit
+		}
+		if first == nil {
+			first = limit
+		}
+	}
+	return first
+}
+
+func claudeDollarWindow(window map[string]any) bool {
+	for _, key := range []string{"limit_dollars", "used_dollars", "remaining_dollars"} {
+		if _, known := numberValue(value(window, key)); known {
+			return true
+		}
+	}
+	return false
 }
 
 const (
@@ -413,60 +474,139 @@ const (
 	claudeWeeklyPeriodSeconds  = int64(7 * 24 * 60 * 60)
 )
 
-// claudeWindowPeriodSeconds maps a Claude usage limit kind to its rolling window length.
-func claudeWindowPeriodSeconds(kind string) int64 {
-	switch {
-	case kind == "session":
-		return claudeSessionPeriodSeconds
-	case strings.HasPrefix(kind, "weekly"):
-		return claudeWeeklyPeriodSeconds
-	default:
-		return 0
-	}
-}
+const (
+	codexFiveHourSeconds = 5 * 60 * 60
+	codexWeekSeconds     = 7 * 24 * 60 * 60
+	codexMinMonthSeconds = 28 * 24 * 60 * 60
+	codexMaxMonthSeconds = 31 * 24 * 60 * 60
+)
 
+// parseCodexCapacity mirrors buildCodexQuotaWindows in the management center:
+// windows are classified by their length (5-hour, weekly or monthly) rather
+// than by primary/secondary position, and carry the dashboard's row ids.
 func parseCodexCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
 	windows := make([]coreauth.CapacityWindow, 0)
-	appendRateInfo := func(prefix, label string, info map[string]any, routing bool) {
+	appendRateInfo := func(info map[string]any, fiveHourID, fiveHourLabel string, secondaryID func(monthly bool) (string, string), routing bool) {
 		if len(info) == 0 {
 			return
 		}
 		reached := boolValue(value(info, "limit_reached", "limitReached")) || explicitlyFalse(value(info, "allowed"))
-		for _, spec := range []struct {
-			key   string
-			camel string
-			name  string
-		}{{"primary_window", "primaryWindow", "primary"}, {"secondary_window", "secondaryWindow", "secondary"}} {
-			window := objectValue(value(info, spec.key, spec.camel))
+		add := func(id, label string, window map[string]any) {
 			if len(window) == 0 {
-				continue
+				return
 			}
+			resetAt := windowResetAt(window, now)
 			used, known := numberValue(value(window, "used_percent", "usedPercent"))
-			if !known && reached {
+			if !known && reached && !resetAt.IsZero() {
 				used, known = 100, true
 			}
 			if !known {
-				continue
+				return
 			}
-			resetAt := windowResetAt(window, now)
-			parsed := capacityWindow(prefix+"-"+spec.name, label+" "+spec.name, used, resetAt, routing, "", reached || used >= 100)
-			if seconds, ok := numberValue(value(window, "limit_window_seconds", "limitWindowSeconds")); ok && seconds > 0 {
+			parsed := capacityWindow(id, label, used, resetAt, routing, "", reached || used >= 100)
+			if seconds, ok := codexWindowSeconds(window); ok && seconds > 0 {
 				parsed.PeriodSeconds = int64(seconds)
 			}
 			windows = append(windows, parsed)
 		}
+		fiveHour, secondary := classifyCodexWindows(info)
+		add(fiveHourID, fiveHourLabel, fiveHour)
+		id, label := secondaryID(codexMonthlyWindow(secondary))
+		add(id, label, secondary)
 	}
-	appendRateInfo("codex", "Codex", objectValue(value(payload, "rate_limit", "rateLimit")), true)
-	appendRateInfo("codex-review", "Code review", objectValue(value(payload, "code_review_rate_limit", "codeReviewRateLimit")), false)
+
+	appendRateInfo(objectValue(value(payload, "rate_limit", "rateLimit")), "five-hour", "5-hour limit", func(monthly bool) (string, string) {
+		if monthly {
+			return "monthly", "Monthly limit"
+		}
+		return "weekly", "Weekly limit"
+	}, true)
+	appendRateInfo(objectValue(value(payload, "code_review_rate_limit", "codeReviewRateLimit")), "code-review-five-hour", "Code review 5-hour limit", func(monthly bool) (string, string) {
+		if monthly {
+			return "code-review-monthly", "Code review monthly limit"
+		}
+		return "code-review-weekly", "Code review weekly limit"
+	}, false)
 	for index, raw := range arrayValue(value(payload, "additional_rate_limits", "additionalRateLimits")) {
 		item := objectValue(raw)
-		label := stringValue(value(item, "limit_name", "limitName", "metered_feature", "meteredFeature"))
-		if label == "" {
-			label = fmt.Sprintf("Additional %d", index+1)
+		name := stringValue(value(item, "limit_name", "limitName", "metered_feature", "meteredFeature"))
+		if name == "" {
+			name = fmt.Sprintf("additional-%d", index+1)
 		}
-		appendRateInfo(fmt.Sprintf("codex-additional-%d", index), label, objectValue(value(item, "rate_limit", "rateLimit")), false)
+		prefix := stableID(name, fmt.Sprintf("additional-%d", index+1))
+		appendRateInfo(objectValue(value(item, "rate_limit", "rateLimit")), fmt.Sprintf("%s-five-hour-%d", prefix, index), name+" 5-hour limit", func(monthly bool) (string, string) {
+			if monthly {
+				return fmt.Sprintf("%s-monthly-%d", prefix, index), name + " monthly limit"
+			}
+			return fmt.Sprintf("%s-weekly-%d", prefix, index), name + " weekly limit"
+		}, false)
 	}
 	return requireWindows(windows)
+}
+
+func codexWindowSeconds(window map[string]any) (float64, bool) {
+	return numberValue(value(window, "limit_window_seconds", "limitWindowSeconds"))
+}
+
+func codexMonthlyWindow(window map[string]any) bool {
+	seconds, ok := codexWindowSeconds(window)
+	return ok && seconds >= codexMinMonthSeconds && seconds <= codexMaxMonthSeconds
+}
+
+// classifyCodexWindows picks the 5-hour and the weekly/monthly window by
+// length, falling back to primary/secondary order for payloads without one.
+func classifyCodexWindows(info map[string]any) (fiveHour, secondary map[string]any) {
+	candidates := []map[string]any{
+		objectValue(value(info, "primary_window", "primaryWindow")),
+		objectValue(value(info, "secondary_window", "secondaryWindow")),
+	}
+	fiveHourIndex, secondaryIndex := -1, -1
+	for index, window := range candidates {
+		if len(window) == 0 {
+			continue
+		}
+		seconds, _ := codexWindowSeconds(window)
+		if seconds == codexFiveHourSeconds && fiveHourIndex < 0 {
+			fiveHourIndex = index
+		} else if (seconds == codexWeekSeconds || codexMonthlyWindow(window)) && secondaryIndex < 0 {
+			secondaryIndex = index
+		}
+	}
+	if fiveHourIndex < 0 && len(candidates[0]) > 0 && secondaryIndex != 0 {
+		fiveHourIndex = 0
+	}
+	if secondaryIndex < 0 && len(candidates[1]) > 0 && fiveHourIndex != 1 {
+		secondaryIndex = 1
+	}
+	if fiveHourIndex >= 0 {
+		fiveHour = candidates[fiveHourIndex]
+	}
+	if secondaryIndex >= 0 {
+		secondary = candidates[secondaryIndex]
+	}
+	return fiveHour, secondary
+}
+
+// stableID mirrors toStableId in the management center.
+func stableID(raw, fallback string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(strings.TrimSpace(raw)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			dash = false
+			continue
+		}
+		if !dash && b.Len() > 0 {
+			b.WriteByte('-')
+		}
+		dash = true
+	}
+	id := strings.TrimRight(b.String(), "-")
+	if id == "" {
+		return fallback
+	}
+	return id
 }
 
 func parseKimiCapacity(payload map[string]any, now time.Time) ([]coreauth.CapacityWindow, error) {
@@ -485,7 +625,7 @@ func parseKimiCapacity(payload map[string]any, now time.Time) ([]coreauth.Capaci
 		hard := hasRemaining && remaining <= 0
 		windows = append(windows, capacityWindow(id, label, usedPercent, windowResetAt(raw, now), routing, scope, hard || usedPercent >= 100))
 	}
-	appendUsage("kimi-summary", "Weekly usage", "", objectValue(value(payload, "usage")), true)
+	// Row order and ids mirror buildKimiQuotaRows in the management center.
 	for index, raw := range arrayValue(value(payload, "limits")) {
 		item := objectValue(raw)
 		detail := objectValue(value(item, "detail"))
@@ -493,11 +633,20 @@ func parseKimiCapacity(payload map[string]any, now time.Time) ([]coreauth.Capaci
 			detail = item
 		}
 		scope := stringValue(value(item, "scope"))
-		label := stringValue(value(item, "name", "title"))
+		label := stringValue(value(detail, "name", "title"))
 		if label == "" {
-			label = fmt.Sprintf("Limit %d", index+1)
+			label = fmt.Sprintf("Limit #%d", index+1)
 		}
-		appendUsage(fmt.Sprintf("kimi-limit-%d", index), label, scope, detail, true)
+		appendUsage(fmt.Sprintf("limit-%d", index), label, scope, detail, true)
+	}
+	appendUsage("summary", "Weekly limit", "", objectValue(value(payload, "usage")), true)
+	monthly := objectValue(value(objectValue(value(payload, "usages")), "limit_month_total"))
+	if ratio, known := numberValue(value(monthly, "used_ratio")); known {
+		appendUsage("monthly", "Monthly limit", "", map[string]any{
+			"used":       math.Round(ratio * 100),
+			"limit":      100.0,
+			"reset_time": value(monthly, "reset_time"),
+		}, true)
 	}
 	return requireWindows(windows)
 }
@@ -516,7 +665,7 @@ func fetchXAICapacity(ctx context.Context, manager *coreauth.Manager, auth *core
 		id    string
 		label string
 		url   string
-	}{{"xai-weekly", "Weekly credits", "https://cli-chat-proxy.grok.com/v1/billing?format=credits"}, {"xai-monthly", "Monthly credits", "https://cli-chat-proxy.grok.com/v1/billing"}}
+	}{{"weekly", "Weekly limit", "https://cli-chat-proxy.grok.com/v1/billing?format=credits"}, {"monthly", "Monthly credits", "https://cli-chat-proxy.grok.com/v1/billing"}}
 	windows := make([]coreauth.CapacityWindow, 0, 2)
 	var lastErr error
 	for _, target := range urls {
@@ -614,7 +763,7 @@ func fetchXAIGrokBotUsage(ctx context.Context, auth *coreauth.Auth) []coreauth.C
 			resetAt = time.UnixMilli(*usage.NextResetAtMs)
 		}
 		return []coreauth.CapacityWindow{
-			capacityWindow("xai-grok-bot", "Grok Bot · Weekly usage", *usage.UsagePercent, resetAt, false, "", *usage.UsagePercent >= 100),
+			capacityWindow("grok-bot", "Grok Bot · Weekly usage", *usage.UsagePercent, resetAt, false, "", *usage.UsagePercent >= 100),
 		}
 	}
 }
@@ -678,6 +827,11 @@ func fetchAntigravityCapacity(ctx context.Context, manager *coreauth.Manager, au
 	for groupIndex, rawGroup := range groups {
 		group := objectValue(rawGroup)
 		groupLabel := stringValue(value(group, "displayName", "display_name"))
+		if groupLabel == "" {
+			groupLabel = fmt.Sprintf("Quota Group %d", groupIndex+1)
+		}
+		// Bucket ids mirror buildAntigravityQuotaGroups in the management center.
+		groupID := stableID(groupLabel, fmt.Sprintf("quota-group-%d", groupIndex+1))
 		for bucketIndex, rawBucket := range arrayValue(value(group, "buckets")) {
 			bucket := objectValue(rawBucket)
 			remaining, known := numberValue(value(bucket, "remainingFraction", "remaining_fraction"))
@@ -687,12 +841,17 @@ func fetchAntigravityCapacity(ctx context.Context, manager *coreauth.Manager, au
 			if remaining <= 1 {
 				remaining *= 100
 			}
-			label := stringValue(value(bucket, "displayName", "display_name", "window"))
+			window := stringValue(value(bucket, "window"))
+			id := stringValue(value(bucket, "bucketId", "bucket_id"))
+			if id == "" {
+				id = fmt.Sprintf("%s-%s-%d", groupID, firstNonEmpty(window, "bucket"), bucketIndex+1)
+			}
+			label := stringValue(value(bucket, "displayName", "display_name", "description", "window"))
 			if label == "" {
-				label = groupLabel
+				label = id
 			}
 			resetAt := parseAbsoluteTime(value(bucket, "resetTime", "reset_time"), now)
-			windows = append(windows, capacityWindow(fmt.Sprintf("antigravity-%d-%d", groupIndex, bucketIndex), label, 100-remaining, resetAt, global, "", remaining <= 0))
+			windows = append(windows, capacityWindow(id, label, 100-remaining, resetAt, global, "", remaining <= 0))
 		}
 	}
 	return requireWindows(windows)
@@ -913,6 +1072,15 @@ func xaiUserID(auth *coreauth.Auth) string {
 		nested := objectValue(auth.Metadata[parent])
 		if found := stringValue(value(nested, "sub", "subject", "id")); found != "" {
 			return found
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
 		}
 	}
 	return ""
