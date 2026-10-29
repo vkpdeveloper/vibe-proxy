@@ -1,10 +1,29 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/ui/Collapsible';
+import { fillStyle } from '@/lib/dither';
 import { formatPercent } from '@/utils/format';
 import { TRAFFIC_BUCKET_MINUTES, type TrafficWindow } from '../types';
 import { axisMax } from '../utils';
 import styles from './ThroughputChart.module.scss';
+
+// Bars are dithered: dense at the data end, thinning towards the baseline.
+const SUCCESS_FILL = fillStyle('gradient', { color: 'green', edge: 'top', length: 18, to: 0.25 });
+const FAILURE_FILL = fillStyle('gradient', { color: 'red', edge: 'top', length: 8, to: 0.5 });
+const SUCCESS_SWATCH = fillStyle('gradient', {
+  color: 'green',
+  cell: 2,
+  edge: 'top',
+  length: 4,
+  to: 0.5,
+});
+const FAILURE_SWATCH = fillStyle('gradient', {
+  color: 'red',
+  cell: 2,
+  edge: 'top',
+  length: 4,
+  to: 0.5,
+});
 
 /** 纵轴刻度条数（含 0），即 TICK_COUNT - 1 个间隔 */
 const TICK_COUNT = 5;
@@ -78,12 +97,12 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
       {/* 两条序列 → 图例常驻，并直接带上数值（浅色主题下绿色对比度偏低，数值即为补偿） */}
       <figcaption className={styles.legend}>
         <span className={styles.legendItem}>
-          <span className={`${styles.legendSwatch} ${styles.swatchSuccess}`} aria-hidden="true" />
+          <span className={styles.legendSwatch} style={SUCCESS_SWATCH} aria-hidden="true" />
           {t('stats.success')}
           <b className={styles.legendValue}>{totalSuccess.toLocaleString()}</b>
         </span>
         <span className={styles.legendItem}>
-          <span className={`${styles.legendSwatch} ${styles.swatchFailure}`} aria-hidden="true" />
+          <span className={styles.legendSwatch} style={FAILURE_SWATCH} aria-hidden="true" />
           {t('stats.failure')}
           <b className={styles.legendValue}>{totalFailure.toLocaleString()}</b>
         </span>
@@ -150,18 +169,14 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
                   >
                     {bucket.failed > 0 && (
                       <span
-                        className={`${styles.segment} ${styles.segmentFailure} ${
-                          hasBoth ? styles.segmentGap : ''
-                        }`}
-                        style={{ height: `${failureHeight}%` }}
+                        className={`${styles.segment} ${hasBoth ? styles.segmentGap : ''}`}
+                        style={{ height: `${failureHeight}%`, ...FAILURE_FILL }}
                       />
                     )}
                     {bucket.success > 0 && (
                       <span
-                        className={`${styles.segment} ${styles.segmentSuccess} ${
-                          bucket.failed > 0 ? styles.segmentSquareTop : ''
-                        }`}
-                        style={{ height: `${successHeight}%` }}
+                        className={styles.segment}
+                        style={{ height: `${successHeight}%`, ...SUCCESS_FILL }}
                       />
                     )}
                     {bucketTotal === 0 && <span className={styles.idleTick} />}
@@ -191,18 +206,12 @@ export function ThroughputChart({ traffic }: ThroughputChartProps) {
                 {bucketRangeLabel(activeBucket.time, activeIndex!, buckets.length)}
               </span>
               <span className={styles.tooltipRow}>
-                <span
-                  className={`${styles.legendSwatch} ${styles.swatchSuccess}`}
-                  aria-hidden="true"
-                />
+                <span className={styles.legendSwatch} style={SUCCESS_SWATCH} aria-hidden="true" />
                 {t('stats.success')}
                 <b>{activeBucket.success.toLocaleString()}</b>
               </span>
               <span className={styles.tooltipRow}>
-                <span
-                  className={`${styles.legendSwatch} ${styles.swatchFailure}`}
-                  aria-hidden="true"
-                />
+                <span className={styles.legendSwatch} style={FAILURE_SWATCH} aria-hidden="true" />
                 {t('stats.failure')}
                 <b>{activeBucket.failed.toLocaleString()}</b>
               </span>

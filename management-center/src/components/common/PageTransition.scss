@@ -14,7 +14,6 @@
     gap: $spacing-lg;
     min-height: 0;
     flex: 1;
-    background: var(--bg-secondary);
     backface-visibility: hidden;
     transform: translateZ(0);
 
@@ -44,7 +43,10 @@
     }
   }
 
+  // Layers are see-through at rest so the dithered band behind the page
+  // shows; during a transition each one covers the other.
   &--animating &__layer {
+    background: var(--bg-secondary);
     will-change: transform, opacity;
   }
 

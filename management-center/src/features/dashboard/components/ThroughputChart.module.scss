@@ -39,14 +39,6 @@
   flex: none;
 }
 
-.swatchSuccess {
-  background: var(--viz-success);
-}
-
-.swatchFailure {
-  background: var(--viz-failure);
-}
-
 /* ---------- 绘图区 ---------- */
 
 .plot {
@@ -154,26 +146,11 @@
 .segment {
   display: block;
   width: 100%;
-  /* 数据末端 4px 圆角，基线端保持直角 */
-  border-radius: $radius-sm $radius-sm 0 0;
-}
-
-.segmentSuccess {
-  background: var(--viz-success);
-}
-
-.segmentFailure {
-  background: var(--viz-failure);
 }
 
 /* 堆叠段之间留 2px 表面色间隙 —— 用留白而不是描边来分隔 */
 .segmentGap {
   margin-bottom: 2px;
-}
-
-/* 上方还有失败段时，成功段顶部不再圆角 */
-.segmentSquareTop {
-  border-radius: 0;
 }
 
 .idleTick {

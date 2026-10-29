@@ -1,4 +1,6 @@
 import { useId, useMemo } from 'react';
+import { cssColor, fillStyle } from '@/lib/dither';
+import type { DitherColor } from '@/lib/dither';
 import { buildSmoothLinePath } from './curve';
 import styles from './Sparkline.module.scss';
 
@@ -9,18 +11,20 @@ const TOP_PADDING = 3;
 
 interface SparklineProps {
   points: number[];
-  /** 折线/填充色，默认取主色 */
-  color?: string;
+  /** Line and area colour, a palette name or CSS colour. Default ink. */
+  color?: DitherColor;
   ariaLabel: string;
   className?: string;
 }
 
 /**
- * 极简迷你折线：2px 线 + 同色 10% 面积。
- * 单序列，因此不需要图例；数值由所在卡片的文本承载。
+ * Mini line chart: a 2px line over a dithered area that is densest at the top
+ * of the box, so high stretches read darker than quiet ones. One series, so no
+ * legend; the card's text carries the value.
  */
 export function Sparkline({ points, color, ariaLabel, className }: SparklineProps) {
-  const gradientId = useId();
+  // The id ends up in a CSS url(), so keep it to plain characters.
+  const clipId = `spark${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   const geometry = useMemo(() => {
     const values = points.filter((value) => Number.isFinite(value));
@@ -54,34 +58,50 @@ export function Sparkline({ points, color, ariaLabel, className }: SparklineProp
     );
   }
 
-  const strokeColor = geometry.isFlat
-    ? 'var(--text-quaternary)'
-    : (color ?? 'var(--primary-color)');
+  const strokeColor = geometry.isFlat ? '--text-quaternary' : (color ?? 'ink');
 
   return (
-    <svg
-      className={[styles.sparkline, className].filter(Boolean).join(' ')}
-      viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-      preserveAspectRatio="none"
+    <div
+      className={['relative', styles.sparkline, className].filter(Boolean).join(' ')}
       role="img"
       aria-label={ariaLabel}
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.16" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
-      {!geometry.isFlat && <path d={geometry.area} fill={`url(#${gradientId})`} stroke="none" />}
-      <path
-        d={geometry.line}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+      {!geometry.isFlat && (
+        <div
+          className="absolute inset-0"
+          style={{
+            clipPath: `url(#${clipId})`,
+            ...fillStyle('gradient', {
+              color: strokeColor,
+              cell: 2,
+              edge: 'top',
+              length: 14,
+              from: 0.75,
+              to: 0.12,
+            }),
+          }}
+        />
+      )}
+      <svg
+        className="absolute inset-0 h-full w-full overflow-visible"
+        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <clipPath id={clipId} clipPathUnits="objectBoundingBox">
+            <path d={geometry.area} transform={`scale(${1 / VIEW_WIDTH} ${1 / VIEW_HEIGHT})`} />
+          </clipPath>
+        </defs>
+        <path
+          d={geometry.line}
+          fill="none"
+          stroke={cssColor(strokeColor)}
+          strokeWidth={2}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
   );
 }

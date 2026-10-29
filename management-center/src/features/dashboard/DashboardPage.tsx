@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  IconBot,
   IconFileText,
   IconSidebarConfig,
   IconSidebarLogs,
@@ -13,6 +12,7 @@ import { useAuthStore } from '@/stores';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { formatCompactNumber, formatDateValue, formatPercent } from '@/utils/format';
 import { useDashboardOverview } from './hooks/useDashboardOverview';
+import { cssColor, ditherMaskStyle } from '@/lib/dither';
 import { LiveWire } from './components/LiveWire';
 import { Meter } from './components/Meter';
 import { Sparkline } from './components/Sparkline';
@@ -20,6 +20,16 @@ import { ThroughputChart } from './components/ThroughputChart';
 import { useCountUp, useRevealGroup, useRevealOnScroll } from '@/hooks/motion';
 import { providerLabel, splitWindowMinutes, toneForSuccessRate, type MeterTone } from './utils';
 import styles from './dashboard.module.scss';
+
+// The success/failure split is drawn as two dense dither runs.
+const RATIO_SUCCESS_FILL = {
+  backgroundColor: cssColor('green'),
+  ...ditherMaskStyle(0.75, { cell: 2 }),
+};
+const RATIO_FAILURE_FILL = {
+  backgroundColor: cssColor('red'),
+  ...ditherMaskStyle(0.75, { cell: 2 }),
+};
 
 const DASH = '—';
 
@@ -185,12 +195,6 @@ export function DashboardPage() {
 
   const ctaCards = [
     {
-      to: '/ai-providers',
-      icon: <IconBot size={20} />,
-      title: t('nav.ai_providers'),
-      description: t('dashboard.cta_providers_desc'),
-    },
-    {
       to: '/auth-files',
       icon: <IconFileText size={20} />,
       title: t('nav.auth_files'),
@@ -245,8 +249,8 @@ export function DashboardPage() {
             {heroMetaLine}
           </p>
           <div className={styles.heroActions} data-reveal>
-            <Link to="/ai-providers" className={styles.primaryAction}>
-              {t('dashboard.cta_manage_providers')}
+            <Link to="/auth-files" className={styles.primaryAction}>
+              {t('nav.auth_files')}
             </Link>
             <Link to="/logs" className={styles.ghostAction}>
               {t('dashboard.cta_inspect_logs')}{' '}
@@ -277,14 +281,14 @@ export function DashboardPage() {
             <div className={styles.ratioBar} aria-hidden="true">
               {traffic.totalSuccess > 0 && (
                 <span
-                  className={`${styles.ratioSegment} ${styles.splitSuccess}`}
-                  style={{ flexGrow: traffic.totalSuccess }}
+                  className={styles.ratioSegment}
+                  style={{ flexGrow: traffic.totalSuccess, ...RATIO_SUCCESS_FILL }}
                 />
               )}
               {traffic.totalFailure > 0 && (
                 <span
-                  className={`${styles.ratioSegment} ${styles.splitFailure}`}
-                  style={{ flexGrow: traffic.totalFailure }}
+                  className={styles.ratioSegment}
+                  style={{ flexGrow: traffic.totalFailure, ...RATIO_FAILURE_FILL }}
                 />
               )}
             </div>

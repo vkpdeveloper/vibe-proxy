@@ -781,6 +781,7 @@
 }
 
 .content {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -804,7 +805,18 @@
   }
 }
 
+/* The dithered request lanes: a strip across the top of every page, above the
+ * page title so no text or control sits on the dots. It scrolls away with the
+ * page; the content sits above it. */
+.content-signal {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 66px;
+  flex: none;
+}
+
 .main-content {
+  position: relative;
   flex: 1 0 auto;
   min-height: 100%;
   padding: 70px clamp(20px, 3vw, 48px) 40px;

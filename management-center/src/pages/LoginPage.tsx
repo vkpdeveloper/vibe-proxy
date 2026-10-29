@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { SignalField } from '@/components/dither/SignalField';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -209,6 +210,14 @@ export function LoginPage() {
     <div className={styles.container}>
       {/* 左侧品牌展示区 */}
       <div className={styles.brandPanel}>
+        {/* The brand panel is black in every theme, so the lanes use a fixed blue. */}
+        <SignalField
+          className="absolute inset-0"
+          palette={['transparent', 'oklch(0.72 0.14 240)']}
+          clear={0}
+          gap={11}
+          intensity={0.75}
+        />
         <div className={styles.brandContent}>
           <span className={styles.brandWord}>CLI</span>
           <span className={styles.brandWord}>PROXY</span>

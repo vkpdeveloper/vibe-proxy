@@ -1,12 +1,16 @@
+import { fillStyle } from '@/lib/dither';
+import type { DitherColor } from '@/lib/dither';
 import { toneForSuccessRate, type MeterTone } from '../utils';
 import styles from './Meter.module.scss';
 
-const TONE_COLORS: Record<MeterTone, string> = {
-  good: 'var(--viz-success, #10b981)',
-  warning: 'var(--amber-color)',
-  critical: 'var(--viz-failure, #c65746)',
-  idle: 'var(--text-quaternary)',
+const TONE_COLORS: Record<MeterTone, DitherColor> = {
+  good: 'green',
+  warning: 'orange',
+  critical: 'red',
+  idle: 'grey',
 };
+
+const METER_CELL = 2;
 
 interface MeterProps {
   /** 0–100；null 表示窗口内无请求 */
@@ -17,24 +21,33 @@ interface MeterProps {
 }
 
 /**
- * 细条计量器：填充色承载严重度，轨道是同色淡化步阶，
- * 因此在整条上都能读出状态。
+ * Dithered bar meter: the fill colour carries severity, and the track is a
+ * sparse dotted run of the same colour so the state reads along the whole bar.
  */
 export function Meter({ value, tone, ariaLabel, className }: MeterProps) {
-  const resolvedTone = tone ?? toneForSuccessRate(value);
+  const color = TONE_COLORS[tone ?? toneForSuccessRate(value)];
   const clamped = value === null ? 0 : Math.max(0, Math.min(100, value));
 
   return (
     <div
       className={[styles.track, className].filter(Boolean).join(' ')}
-      style={{ '--meter-fill': TONE_COLORS[resolvedTone] } as React.CSSProperties}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={value === null ? undefined : Math.round(clamped)}
       aria-label={ariaLabel}
     >
-      <div className={styles.fill} style={{ width: `${clamped}%` }} />
+      <div
+        className="absolute inset-0 opacity-70"
+        style={fillStyle('dotted', { color, cell: METER_CELL })}
+      />
+      <div
+        className={styles.fill}
+        style={{
+          width: `${clamped}%`,
+          ...fillStyle('gradient', { color, cell: METER_CELL, edge: 'right', length: 24, to: 0.5 }),
+        }}
+      />
     </div>
   );
 }

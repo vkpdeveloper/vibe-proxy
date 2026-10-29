@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/Table';
 import { Meter } from '@/features/dashboard/components/Meter';
+import { fillStyle } from '@/lib/dither';
 import { toneForSuccessRate, type MeterTone } from '@/features/dashboard/utils';
 import { useRevealGroup } from '@/hooks/motion';
 import { usageCostsApi, type UsageBreakdown, type UsageCostReport } from '@/services/api';
@@ -24,6 +25,15 @@ const RANGES: Range[] = ['7d', '30d', 'month', 'all'];
 const DIMENSIONS: Dimension[] = ['client', 'provider', 'account', 'model', 'auth'];
 /** Keep the date axis legible: at most this many labels regardless of range. */
 const MAX_DATE_LABELS = 10;
+
+// Spend bars are dithered, dense at the top. The colour comes from
+// --usage-bar so the stylesheet can still light the peak and hovered bars.
+const SPEND_BAR_FILL = fillStyle('gradient', {
+  color: '--usage-bar',
+  edge: 'top',
+  length: 16,
+  to: 0.25,
+});
 
 const TONE_ACCENTS: Record<MeterTone, string> = {
   good: 'var(--viz-success)',
@@ -319,6 +329,7 @@ export function UsagePage() {
                         className={`${styles.bar} ${index === peakIndex ? styles.barPeak : ''}`}
                         style={{
                           height: `${Math.max(2, (day.estimated_usd / Math.max(maxDailyCost, 0.000001)) * 100)}%`,
+                          ...SPEND_BAR_FILL,
                         }}
                         role="img"
                         aria-label={label}

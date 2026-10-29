@@ -45,3 +45,11 @@ body.modal-open .content {
   }
 }
 
+
+// The console is drawn with square corners throughout. One rule here instead
+// of zeroing every component's radius keeps new components square by default.
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}

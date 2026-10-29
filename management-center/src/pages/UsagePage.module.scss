@@ -445,23 +445,21 @@
 }
 
 .bar {
+  --usage-bar: color-mix(in srgb, var(--text-primary) 55%, transparent);
   flex-shrink: 0;
   width: 100%;
   max-width: 24px;
-  border-radius: 3px 3px 0 0;
-  background: color-mix(in srgb, var(--text-primary) 22%, transparent);
   transform-origin: bottom center;
   animation: usage-bar-grow 0.42s cubic-bezier(0.4, 0, 0.2, 1) both;
-  transition: background-color 120ms ease-out;
 }
 
 .barPeak {
-  background: color-mix(in srgb, var(--text-primary) 72%, transparent);
+  --usage-bar: var(--text-primary);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .column:hover .bar {
-    background: var(--text-primary);
+    --usage-bar: var(--primary-color);
   }
 }
 

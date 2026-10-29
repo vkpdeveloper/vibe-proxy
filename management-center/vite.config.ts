@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -39,6 +40,7 @@ function getVersion(): string {
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     viteSingleFile({
       removeViteModuleLoader: true
     })
