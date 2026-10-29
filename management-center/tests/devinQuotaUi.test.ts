@@ -16,6 +16,7 @@ import {
   commitIfQuotaCacheCurrent,
   useQuotaStore,
 } from '@/stores/useQuotaStore';
+import { formatRelativeInstant } from '@/utils/quota';
 
 const file: AuthFileItem = {
   name: 'devin-example.json',
@@ -71,8 +72,12 @@ describe('Devin quota UI integration', () => {
     expect(markup).toContain('width:0%');
     expect(markup).toContain('width:80%');
     expect(markup).toContain('Pro');
-    expect(markup).toContain('01/02');
-    expect(markup).toContain('01/08');
+    expect(markup).toContain(
+      formatRelativeInstant(Date.parse('2099-01-02T00:00:00Z'), Date.now(), 'en')
+    );
+    expect(markup).toContain(
+      formatRelativeInstant(Date.parse('2099-01-08T00:00:00Z'), Date.now(), 'en')
+    );
     expect(markup).not.toContain('01/01');
     expect(markup).not.toContain(classes.quotaMessage);
   });

@@ -143,7 +143,7 @@ export const isQuotaRefreshDisabled = (
 /**
  * The xAI account's own Grok Bot allowance is only exposed through the
  * computer-hub WebSocket (`bot.usage`), which the backend collector reaches
- * and persists as the `xai-grok-bot` window in `quota_capacity`. The browser
+ * and persists as the `grok-bot` window in `quota_capacity`. The browser
  * cannot open that socket (no Authorization header on WS upgrades), so the
  * card reads the backend-collected snapshot rather than fetching directly.
  */
@@ -151,9 +151,7 @@ export function resolveXaiGrokBotWindow(file: AuthFileItem): XaiGrokBotWindow | 
   const windows = (file.quota_capacity ?? file.quotaCapacity)?.windows ?? [];
   const stored = windows.find(
     (entry) =>
-      entry.id === 'xai-grok-bot' &&
-      entry.known === true &&
-      typeof entry.remaining_percent === 'number'
+      entry.id === 'grok-bot' && entry.known === true && typeof entry.remaining_percent === 'number'
   );
   if (!stored) return null;
   return {

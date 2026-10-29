@@ -48,17 +48,17 @@ const STORED_WINDOW_DESCRIPTIONS: Partial<Record<QuotaFileEntry['type'], Record<
     cursor: {
       'cursor-models': 'cursor_quota.cursor_models_desc',
       'other-models': 'cursor_quota.other_models_desc',
-      'cursor-grok-bot': 'cursor_quota.grok_bot_weekly_desc',
-      'cursor-included': 'cursor_quota.overall_included_usage_desc',
+      'grok-bot': 'cursor_quota.grok_bot_weekly_desc',
+      plan: 'cursor_quota.overall_included_usage_desc',
     },
     'opencode-go': {
-      'opencode-go-rolling': 'opencode_go_quota.five_hour_desc',
-      'opencode-go-weekly': 'opencode_go_quota.weekly_desc',
-      'opencode-go-monthly': 'opencode_go_quota.monthly_desc',
+      rolling: 'opencode_go_quota.five_hour_desc',
+      weekly: 'opencode_go_quota.weekly_desc',
+      monthly: 'opencode_go_quota.monthly_desc',
     },
     'devin-cli': {
-      'devin-cli-daily': 'devin_cli_quota.daily_desc',
-      'devin-cli-weekly': 'devin_cli_quota.weekly_desc',
+      daily: 'devin_cli_quota.daily_desc',
+      weekly: 'devin_cli_quota.weekly_desc',
     },
   };
 
@@ -154,7 +154,6 @@ export function QuotaCard(props: QuotaCardProps) {
     file,
     entry.type === 'claude' && status !== 'idle',
     !canRefresh || loading || resetting,
-    quota,
     onRefresh
   );
   const providerType =

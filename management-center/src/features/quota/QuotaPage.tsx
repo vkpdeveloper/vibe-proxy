@@ -17,6 +17,7 @@ import { IconSearch, IconX } from '@/components/ui/icons';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
@@ -25,7 +26,6 @@ import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
-import { QuotaTimeline } from './components/QuotaTimeline';
 import {
   CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
@@ -48,6 +48,7 @@ import {
   type QuotaFileEntry,
 } from './logic';
 import { nextRecoveryMs } from './resetSchedule';
+import { readSavedQuotaCard, resolveQuotaCard, startQuotaDetailsSync } from './quotaDetails';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
@@ -59,11 +60,8 @@ import styles from './QuotaPage.module.scss';
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
 
-/**
- * Existing providers display filenames; Devin's card and timeline share an
- * identity-aware display label. Keep the filename fallback stable for memoization.
- */
-const displayNameFor = (name: string) => name;
+/** How often the open page reloads credentials to pick up the server's quota poll. */
+const QUOTA_POLL_RELOAD_MS = 60_000;
 
 export function QuotaPage() {
   const { t } = useTranslation();
@@ -90,34 +88,49 @@ export function QuotaPage() {
   const sessionGeneration = useQuotaStore((state) => state.cacheGeneration);
   const [filesGeneration, setFilesGeneration] = useState<number | null>(null);
   const listRequestRef = useRef(0);
-  const loadFiles = useCallback(async () => {
-    const requestId = ++listRequestRef.current;
-    if (connectionStatus !== 'connected') {
-      setFiles([]);
-      setFilesGeneration(null);
-      setLoading(false);
-      return;
-    }
-    const isCurrent = () =>
-      requestId === listRequestRef.current &&
-      sessionGeneration === useQuotaStore.getState().cacheGeneration;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await authFilesApi.list();
-      if (!isCurrent()) return;
-      setFiles(data?.files || []);
-      setFilesGeneration(sessionGeneration);
-    } catch (err: unknown) {
-      if (!isCurrent()) return;
-      const message = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(message);
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [connectionStatus, sessionGeneration, t]);
+  // Background reloads pick up the server's quota poll without a skeleton flash.
+  const loadFiles = useCallback(
+    async (options?: { background?: boolean }) => {
+      const background = options?.background === true;
+      const requestId = ++listRequestRef.current;
+      if (connectionStatus !== 'connected') {
+        setFiles([]);
+        setFilesGeneration(null);
+        setLoading(false);
+        return;
+      }
+      const isCurrent = () =>
+        requestId === listRequestRef.current &&
+        sessionGeneration === useQuotaStore.getState().cacheGeneration;
+      if (!background) {
+        setLoading(true);
+        setError('');
+      }
+      try {
+        const data = await authFilesApi.list();
+        if (!isCurrent()) return;
+        setFiles(data?.files || []);
+        setFilesGeneration(sessionGeneration);
+      } catch (err: unknown) {
+        if (!isCurrent() || background) return;
+        const message = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(message);
+      } finally {
+        if (isCurrent() && !background) setLoading(false);
+      }
+    },
+    [connectionStatus, sessionGeneration, t]
+  );
 
   useHeaderRefresh(loadFiles);
+
+  useEffect(startQuotaDetailsSync, []);
+
+  // The server polls provider quotas every few minutes; merge its newer numbers.
+  useInterval(
+    () => void loadFiles({ background: true }),
+    disableControls ? null : QUOTA_POLL_RELOAD_MS
+  );
 
   useEffect(() => {
     void loadFiles();
@@ -180,6 +193,8 @@ export function QuotaPage() {
 
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
+  // Providers without credentials stay out of the tab bar.
+  const visibleTabs = TAB_IDS.filter((id) => id === 'all' || id === tab || tabCounts[id] > 0);
   const filteredEntries = useMemo(
     () => filterEntriesBySearch(filterEntriesByTab(entries, tab), search),
     [entries, tab, search]
@@ -189,13 +204,18 @@ export function QuotaPage() {
     setPage(1);
   }, []);
 
-  /* Grok Bot usage is a per-account xAI allowance collected by the backend over
-     the computer-hub WebSocket. It lands on the credential's stored
-     quota_capacity snapshot (`xai-grok-bot`), so each xAI card merges in its
-     own window — distinct from the Cursor-plan Grok Bot meter on cursor cards. */
+  /* Saved cards and the server's quota poll are merged in by resolveQuotaCard.
+     Grok Bot usage is a per-account xAI allowance collected by the backend
+     over the computer-hub WebSocket. It lands on the credential's stored
+     quota_capacity snapshot (`grok-bot`), so each xAI card merges in its own
+     window — distinct from the Cursor-plan Grok Bot meter on cursor cards. */
   const getQuota = useCallback(
     (entry: QuotaFileEntry): QuotaCardState | undefined => {
-      const state = quotaByType[entry.type][getQuotaCacheKey(entry.file)];
+      const state = resolveQuotaCard(
+        entry.type,
+        entry.file,
+        quotaByType[entry.type][getQuotaCacheKey(entry.file)]
+      );
       if (entry.type === 'xai' && state) {
         const grokBot = resolveXaiGrokBotWindow(entry.file);
         if (grokBot) {
@@ -245,7 +265,12 @@ export function QuotaPage() {
     let attention = 0;
     entries.forEach((entry) => {
       const status = quotaByType[entry.type][getQuotaCacheKey(entry.file)]?.status;
-      if (status === 'success' || hasStoredQuotaCapacity(entry.file)) loaded += 1;
+      if (
+        status === 'success' ||
+        readSavedQuotaCard(entry.type, entry.file) ||
+        hasStoredQuotaCapacity(entry.file)
+      )
+        loaded += 1;
       else if (status === 'error' || hasStoredQuotaError(entry.file)) attention += 1;
     });
     return { loadedCount: loaded, attentionCount: attention };
@@ -362,7 +387,7 @@ export function QuotaPage() {
         {/* 提供商导航与搜索工具栏分层，避免不同控件争夺视觉焦点。 */}
         <div className={styles.tabsRow} data-reveal>
           <ProviderTabs
-            types={TAB_IDS}
+            types={visibleTabs}
             counts={tabCounts}
             active={tab}
             resolvedTheme={resolvedTheme}
@@ -417,7 +442,7 @@ export function QuotaPage() {
         {loading ? (
           <div className={styles.grid} aria-hidden="true">
             {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-              <Skeleton key={index} height={168} rounded={14} />
+              <Skeleton key={index} height={96} rounded={0} />
             ))}
           </div>
         ) : isEmpty ? (
@@ -493,14 +518,6 @@ export function QuotaPage() {
             </Button>
           </div>
         )}
-
-        {/* 时间线只比较当前页凭证，避免大量凭证一次性生成无界泳道。 */}
-        <QuotaTimeline
-          entries={pageItems}
-          quotaFor={getQuota}
-          displayNameFor={displayNameFor}
-          resolvedTheme={resolvedTheme}
-        />
       </section>
     </div>
   );

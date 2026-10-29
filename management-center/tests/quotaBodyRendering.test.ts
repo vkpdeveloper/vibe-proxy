@@ -20,6 +20,7 @@ import { XaiQuotaBody } from '@/features/quota/providers/xai/XaiQuotaBody';
 import {
   getResetDisplayFormats,
   getResetDisplayValue,
+  RESET_DISPLAY_MODES,
   useQuotaResetDisplayStore,
 } from '@/features/quota/components/resetDisplayFormats';
 import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
@@ -136,17 +137,17 @@ describe('CodexQuotaBody', () => {
     }
   );
 
-  test('renders a window reset as absolute plus countdown', () => {
+  test('renders a window reset as a countdown by default', () => {
     const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
 
-    expect(markup).toContain('08-02 18:00');
+    expect(markup).toContain('in 3 hours');
     expect(markup).toContain('aria-label="Change reset time format"');
   });
 
-  test('renders reset-credit expiry in local time as a cycling control', () => {
+  test('renders reset-credit expiry as a cycling control', () => {
     const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
 
-    expect(markup).toContain(formatInstantShort(now + 11 * DAY_MS));
+    expect(markup).toContain('in 11 days');
     expect(markup).toContain('quotaResetCycle');
   });
 
@@ -234,22 +235,27 @@ describe('KimiQuotaBody', () => {
     };
     const markup = renderToStaticMarkup(createElement(KimiQuotaBody, { quota, classes }));
 
-    expect(markup).toContain(formatInstantShort(resetAtMs));
+    expect(markup).toContain('in 3 hours');
     expect(markup).toContain('quotaResetCycle');
     expect(markup).not.toContain('resets in 3h');
   });
 });
 
 describe('reset time formats', () => {
-  test('cycles compact, relative, and full formats before returning to compact', () => {
+  test('relative is the default everywhere', () => {
+    expect(RESET_DISPLAY_MODES[0]).toBe('relative');
+    expect(useQuotaResetDisplayStore.getInitialState().mode).toBe('relative');
+  });
+
+  test('offers relative, compact, and full formats', () => {
     const display = buildResetDisplay(null, now + 3 * HOUR_MS, now, 'en');
     expect(display).not.toBeNull();
     const formats = getResetDisplayFormats(display!);
 
     expect(formats).toHaveLength(3);
-    expect(formats[0]).toBe(formatInstantShort(now + 3 * HOUR_MS));
-    expect(formats[1]).toMatch(/3 hours/);
-    expect(formats[2]).not.toBe(formats[0]);
+    expect(formats[0]).toBe('in 3 hours');
+    expect(formats[1]).toBe(formatInstantShort(now + 3 * HOUR_MS));
+    expect(formats[2]).not.toBe(formats[1]);
   });
 
   test('one shared cycle changes the display value used by every card', () => {
@@ -260,17 +266,17 @@ describe('reset time formats', () => {
       return [getResetDisplayValue(first, mode), getResetDisplayValue(second, mode)];
     };
 
-    useQuotaResetDisplayStore.getState().setMode('compact');
-    expect(displayBoth()).toEqual([first.absolute, second.absolute]);
+    useQuotaResetDisplayStore.getState().setMode('relative');
+    expect(displayBoth()).toEqual([first.relative, second.relative]);
 
     useQuotaResetDisplayStore.getState().cycleMode();
-    expect(displayBoth()).toEqual([first.relative, second.relative]);
+    expect(displayBoth()).toEqual([first.absolute, second.absolute]);
 
     useQuotaResetDisplayStore.getState().cycleMode();
     expect(displayBoth()).toEqual([first.full, second.full]);
 
     useQuotaResetDisplayStore.getState().cycleMode();
-    expect(useQuotaResetDisplayStore.getState().mode).toBe('compact');
+    expect(useQuotaResetDisplayStore.getState().mode).toBe('relative');
   });
 });
 
@@ -332,7 +338,7 @@ describe('CursorQuotaBody', () => {
     expect(markup).toContain('Grok Bot · Weekly usage');
     expect(markup).toContain('91% left');
     expect(markup).toContain('Separate allowance included with your Cursor plan');
-    expect(markup).toContain(formatInstantShort(resetAtMs));
+    expect(markup).toContain('in 5 days');
     expect(markup).toContain('aria-label="Change reset time format"');
   });
 });
@@ -362,8 +368,8 @@ describe('ClaudeQuotaBody', () => {
     };
     const markup = renderToStaticMarkup(createElement(ClaudeQuotaBody, { quota, classes }));
 
-    expect(markup).toContain('08-02 17:00');
-    expect(markup).toContain('08-06 04:00');
+    expect(markup).toContain('in 2 hours');
+    expect(markup).toContain('in 4 days');
     expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(2);
   });
 });

@@ -13,19 +13,87 @@
 
 /* ---------- 额度行 ---------- */
 
+/* Every limit is one line on a fixed grid: name | bar | left | resets.
+ * The header and its meta use display: contents so their children become
+ * grid cells, which keeps the columns aligned across every account. */
 .quotaRow {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 1.6fr) 120px minmax(170px, 1fr);
+  align-items: center;
+  column-gap: 18px;
+  row-gap: 3px;
   min-width: 0;
+  padding: 6px 0;
+
+  & + & {
+    border-top: 1px dashed color-mix(in srgb, var(--text-primary) 8%, transparent);
+  }
+
+  /* Rows without a bar (extra usage, dollar balances) put their amount in
+   * the bar column and their notes in the reset column, on the same line
+   * when those cells are free. */
+  > .quotaAmount {
+    grid-column: 2;
+  }
+
+  > .quotaMeta {
+    grid-column: 4;
+  }
+
+  > .quotaBar {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    > .quotaBar {
+      grid-column: 1 / -1;
+      grid-row: auto;
+    }
+
+    > :is(.quotaMeta, .quotaAmount) {
+      grid-column: 1 / -1;
+    }
+  }
 }
 
 .quotaRowHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
+  display: contents;
+
+  > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  > .quotaMeta {
+    display: contents;
+  }
+
+  > .quotaMeta > .quotaPercent {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  > .quotaMeta > :not(.quotaPercent) {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  @media (max-width: 900px) {
+    > .quotaMeta > .quotaPercent {
+      grid-column: 2;
+    }
+
+    > .quotaMeta > :not(.quotaPercent) {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
 }
 
 .quotaLabel {
@@ -65,6 +133,7 @@
 
 /* 百分比穿墨色而非填充色 —— 文字不承担状态编码，颜色留给水位条 */
 .quotaPercent {
+  font-size: 12.5px;
   font-weight: 650;
   color: var(--text-primary);
 }
@@ -136,13 +205,13 @@
  * percent === null 时宽度为 0 —— 未知不着色。 */
 
 .quotaBar {
-  height: 6px;
-  border-radius: $radius-full;
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  position: relative;
+  height: 8px;
   overflow: hidden;
 }
 
 .quotaBarFill {
+  position: relative;
   height: 100%;
   border-radius: $radius-full;
   /* 刷新时平滑重定向到新水位（可中断） */

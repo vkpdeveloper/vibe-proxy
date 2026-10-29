@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNow } from '@/hooks/useNow';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores';
 import { apiClient } from '@/services/api/client';
-import {
-  AnthropicResetGrantError,
-  type AnthropicResetGrantStatus,
-} from '@/services/api/claudeResetGrants';
+import { parseAnthropicResetGrantStatus } from '@/services/api/claudeResetGrants';
 import type { AuthFileItem } from '@/types';
 import { normalizeAuthIndex } from '@/utils/quota';
 import {
@@ -17,14 +14,12 @@ import {
   resetGrantFailureMessageKey,
 } from './resetGrantOperations';
 import { selectResetGrant } from './selectResetGrant';
-import { readResetGrantsForCard, scheduleResetGrantRead } from './resetGrantReads';
 
-/** Card-owned reads; the session-scoped journal owns spending and ambiguous retries. */
+/** Card view of the server-read grants; the session-scoped journal owns spending and ambiguous retries. */
 export function useClaudeResetGrants(
   file: AuthFileItem,
   enabled: boolean,
   disabled: boolean,
-  refreshToken: unknown,
   onRefresh: () => void
 ) {
   const { t } = useTranslation();
@@ -37,44 +32,15 @@ export function useClaudeResetGrants(
   const now = useNow();
   const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
   const key = JSON.stringify([file.name, authIndex]);
-  const [status, setStatus] = useState<AnthropicResetGrantStatus | null>(null);
+  // The server's quota poll reads the grants with the usage windows, so cards
+  // never call Anthropic themselves. Spending still does fresh preflight reads.
+  const capacity = file.quota_capacity ?? file.quotaCapacity;
+  const status = useMemo(
+    () => (enabled ? parseAnthropicResetGrantStatus(capacity?.reset_grants) : null),
+    [enabled, capacity?.reset_grants]
+  );
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [reload, setReload] = useState(0);
   const lock = useRef(false);
-  const generation = useRef(0);
-  useEffect(() => {
-    const version = ++generation.current;
-    setStatus(null);
-    if (!enabled || disabled || !sessionActive || !authIndex) return;
-    let cancelled = false;
-    const current = () =>
-      !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
-    const cancelRead = scheduleResetGrantRead(() => {
-      void readResetGrantsForCard(authIndex).then(
-        (result) => {
-          if (current()) {
-            setStatus(result);
-            setMessage('');
-          }
-        },
-        (error: unknown) => {
-          if (current()) {
-            setMessage(
-              error instanceof AnthropicResetGrantError && error.code === 'rate_limited'
-                ? 'rate_limited'
-                : 'read_error'
-            );
-          }
-        }
-      );
-    }, current);
-    return () => {
-      cancelled = true;
-      cancelRead();
-      generation.current += 1;
-    };
-  }, [authIndex, key, enabled, disabled, sessionActive, session, refreshToken, reload]);
 
   const operation = resetGrantOperations.inspect(key);
   const pending = operation && !operation.code ? operation : undefined;
@@ -83,9 +49,7 @@ export function useClaudeResetGrants(
   const blocked = disabled || !sessionActive || !authIndex || busy || expired || !selected;
   const confirm = () => {
     if (blocked || lock.current || !selected || !authIndex) return;
-    const version = generation.current;
-    const current = () =>
-      session === apiClient.getConnectionRevision() && version === generation.current;
+    const current = () => session === apiClient.getConnectionRevision();
     showConfirmation({
       title: t('claude_reset.title'),
       message: t(pending ? 'claude_reset.retry_confirm' : 'claude_reset.confirm_text', {
@@ -123,10 +87,8 @@ export function useClaudeResetGrants(
           );
         } finally {
           lock.current = false;
-          // A concurrent page-wide refresh can invalidate this read generation.
-          // Release the local lock regardless, but never refresh a replacement account.
+          // Release the local lock regardless, but never refresh after the session changed.
           setBusy(false);
-          setReload((value) => value + 1);
           if (current()) onRefresh();
         }
       },
@@ -138,7 +100,7 @@ export function useClaudeResetGrants(
     busy,
     blocked,
     confirm,
-    message: pending ? (expired ? 'expired' : 'unknown') : message,
+    message: pending ? (expired ? 'expired' : 'unknown') : '',
     buttonLabel: pending ? 'retry' : 'use',
   };
 }

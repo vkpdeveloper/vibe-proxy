@@ -1,5 +1,5 @@
 /**
- * A reset instant that cycles every quota card through compact → relative
+ * A reset instant that cycles every quota card through relative → compact
  * → full date on click.
  *
  * Shared by every provider body so the two halves can never drift apart in

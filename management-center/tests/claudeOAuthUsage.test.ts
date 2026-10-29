@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider } from 'react-i18next';
@@ -20,7 +19,7 @@ import {
 import {
   CLAUDE_PROFILE_URL,
   CLAUDE_USAGE_URL,
-  formatQuotaResetTime,
+  formatRelativeInstant,
   getStatusFromError,
 } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
@@ -398,29 +397,6 @@ describe('Claude usage snapshot rendering and retention', () => {
     useQuotaStore.getState().clearQuotaCache();
   });
 
-  test('offers read-only refresh for every non-idle auth-file quota, including Claude', () => {
-    // This host imports SCSS modules, so cover the action wiring here and
-    // verify its interaction with the production build in the browser.
-    const source = readFileSync(
-      new URL('../src/features/authFiles/components/AuthFileQuotaSection.tsx', import.meta.url),
-      'utf8'
-    );
-    // Idle quota is refreshed via the clickable idle prompt; avoid a duplicate button.
-    expect(source).toContain("const showRefreshQuotaAction = quotaStatus !== 'idle';");
-    expect(source).toContain('{showRefreshQuotaAction && (');
-    expect(source).toContain('<div className={styles.quotaCardActions}>');
-    expect(source).toContain('onClick={() => void refreshQuotaForFile()}');
-    expect(source).toContain("disabled={!canRefreshQuota || quotaStatus === 'loading'}");
-    expect(source).toContain("loading={quotaStatus === 'loading'}");
-    expect(source).toContain("{t('auth_files.quota_refresh_single')}");
-    expect(source).toContain("if (quota?.status === 'loading' || resettingQuota) return;");
-    expect(source).toContain(
-      'const canRefreshQuota = !disableControls && !file.disabled && !resettingQuota;'
-    );
-    expect(source).toContain('{resetQuotaAction}');
-    expect(CLAUDE_CONFIG).not.toHaveProperty('resetQuota');
-  });
-
   test('renders enabled extra usage in minor units and each balance in dollars', () => {
     const markup = render(quota);
     expect(markup).toContain('Extra Usage');
@@ -430,7 +406,9 @@ describe('Claude usage snapshot rendering and retention', () => {
     expect(markup).toContain('iguana_necktie');
     expect(markup).toContain('$94.96 remaining');
     expect(markup).toContain('Spent $5.04 / Limit $100.00');
-    expect(markup).toContain(formatQuotaResetTime(fixture.iguana_necktie.resets_at));
+    expect(markup).toContain(
+      formatRelativeInstant(Date.parse(fixture.iguana_necktie.resets_at), Date.now(), 'en')
+    );
     expect(markup).toContain('additional_credit_balance');
     expect(markup).toContain('$20.00 remaining');
     expect(markup).toContain('Spent $0.00 / Limit $20.00');

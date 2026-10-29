@@ -15,42 +15,72 @@ import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 const NOW = new Date(2026, 7, 2, 12, 0, 0).getTime();
 
 describe('relativeTimeParts', () => {
-  test('picks the coarsest unit that still describes the gap', () => {
-    expect(relativeTimeParts(NOW + DAY_MS, NOW)).toEqual({ value: 1, unit: 'day' });
-    expect(relativeTimeParts(NOW + HOUR_MS, NOW)).toEqual({ value: 1, unit: 'hour' });
-    expect(relativeTimeParts(NOW + 30_000, NOW)).toEqual({ value: 1, unit: 'minute' });
+  const parts = (target: number) => relativeTimeParts(target, NOW);
+
+  test('shows the two most significant units', () => {
+    expect(parts(NOW + 35 * MINUTE_MS)).toEqual({
+      sign: 1,
+      components: [{ value: 35, unit: 'minute' }],
+    });
+    expect(parts(NOW + HOUR_MS + 25 * MINUTE_MS)).toEqual({
+      sign: 1,
+      components: [
+        { value: 1, unit: 'hour' },
+        { value: 25, unit: 'minute' },
+      ],
+    });
+    expect(parts(NOW + 6 * DAY_MS + 4 * HOUR_MS + 30 * MINUTE_MS)).toEqual({
+      sign: 1,
+      components: [
+        { value: 6, unit: 'day' },
+        { value: 4, unit: 'hour' },
+      ],
+    });
   });
 
-  test('never renders a magnitude that should have been the next unit up', () => {
-    // Rounding up here would produce "24 hours" and "60 minutes".
-    expect(relativeTimeParts(NOW + DAY_MS - 1, NOW)).toEqual({ value: 23, unit: 'hour' });
-    expect(relativeTimeParts(NOW + HOUR_MS - 1, NOW)).toEqual({ value: 59, unit: 'minute' });
+  test('drops a zero second component', () => {
+    expect(parts(NOW + 2 * HOUR_MS)).toEqual({ sign: 1, components: [{ value: 2, unit: 'hour' }] });
+    expect(parts(NOW + DAY_MS + 30 * MINUTE_MS)).toEqual({
+      sign: 1,
+      components: [{ value: 1, unit: 'day' }],
+    });
   });
 
   test('truncates, so a deadline never appears further off than it is', () => {
-    expect(relativeTimeParts(NOW + 11 * DAY_MS + 1, NOW)).toEqual({ value: 11, unit: 'day' });
-    expect(relativeTimeParts(NOW + 11 * DAY_MS + 23 * HOUR_MS, NOW)).toEqual({
-      value: 11,
-      unit: 'day',
+    expect(parts(NOW + DAY_MS - 1)).toEqual({
+      sign: 1,
+      components: [
+        { value: 23, unit: 'hour' },
+        { value: 59, unit: 'minute' },
+      ],
     });
-    expect(relativeTimeParts(NOW + 90 * MINUTE_MS, NOW)).toEqual({ value: 1, unit: 'hour' });
   });
 
   test('past instants are negative rather than clamped to zero', () => {
     // The timeline-local predecessor clamped with Math.max(0, …), so an expired
     // credit read "in 1 minute".
-    expect(relativeTimeParts(NOW - 3 * DAY_MS, NOW)).toEqual({ value: -3, unit: 'day' });
-    expect(relativeTimeParts(NOW - 2 * HOUR_MS, NOW)).toEqual({ value: -2, unit: 'hour' });
+    expect(parts(NOW - 3 * DAY_MS)).toEqual({ sign: -1, components: [{ value: 3, unit: 'day' }] });
   });
 
   test('sub-minute magnitudes floor to 1 in both directions', () => {
-    expect(relativeTimeParts(NOW + 1, NOW)).toEqual({ value: 1, unit: 'minute' });
-    expect(relativeTimeParts(NOW, NOW)).toEqual({ value: 1, unit: 'minute' });
-    expect(relativeTimeParts(NOW - 1, NOW)).toEqual({ value: -1, unit: 'minute' });
+    expect(parts(NOW)).toEqual({ sign: 1, components: [{ value: 1, unit: 'minute' }] });
+    expect(parts(NOW - 1)).toEqual({ sign: -1, components: [{ value: 1, unit: 'minute' }] });
   });
 });
 
 describe('formatRelativeInstant', () => {
+  test('direction words wrap the whole two-unit span', () => {
+    expect(formatRelativeInstant(NOW + HOUR_MS + 25 * MINUTE_MS, NOW, 'en')).toBe(
+      'in 1 hour 25 minutes'
+    );
+    expect(formatRelativeInstant(NOW - 2 * DAY_MS - 3 * HOUR_MS, NOW, 'en')).toBe(
+      '2 days 3 hours ago'
+    );
+    expect(formatRelativeInstant(NOW + HOUR_MS + 25 * MINUTE_MS, NOW, 'ru')).toBe(
+      'через 1 час 25 минут'
+    );
+  });
+
   test('renders in the requested locale', () => {
     expect(formatRelativeInstant(NOW + 11 * DAY_MS, NOW, 'en')).toContain('days');
     expect(formatRelativeInstant(NOW + 11 * DAY_MS, NOW, 'zh-CN')).toContain('天');

@@ -6,26 +6,29 @@
  * 遥测内容一律 mono + tabular-nums。
  * ============================================================ */
 
+/* An account row: identity | limits | actions. */
 .card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 15px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
-  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-  transition:
-    transform var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
-    box-shadow var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 132px;
+  align-items: start;
+  gap: 28px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-hover);
-    box-shadow: 0 12px 26px -14px rgb(0 0 0 / 0.16);
+    background: color-mix(in srgb, var(--bg-tertiary) 35%, transparent);
+  }
+}
+
+@media (max-width: 900px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px 12px;
   }
 }
 
@@ -46,8 +49,9 @@
 
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 9px;
+  gap: 8px 9px;
   min-width: 0;
 }
 
@@ -76,6 +80,7 @@
 }
 
 .fileName {
+  flex: 1 1 calc(100% - 35px);
   min-width: 0;
   font-family: $font-mono;
   font-size: 12.5px;
@@ -230,9 +235,14 @@
 
 .actionRow {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
-  flex-wrap: wrap;
+
+  @media (max-width: 900px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 
 /* 安静描边药丸（与凭证卡图标动作同族：hover 才显色块） */
@@ -244,6 +254,7 @@
   border: 1px solid var(--border-color);
   border-radius: $radius-full;
   background: none;
+  justify-content: center;
   padding: 5px 11px;
   font-size: 11.5px;
   font-weight: 600;
@@ -312,17 +323,13 @@
 /* ---------- Stored quota snapshot (fork feature) ---------- */
 
 .cardRoutingSelected {
-  border-color: color-mix(in srgb, var(--primary-color) 52%, var(--border-color));
-  box-shadow:
-    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 82%, #22c55e),
-    0 8px 24px -18px color-mix(in srgb, var(--primary-color) 52%, transparent);
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--primary-color) 64%, var(--border-color));
-  }
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--primary-color);
 }
 
 .routingSelectionBadge {
+  order: 3;
+  margin-left: 35px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

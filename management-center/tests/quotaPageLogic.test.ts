@@ -350,7 +350,7 @@ describe('resolveXaiGrokBotWindow', () => {
             routing: true,
           },
           {
-            id: 'xai-grok-bot',
+            id: 'grok-bot',
             label: 'Grok Bot',
             used_percent: 16,
             remaining_percent: 84,
@@ -378,7 +378,7 @@ describe('resolveXaiGrokBotWindow', () => {
             supported: true,
             windows: [
               {
-                id: 'xai-grok-bot',
+                id: 'grok-bot',
                 label: 'Grok Bot',
                 used_percent: 0,
                 remaining_percent: 0,
