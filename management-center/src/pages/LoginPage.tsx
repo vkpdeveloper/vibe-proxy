@@ -11,7 +11,7 @@ import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
-import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import vibeProxyLogo from '@/assets/vibe-proxy-logo.svg';
 import type { ApiError } from '@/types';
 import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
 import styles from './LoginPage.module.scss';
@@ -219,9 +219,8 @@ export function LoginPage() {
           intensity={0.75}
         />
         <div className={styles.brandContent}>
-          <span className={styles.brandWord}>CLI</span>
+          <span className={styles.brandWord}>VIBE</span>
           <span className={styles.brandWord}>PROXY</span>
-          <span className={styles.brandWord}>API</span>
         </div>
       </div>
 
@@ -230,7 +229,7 @@ export function LoginPage() {
         {showSplash ? (
           /* 启动动画 */
           <div className={styles.splashContent}>
-            <img src={INLINE_LOGO_JPEG} alt="CPAMC" className={styles.splashLogo} />
+            <img src={vibeProxyLogo} alt="Vibe Proxy" className={styles.splashLogo} />
             <h1 className={styles.splashTitle}>{t('splash.title')}</h1>
             <p className={styles.splashSubtitle}>{t('splash.subtitle')}</p>
             <div className={styles.splashLoader}>
@@ -241,7 +240,7 @@ export function LoginPage() {
           /* 登录表单 */
           <div className={styles.formContent}>
             {/* Logo */}
-            <img src={INLINE_LOGO_JPEG} alt="Logo" className={styles.logo} />
+            <img src={vibeProxyLogo} alt="Vibe Proxy" className={styles.logo} />
 
             {/* 登录表单卡片 */}
             <div className={styles.loginCard}>

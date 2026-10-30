@@ -58,11 +58,11 @@
     "reveal_email": "Reveal email address"
   },
   "title": {
-    "login": "Trung tâm Quản lý CLI Proxy API",
-    "abbr": "CPAMC"
+    "login": "VProxy",
+    "abbr": "VProxy"
   },
   "splash": {
-    "title": "CLI Proxy API",
+    "title": "VProxy",
     "subtitle": "Trung tâm Quản lý"
   },
   "login": {
@@ -1789,7 +1789,7 @@
   },
   "system_info": {
     "title": "Thông tin Trung tâm Quản lý",
-    "about_title": "Trung tâm Quản lý CLI Proxy API",
+    "about_title": "VProxy",
     "models_title": "Model khả dụng",
     "models_desc": "Hiển thị phản hồi /models và tự động dùng API key đã lưu để xác thực.",
     "models_loading": "Đang tải model khả dụng...",

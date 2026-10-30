@@ -58,11 +58,11 @@
     "reveal_email": "Reveal email address"
   },
   "title": {
-    "login": "CLI Proxy API 관리 센터",
-    "abbr": "CPAMC"
+    "login": "VProxy",
+    "abbr": "VProxy"
   },
   "splash": {
-    "title": "CLI Proxy API",
+    "title": "VProxy",
     "subtitle": "관리 센터"
   },
   "login": {
@@ -1833,7 +1833,7 @@
   },
   "system_info": {
     "title": "관리 센터 정보",
-    "about_title": "CLI Proxy API 관리 센터",
+    "about_title": "VProxy",
     "models_title": "사용 가능한 모델",
     "models_desc": "/models 응답을 표시하며 저장된 API 키를 사용하여 자동으로 인증합니다.",
     "models_loading": "사용 가능한 모델을 불러오는 중...",

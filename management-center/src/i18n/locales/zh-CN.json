@@ -58,11 +58,11 @@
     "unsaved_changes_message": "你有未保存的更改，离开后将丢失这些更改。确定要离开吗？"
   },
   "title": {
-    "login": "CLI Proxy API Management Center",
-    "abbr": "CPAMC"
+    "login": "VProxy",
+    "abbr": "VProxy"
   },
   "splash": {
-    "title": "CLI Proxy API",
+    "title": "VProxy",
     "subtitle": "管理中心"
   },
   "login": {
@@ -577,7 +577,6 @@
     "reset_confirm_button": "确认重置",
     "reset_not_confirmed": "未确认额度重置成功，请刷新额度后再决定是否重试。",
     "reset_cooldown_failed": "额度已重置，但代理冷却清除失败。请在原连接的认证文件页面使用“清除冷却”，不要再次消耗重置卡。",
-
     "reset_success": "已重置 \"{{name}}\" 的 Codex 额度",
     "reset_failed": "重置 \"{{name}}\" 的 Codex 额度失败：{{message}}",
     "plan_plus": "Plus",
@@ -1925,7 +1924,7 @@
   },
   "system_info": {
     "title": "管理中心信息",
-    "about_title": "CLI Proxy API Management Center",
+    "about_title": "VProxy",
     "models_title": "可用模型列表",
     "models_desc": "展示 /models 返回的模型，并自动使用服务器保存的 API Key 进行鉴权。",
     "models_loading": "正在加载可用模型...",
