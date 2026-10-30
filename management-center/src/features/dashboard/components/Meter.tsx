@@ -16,6 +16,8 @@ interface MeterProps {
   /** 0–100；null 表示窗口内无请求 */
   value: number | null;
   tone?: MeterTone;
+  /** Overrides the tone colour, for meters that show a share rather than health. */
+  color?: DitherColor;
   ariaLabel: string;
   className?: string;
 }
@@ -24,8 +26,8 @@ interface MeterProps {
  * Dithered bar meter: the fill colour carries severity, and the track is a
  * sparse dotted run of the same colour so the state reads along the whole bar.
  */
-export function Meter({ value, tone, ariaLabel, className }: MeterProps) {
-  const color = TONE_COLORS[tone ?? toneForSuccessRate(value)];
+export function Meter({ value, tone, color: colorOverride, ariaLabel, className }: MeterProps) {
+  const color = colorOverride ?? TONE_COLORS[tone ?? toneForSuccessRate(value)];
   const clamped = value === null ? 0 : Math.max(0, Math.min(100, value));
 
   return (

@@ -403,13 +403,12 @@ export function UsagePage() {
                   <TableCell>
                     <div className={styles.rowIdentity}>
                       <span className={styles.rowName}>{row.key}</span>
-                      <span className={styles.rowTrack} aria-hidden="true">
-                        <span
-                          style={{
-                            width: `${maxRowCost ? (row.estimated_usd / maxRowCost) * 100 : 0}%`,
-                          }}
-                        />
-                      </span>
+                      <Meter
+                        className={styles.rowTrack}
+                        value={maxRowCost ? (row.estimated_usd / maxRowCost) * 100 : 0}
+                        color="ink"
+                        ariaLabel={`${row.key} share of the top spend`}
+                      />
                     </div>
                   </TableCell>
                   <TableCell alignRight className={styles.numberCell}>

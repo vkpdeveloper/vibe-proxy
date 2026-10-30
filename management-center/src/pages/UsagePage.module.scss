@@ -606,21 +606,8 @@
 }
 
 .rowTrack {
-  display: block;
-  width: 100%;
   max-width: 320px;
-  height: 4px;
-  overflow: hidden;
-  border-radius: $radius-full;
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-
-  > span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: color-mix(in srgb, var(--text-primary) 55%, transparent);
-    transition: width 360ms var(--ease-out-strong, ease);
-  }
+  height: 6px;
 }
 
 .numberCell {
@@ -742,10 +729,6 @@
   .tab::after,
   .statTile,
   .bar,
-  .rowTrack > span {
-    transition: none;
-  }
-
   .ghostAction:active:not(:disabled),
   .primaryAction:active,
   .segment:active {
