@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import { getTypeLabel, isModelExcluded, normalizeProviderKey } from '@/features/authFiles/constants';
-import { namedModels } from '@/features/authFiles/modelNames';
+import { namedModels } from '@/utils/modelNames';
 import styles from './AuthFileModelsModal.module.scss';
 
 export type AuthFileModelsModalProps = {

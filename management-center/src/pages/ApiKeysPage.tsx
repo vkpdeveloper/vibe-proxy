@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
@@ -8,8 +9,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconAlertTriangle,
-  IconCheckCircle2,
-  IconKey,
   IconPencil,
   IconPlus,
   IconRefreshCw,
@@ -23,7 +22,13 @@ import {
   type ClientApiKeyInput,
   type ClientApiKeyOptions,
 } from '@/services/api';
-import { useAuthStore, useNotificationStore } from '@/stores';
+import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
+import {
+  getAuthFileIcon,
+  getTypeLabel,
+  normalizeProviderKey,
+} from '@/features/authFiles/constants';
+import { namedModels } from '@/utils/modelNames';
 import styles from './ApiKeysPage.module.scss';
 
 const emptyOptions: ClientApiKeyOptions = { providers: [], models: [] };
@@ -31,7 +36,7 @@ const money = new Intl.NumberFormat(undefined, {
   style: 'currency',
   currency: 'USD',
   minimumFractionDigits: 2,
-  maximumFractionDigits: 5,
+  maximumFractionDigits: 2,
 });
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -61,11 +66,9 @@ function inputFromKey(key: ClientApiKey, options: ClientApiKeyOptions): ClientAp
   };
 }
 
-function formatLimit(value: number, suffix: string): string {
-  return value > 0 ? `${compact.format(value)} ${suffix}` : `Unlimited ${suffix}`;
-}
-
 export function ApiKeysPage() {
+  const { t } = useTranslation();
+  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const connected = useAuthStore((state) => state.connectionStatus === 'connected');
   const revealRef = useRevealGroup<HTMLDivElement>();
   const { showNotification, showConfirmation } = useNotificationStore();
@@ -104,10 +107,10 @@ export function ApiKeysPage() {
   const visibleModels = useMemo(() => {
     const providers = new Set(form.allowed_providers);
     const query = modelSearch.trim().toLowerCase();
-    return options.models.filter(
+    return namedModels(options.models).filter(
       (model) =>
         model.providers.some((provider) => providers.has(provider)) &&
-        (!query || model.id.toLowerCase().includes(query))
+        (!query || `${model.name} ${model.id}`.toLowerCase().includes(query))
     );
   }, [form.allowed_providers, modelSearch, options.models]);
 
@@ -223,6 +226,10 @@ export function ApiKeysPage() {
     });
   };
 
+  const providerLabel = (provider: string) => getTypeLabel(t, normalizeProviderKey(provider));
+  const providerIcon = (provider: string) =>
+    getAuthFileIcon(normalizeProviderKey(provider), resolvedTheme);
+
   return (
     <div className={styles.page} ref={revealRef}>
       <header className={styles.header}>
@@ -248,6 +255,10 @@ export function ApiKeysPage() {
                 <span className={styles.metaProblem}>{blockedKeys} blocked</span>
               </>
             )}
+            <span className={styles.metaDot} aria-hidden="true">
+              ·
+            </span>
+            <span>{money.format(totalToday)} today</span>
           </p>
         </div>
         <div className={styles.actions} data-reveal>
@@ -274,186 +285,134 @@ export function ApiKeysPage() {
         </div>
       )}
 
-      <section className={styles.statsRow} aria-label="API key summary" data-reveal>
-        <article
-          className={styles.statTile}
-          style={
-            keys.length > 0
-              ? ({ '--tile-accent': 'var(--viz-success)' } as CSSProperties)
-              : undefined
-          }
-        >
-          <span className={styles.statLabel}>Total keys</span>
-          <strong className={styles.statValue}>{keys.length}</strong>
-          <span className={styles.statHint}>{activeKeys} currently enabled</span>
-        </article>
-        <article
-          className={styles.statTile}
-          style={{ '--tile-accent': 'var(--text-primary)' } as CSSProperties}
-        >
-          <span className={styles.statLabel}>Spend today</span>
-          <strong className={styles.statValue}>{money.format(totalToday)}</strong>
-          <span className={styles.statHint}>Resets at 00:00 UTC</span>
-        </article>
-        <article
-          className={styles.statTile}
-          style={
-            blockedKeys > 0
-              ? ({ '--tile-accent': 'var(--viz-failure)' } as CSSProperties)
-              : undefined
-          }
-        >
-          <span className={styles.statLabel}>Blocked now</span>
-          <strong className={styles.statValue}>{blockedKeys}</strong>
-          <span className={styles.statHint}>Disabled or at a configured limit</span>
-        </article>
-      </section>
-
       <section aria-busy={loading}>
         {loading && keys.length === 0 ? (
-          <div className={styles.grid} aria-hidden="true">
-            {Array.from({ length: 2 }, (_, index) => (
-              <Skeleton key={index} height={280} rounded={14} />
+          <div className={styles.list} aria-hidden="true">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Skeleton key={index} height={44} className={styles.skeletonRow} />
             ))}
           </div>
         ) : !loading && keys.length === 0 ? (
           <EmptyState
             title="No client keys yet"
-            description="Generate a key and choose the providers, models, and limits it can use."
             action={
               <Button size="sm" onClick={openCreate}>
-                <IconPlus size={14} /> Generate your first key
+                <IconPlus size={14} /> Generate key
               </Button>
             }
           />
         ) : (
-          <div className={styles.grid}>
+          <div className={styles.list}>
+            <div className={styles.listHead} aria-hidden="true">
+              <span>Key</span>
+              <span>Access</span>
+              <span>Spend today</span>
+              <span className={styles.alignRight}>Requests · Tokens</span>
+              <span />
+            </div>
             {keys.map((key) => {
-              const progress =
-                key.daily_limit_usd > 0
-                  ? Math.min(100, (key.today_usd / key.daily_limit_usd) * 100)
-                  : 0;
+              const budgetUsed =
+                key.daily_limit_usd > 0 ? (key.today_usd / key.daily_limit_usd) * 100 : null;
+              const limits = [
+                key.daily_request_limit > 0 &&
+                  `${compact.format(key.daily_request_limit)} req/day`,
+                key.daily_token_limit > 0 && `${compact.format(key.daily_token_limit)} tok/day`,
+                key.requests_per_minute > 0 && `${compact.format(key.requests_per_minute)} rpm`,
+              ].filter(Boolean);
               return (
                 <article
-                  className={`${styles.card} ${key.blocked ? styles.cardBlocked : ''}`}
+                  className={`${styles.row} ${key.disabled ? styles.rowDisabled : ''}`}
                   key={key.id}
                 >
-                  <div className={styles.head}>
-                    <span className={styles.avatar} aria-hidden="true">
-                      <IconKey size={16} />
+                  <div className={styles.who}>
+                    <span className={styles.name}>{key.name}</span>
+                    <span className={styles.rowMeta}>
+                      {key.managed && <code>{key.masked_key}</code>}
+                      {key.disabled ? (
+                        <span className={styles.stateOff}>Disabled</span>
+                      ) : key.blocked ? (
+                        <span className={styles.stateBlocked} title={key.block_reason}>
+                          Blocked
+                        </span>
+                      ) : null}
                     </span>
-                    <div className={styles.identity}>
-                      <div className={styles.nameLine}>
-                        <h2 className={styles.name}>{key.name}</h2>
-                        {!key.managed && <span className={styles.typeBadge}>Unrestricted</span>}
-                      </div>
-                      <code className={styles.maskedKey}>{key.masked_key}</code>
-                    </div>
-                    {key.blocked ? (
-                      <span className={`${styles.stateBadge} ${styles.stateBlocked}`}>
-                        <span className={styles.stateDot} />
-                        Blocked
+                  </div>
+
+                  <div className={styles.access}>
+                    {key.managed ? (
+                      <span className={styles.providers}>
+                        {key.allowed_providers.map((provider) => {
+                          const icon = providerIcon(provider);
+                          return (
+                            <span className={styles.provider} key={provider} title={providerLabel(provider)}>
+                              {icon ? <img src={icon} alt="" /> : null}
+                              {providerLabel(provider)}
+                            </span>
+                          );
+                        })}
                       </span>
                     ) : (
-                      <span className={`${styles.stateBadge} ${styles.stateActive}`}>
-                        <span className={styles.stateDot} />
-                        Active
-                      </span>
+                      <span className={styles.unrestricted}>Unrestricted</span>
+                    )}
+                    <span className={styles.accessHint}>
+                      {key.allowed_models.length
+                        ? `${key.allowed_models.length} model${key.allowed_models.length === 1 ? '' : 's'}`
+                        : 'All models'}
+                      {limits.length > 0 && ` · ${limits.join(' · ')}`}
+                    </span>
+                  </div>
+
+                  <div className={styles.spend}>
+                    <span className={styles.spendHead}>
+                      <strong>{money.format(key.today_usd)}</strong>
+                      {key.daily_limit_usd > 0 && (
+                        <span>of {money.format(key.daily_limit_usd)}</span>
+                      )}
+                    </span>
+                    {budgetUsed !== null && (
+                      <Meter
+                        value={budgetUsed}
+                        tone={budgetUsed >= 100 ? 'critical' : budgetUsed >= 80 ? 'warning' : 'good'}
+                        ariaLabel={`${key.name} daily budget used`}
+                      />
                     )}
                   </div>
 
-                  <dl className={styles.usageGrid}>
-                    <div>
-                      <dt>Today</dt>
-                      <dd>{money.format(key.today_usd)}</dd>
-                    </div>
-                    <div>
-                      <dt>Requests</dt>
-                      <dd>{compact.format(key.today_requests)}</dd>
-                    </div>
-                    <div>
-                      <dt>Tokens</dt>
-                      <dd>{compact.format(key.today_tokens)}</dd>
-                    </div>
-                    <div>
-                      <dt>Rate</dt>
-                      <dd>{formatLimit(key.requests_per_minute, 'rpm')}</dd>
-                    </div>
-                  </dl>
-
-                  {key.daily_limit_usd > 0 && (
-                    <div className={styles.budget}>
-                      <div className={styles.budgetHead}>
-                        <span className={styles.label}>Daily budget</span>
-                        <strong>
-                          {money.format(key.today_usd)} / {money.format(key.daily_limit_usd)}
-                        </strong>
-                      </div>
-                      <Meter
-                        value={progress}
-                        tone={progress >= 100 ? 'critical' : progress >= 80 ? 'warning' : 'good'}
-                        ariaLabel={`${key.name} daily budget used`}
-                      />
-                    </div>
-                  )}
-
-                  <div className={styles.scopeRow}>
-                    <div>
-                      <span className={styles.label}>Providers</span>
-                      <div className={styles.pills}>
-                        {key.allowed_providers.length ? (
-                          key.allowed_providers.map((provider) => (
-                            <span className={styles.pill} key={provider}>
-                              {provider}
-                            </span>
-                          ))
-                        ) : (
-                          <span className={styles.pill}>All providers</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <span className={styles.label}>Models</span>
-                      <p>
-                        {key.allowed_models.length
-                          ? `${key.allowed_models.length} selected model${key.allowed_models.length === 1 ? '' : 's'}`
-                          : 'All models in selected providers'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className={styles.label}>Daily caps</span>
-                      <p>
-                        {formatLimit(key.daily_request_limit, 'requests')} ·{' '}
-                        {formatLimit(key.daily_token_limit, 'tokens')}
-                      </p>
-                    </div>
+                  <div className={styles.counts}>
+                    {compact.format(key.today_requests)}
+                    <span className={styles.countDivider}>·</span>
+                    {compact.format(key.today_tokens)}
                   </div>
 
-                  <footer className={styles.cardActions}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
+                  <div className={styles.rowActions}>
+                    <button
+                      type="button"
+                      className={styles.iconButton}
                       onClick={() => openEdit(key)}
                       aria-label={`Edit ${key.name}`}
+                      title="Edit"
                     >
-                      <IconPencil size={14} />
-                      Edit
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => rotate(key)}>
-                      <IconRefreshCw size={14} />
-                      Rotate
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
+                      <IconPencil size={15} />
+                    </button>
+                    <button
+                      type="button"
                       className={styles.iconButton}
+                      onClick={() => rotate(key)}
+                      aria-label={`Rotate ${key.name}`}
+                      title="Rotate secret"
+                    >
+                      <IconRefreshCw size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${styles.iconButtonDanger}`}
                       onClick={() => remove(key)}
                       aria-label={`Delete ${key.name}`}
-                      title={`Delete ${key.name}`}
+                      title="Delete"
                     >
                       <IconTrash2 size={15} />
-                    </Button>
-                  </footer>
+                    </button>
+                  </div>
                 </article>
               );
             })}
@@ -465,129 +424,143 @@ export function ApiKeysPage() {
         open={editing !== undefined}
         onClose={() => !saving && setEditing(undefined)}
         closeDisabled={saving}
-        width={720}
-        title={editing ? `Edit ${editing.name}` : 'Generate client API key'}
+        width={640}
+        title={editing ? `Edit ${editing.name}` : 'New API key'}
         footer={
           <div className={styles.modalFooter}>
             <Button variant="ghost" onClick={() => setEditing(undefined)} disabled={saving}>
               Cancel
             </Button>
             <Button onClick={() => void save()} loading={saving}>
-              {editing ? 'Save changes' : 'Generate key'}
+              {editing ? 'Save' : 'Generate key'}
             </Button>
           </div>
         }
       >
         <div className={styles.form}>
           <Input
-            label="Key name"
+            label="Name"
             value={form.name}
             placeholder="Production app"
             onChange={(event) => setForm({ ...form, name: event.target.value })}
           />
-          <div className={styles.providerSection}>
-            <div className={styles.fieldHeading}>
-              <label>Allowed providers</label>
-              <span>Select one or more upstream routes.</span>
+
+          <fieldset className={styles.fieldset}>
+            <legend>Providers</legend>
+            <div className={styles.providerChoices}>
+              {options.providers.map((provider) => {
+                const selected = form.allowed_providers.includes(provider);
+                const icon = providerIcon(provider);
+                return (
+                  <button
+                    key={provider}
+                    type="button"
+                    className={`${styles.providerChoice} ${selected ? styles.providerChoiceOn : ''}`}
+                    aria-pressed={selected}
+                    onClick={() => toggleProvider(provider, !selected)}
+                  >
+                    {icon ? <img src={icon} alt="" /> : null}
+                    {providerLabel(provider)}
+                  </button>
+                );
+              })}
             </div>
-            <div className={styles.choiceGrid}>
-              {options.providers.map((provider) => (
-                <SelectionCheckbox
-                  key={provider}
-                  checked={form.allowed_providers.includes(provider)}
-                  onChange={(value) => toggleProvider(provider, value)}
-                  label={provider}
-                />
-              ))}
-            </div>
-          </div>
-          <div className={styles.modelSection}>
-            <div className={styles.fieldHeading}>
-              <label>Allowed models</label>
-              <span>
-                Leave every model unchecked to allow all models from the selected providers.
+          </fieldset>
+
+          <fieldset className={styles.fieldset}>
+            <legend>
+              Models
+              <span className={styles.legendHint}>
+                {form.allowed_models.length
+                  ? `${form.allowed_models.length} selected`
+                  : 'None selected allows all'}
               </span>
-            </div>
+            </legend>
             <Input
               aria-label="Search models"
-              placeholder="Search models…"
+              placeholder="Search models"
               value={modelSearch}
               onChange={(event) => setModelSearch(event.target.value)}
             />
-            <div className={styles.modelGrid}>
+            <div className={styles.modelList}>
               {visibleModels.map((model) => (
                 <SelectionCheckbox
                   key={model.id}
+                  className={styles.modelRow}
+                  labelClassName={styles.modelLabel}
                   checked={form.allowed_models.includes(model.id)}
                   onChange={(value) => toggleModel(model.id, value)}
                   label={
-                    <span>
-                      <strong>{model.id}</strong>
-                      <small>{model.providers.join(' · ')}</small>
-                    </span>
+                    <>
+                      <span className={styles.modelName}>{model.name}</span>
+                      {model.name !== model.id && (
+                        <code className={styles.modelId}>{model.id}</code>
+                      )}
+                    </>
                   }
                 />
               ))}
               {visibleModels.length === 0 && (
-                <p>No models match the selected providers and search.</p>
+                <p className={styles.modelEmpty}>No models match.</p>
               )}
             </div>
-          </div>
-          <div className={styles.limitGrid}>
-            <Input
-              label="USD per day"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.daily_limit_usd}
-              hint="0 = unlimited"
-              onChange={(event) =>
-                setForm({ ...form, daily_limit_usd: Number(event.target.value) })
-              }
-            />
-            <Input
-              label="Requests per day"
-              type="number"
-              min="0"
-              step="1"
-              value={form.daily_request_limit}
-              hint="0 = unlimited"
-              onChange={(event) =>
-                setForm({ ...form, daily_request_limit: Number(event.target.value) })
-              }
-            />
-            <Input
-              label="Tokens per day"
-              type="number"
-              min="0"
-              step="1"
-              value={form.daily_token_limit}
-              hint="0 = unlimited"
-              onChange={(event) =>
-                setForm({ ...form, daily_token_limit: Number(event.target.value) })
-              }
-            />
-            <Input
-              label="Requests per minute"
-              type="number"
-              min="0"
-              step="1"
-              value={form.requests_per_minute}
-              hint="0 = unlimited"
-              onChange={(event) =>
-                setForm({ ...form, requests_per_minute: Number(event.target.value) })
-              }
-            />
-          </div>
-          <div className={styles.disableRow}>
-            <div>
-              <strong>Disable this key</strong>
-              <span>Reject every request until you enable it again.</span>
+          </fieldset>
+
+          <fieldset className={styles.fieldset}>
+            <legend>
+              Limits
+              <span className={styles.legendHint}>0 means no limit</span>
+            </legend>
+            <div className={styles.limitGrid}>
+              <Input
+                label="USD per day"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.daily_limit_usd}
+                onChange={(event) =>
+                  setForm({ ...form, daily_limit_usd: Number(event.target.value) })
+                }
+              />
+              <Input
+                label="Requests per day"
+                type="number"
+                min="0"
+                step="1"
+                value={form.daily_request_limit}
+                onChange={(event) =>
+                  setForm({ ...form, daily_request_limit: Number(event.target.value) })
+                }
+              />
+              <Input
+                label="Tokens per day"
+                type="number"
+                min="0"
+                step="1"
+                value={form.daily_token_limit}
+                onChange={(event) =>
+                  setForm({ ...form, daily_token_limit: Number(event.target.value) })
+                }
+              />
+              <Input
+                label="Requests per minute"
+                type="number"
+                min="0"
+                step="1"
+                value={form.requests_per_minute}
+                onChange={(event) =>
+                  setForm({ ...form, requests_per_minute: Number(event.target.value) })
+                }
+              />
             </div>
+          </fieldset>
+
+          <div className={styles.enableRow}>
+            <span>Enabled</span>
             <ToggleSwitch
-              checked={form.disabled}
-              onChange={(disabled) => setForm({ ...form, disabled })}
-              ariaLabel="Disable this API key"
+              checked={!form.disabled}
+              onChange={(enabled) => setForm({ ...form, disabled: !enabled })}
+              ariaLabel="Enable this API key"
             />
           </div>
         </div>
@@ -596,21 +569,20 @@ export function ApiKeysPage() {
       <Modal
         open={Boolean(revealedSecret)}
         onClose={() => setRevealedSecret('')}
-        width={560}
-        title="Your new API key"
-      >
-        <div className={styles.secretPanel}>
-          <span className={styles.successIcon}>
-            <IconCheckCircle2 size={22} />
-          </span>
-          <p>Copy this secret now. For security, it won’t be shown again.</p>
-          <div>
-            <code>{revealedSecret}</code>
+        width={520}
+        title="Copy your API key"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button variant="ghost" onClick={() => setRevealedSecret('')}>
+              Done
+            </Button>
             <Button onClick={() => void copySecret()}>Copy key</Button>
           </div>
-          <Button variant="ghost" onClick={() => setRevealedSecret('')}>
-            I’ve saved it
-          </Button>
+        }
+      >
+        <div className={styles.secretPanel}>
+          <code>{revealedSecret}</code>
+          <p>It won't be shown again.</p>
         </div>
       </Modal>
     </div>

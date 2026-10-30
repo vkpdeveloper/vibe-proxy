@@ -1,4 +1,4 @@
-import type { AuthFileModelItem } from './constants';
+import type { AuthFileModelItem } from '@/features/authFiles/constants';
 
 const CLAUDE_FAMILIES = ['fable', 'opus', 'sonnet', 'haiku'];
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -23,6 +23,13 @@ export function modelDisplayName(model: AuthFileModelItem): string {
     return `Claude ${capitalize(legacy[3])} ${version}`;
   }
 
+  // gpt-6.1-sol without a registry name reads as "GPT-6.1 Sol".
+  const gpt = id.match(/^gpt-(\d+(?:\.\d+)?)((?:-[a-z]+)*)$/);
+  if (!model.display_name?.trim() && gpt) {
+    const words = gpt[2].split('-').filter(Boolean).map(capitalize);
+    return [`GPT-${gpt[1]}`, ...words].join(' ');
+  }
+
   const name = model.display_name?.trim() || model.id;
   return name.replace(/^GPT (\d+(?:\.\d+)?)/, (_, version: string) =>
     `GPT-${version.replace(/\.0$/, '')}`
@@ -32,7 +39,7 @@ export function modelDisplayName(model: AuthFileModelItem): string {
 const versionOf = (name: string) => Number(name.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
 
 /** Named models, newest version first. */
-export function namedModels(models: AuthFileModelItem[]) {
+export function namedModels<T extends AuthFileModelItem>(models: T[]) {
   return models
     .map((model) => ({ ...model, name: modelDisplayName(model) }))
     .sort((a, b) => versionOf(b.name) - versionOf(a.name) || a.name.localeCompare(b.name));

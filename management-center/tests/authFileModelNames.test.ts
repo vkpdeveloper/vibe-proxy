@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { modelDisplayName, namedModels } from '@/features/authFiles/modelNames';
+import { modelDisplayName, namedModels } from '@/utils/modelNames';
 
 describe('model display names', () => {
   test('rebuilds Claude names from the id in one order', () => {
@@ -20,6 +20,7 @@ describe('model display names', () => {
     expect(modelDisplayName({ id: 'gpt-5.6-sol', display_name: 'GPT 5.6 Sol' })).toBe('GPT-5.6 Sol');
     expect(modelDisplayName({ id: 'gpt-image-2', display_name: 'GPT Image 2' })).toBe('GPT Image 2');
     expect(modelDisplayName({ id: 'grok-4.7' })).toBe('grok-4.7');
+    expect(modelDisplayName({ id: 'gpt-6.1-sol' })).toBe('GPT-6.1 Sol');
   });
 
   test('sorts newest version first', () => {
