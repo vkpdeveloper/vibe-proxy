@@ -74,6 +74,11 @@ func (s *Server) updateClientPolicies(cfg *config.Config) {
 	if s.usageStore == nil {
 		return
 	}
+	s.usageStore.SetClientKeyLabels(clientKeyLabels(cfg))
+}
+
+// clientKeyLabels maps usage client key IDs to the names set on their policies.
+func clientKeyLabels(cfg *config.Config) map[string]string {
 	policies := make(map[string]config.ClientAPIKeyPolicy, len(cfg.ClientAPIKeyPolicies))
 	for _, policy := range cfg.ClientAPIKeyPolicies {
 		policies[strings.TrimSpace(policy.APIKey)] = policy
@@ -84,18 +89,21 @@ func (s *Server) updateClientPolicies(cfg *config.Config) {
 		if apiKey == "" {
 			continue
 		}
+		// Usage rows are keyed by the same ID the policy manager records:
+		// the policy's stable ID, or a hash of the key. Never the raw key.
 		policy := policies[apiKey]
-		id := strings.TrimSpace(policy.ID)
-		if id == "" {
-			id = apiKey
-		}
 		name := strings.TrimSpace(policy.Name)
 		if name == "" {
-			name = id
+			// Same fallback the Client API keys page shows for unnamed keys.
+			name = "Key " + clientpolicy.MaskAPIKey(apiKey)
 		}
-		labels[apiKey] = name
+		id := strings.TrimSpace(policy.ID)
+		if id == "" {
+			id = clientpolicy.ClientKeyID(apiKey)
+		}
+		labels[id] = name
 	}
-	s.usageStore.SetClientKeyLabels(labels)
+	return labels
 }
 
 func usageAccountingRequired(cfg *config.Config) bool {

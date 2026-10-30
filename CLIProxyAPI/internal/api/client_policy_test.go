@@ -60,3 +60,27 @@ func TestClientAPIKeyPolicyMiddlewareBlocksDisabledKeyEverywhere(t *testing.T) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestClientKeyLabelsUseUsageKeyIDsAndMaskUnnamedKeys(t *testing.T) {
+	labels := clientKeyLabels(&proxyconfig.Config{
+		SDKConfig: proxyconfig.SDKConfig{APIKeys: []string{"stable", "hashed", "unnamed"}},
+		ClientAPIKeyPolicies: []proxyconfig.ClientAPIKeyPolicy{
+			{APIKey: "stable", ID: "50d09941a032bfea", Name: "Raghav"},
+			{APIKey: "hashed", Name: "sandbox"},
+			{APIKey: "unnamed", ID: "d1c3f106"},
+		},
+	})
+	want := map[string]string{
+		"50d09941a032bfea":                 "Raghav",
+		clientpolicy.ClientKeyID("hashed"): "sandbox",
+		"d1c3f106":                         "Key " + clientpolicy.MaskAPIKey("unnamed"),
+	}
+	if len(labels) != len(want) {
+		t.Fatalf("labels = %#v", labels)
+	}
+	for id, name := range want {
+		if labels[id] != name {
+			t.Fatalf("labels = %#v, want %#v", labels, want)
+		}
+	}
+}
