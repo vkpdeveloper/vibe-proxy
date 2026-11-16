@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Smiling face</title>
+  <circle cx="64" cy="64" r="60" fill="#FFD93D"/>
+  <circle cx="44" cy="49" r="7" fill="#3B2F2F"/>
+  <circle cx="84" cy="49" r="7" fill="#3B2F2F"/>
+  <path d="M35 73c6 13 17 20 29 20s23-7 29-20" fill="none" stroke="#3B2F2F" stroke-width="7" stroke-linecap="round"/>
+</svg>
