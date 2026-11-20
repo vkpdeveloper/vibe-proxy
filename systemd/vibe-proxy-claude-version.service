@@ -1,0 +1,9 @@
+[Unit]
+Description=Update Vibe Proxy Claude Code version pin
+After=vibe-proxy.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/vaibhav/Developer/docker/vibe-proxy
+EnvironmentFile=-/home/vaibhav/Developer/docker/vibe-proxy/.env
+ExecStart=/home/vaibhav/Developer/docker/vibe-proxy/scripts/update-claude-version.sh
