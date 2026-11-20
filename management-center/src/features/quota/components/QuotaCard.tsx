@@ -104,7 +104,8 @@ export type QuotaCardProps = {
   /** Initial cascade delay; null disables entrance motion for later mounts. */
   entranceDelayMs?: number | null;
   onRefresh: () => void;
-  onReset: () => void;
+  /** `targetId` spends one specific reset credit. */
+  onReset: (targetId?: string) => void;
 };
 
 export function QuotaCard(props: QuotaCardProps) {
@@ -179,7 +180,12 @@ export function QuotaCard(props: QuotaCardProps) {
   ) : undefined;
   const claudeAfterPlan = showClaudeReset ? (
     <>
-      <ClaudeResetGrantDetails grants={claudeReset.grants} classes={quotaClasses} />
+      <ClaudeResetGrantDetails
+        grants={claudeReset.grants}
+        classes={quotaClasses}
+        onUse={claudeReset.confirm}
+        canUse={claudeReset.canUse}
+      />
       {claudeReset.message && (
         <div role="status" className={quotaClasses.codexResetCreditsError}>
           {t(`claude_reset.${claudeReset.message}`)}
@@ -324,6 +330,8 @@ export function QuotaCard(props: QuotaCardProps) {
             classes={quotaClasses}
             planItems={claudePlanItems}
             afterPlan={claudeAfterPlan}
+            onUseReset={showReset ? onReset : undefined}
+            useResetDisabled={!canRefresh || loading || resetting}
           />
         ) : !retainedClaudeUsage ? (
           <div className={styles.idleHint}>{t(`${adapter.i18nPrefix}.idle`)}</div>
@@ -339,6 +347,8 @@ export function QuotaCard(props: QuotaCardProps) {
             classes={quotaClasses}
             planItems={claudePlanItems}
             afterPlan={claudeAfterPlan}
+            onUseReset={showReset ? onReset : undefined}
+            useResetDisabled={!canRefresh || loading || resetting}
           />
         )}
       </div>
@@ -350,7 +360,7 @@ export function QuotaCard(props: QuotaCardProps) {
               type="button"
               className={styles.actionPill}
               disabled={claudeReset.blocked}
-              onClick={claudeReset.confirm}
+              onClick={() => claudeReset.confirm()}
               title={t(`claude_reset.${claudeReset.buttonLabel}`)}
             >
               <IconRefreshCw size={13} className={claudeReset.busy ? styles.spinning : undefined} />
@@ -361,7 +371,7 @@ export function QuotaCard(props: QuotaCardProps) {
             <button
               type="button"
               className={styles.actionPill}
-              onClick={onReset}
+              onClick={() => onReset()}
               disabled={!canRefresh || loading || resetting}
               title={t('codex_quota.reset_button')}
             >

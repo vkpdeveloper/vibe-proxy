@@ -59,12 +59,17 @@ export function ClaudeQuotaBody({
           })}
         </div>
       )}
-      {(planType || planItems) && (
+      {(planType || planItems || quota.noSessionLimit) && (
         <div className={classes.codexPlan}>
           {planType && (
             <span className={classes.codexPlanItem}>
               <span className={classes.codexPlanLabel}>{t('claude_quota.plan_label')}</span>
               <span className={classes.codexPlanValue}>{t(`claude_quota.${planType}`)}</span>
+            </span>
+          )}
+          {quota.noSessionLimit && (
+            <span className={classes.codexPlanItem}>
+              <span className={classes.codexPlanValue}>{t('claude_quota.no_session_limit')}</span>
             </span>
           )}
           {planItems}

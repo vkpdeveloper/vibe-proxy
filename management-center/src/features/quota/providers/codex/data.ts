@@ -28,6 +28,7 @@ import {
   normalizeStringValue,
   normalizeCodexResetCreditsPayload,
   parseCodexUsagePayload,
+  parseIsoToMs,
   parseOffsetSecondsToMs,
   periodHoursFromSeconds,
   resolveResetMs,
@@ -489,9 +490,26 @@ const createCodexRedeemRequestId = (): string => {
   });
 };
 
+/** Without a choice, spend the credit closest to expiring; null lets upstream pick. */
+const pickSoonestExpiringCreditId = async (
+  authIndex: string,
+  requestHeader: Record<string, string>,
+  t: TFunction
+): Promise<string | null> => {
+  const { credits } = await fetchCodexResetCredits(authIndex, requestHeader, t);
+  let soonest: { id: string; expiresAtMs: number } | null = null;
+  for (const credit of credits) {
+    const expiresAtMs = parseIsoToMs(credit.expiresAt);
+    if (!credit.id || expiresAtMs === null) continue;
+    if (!soonest || expiresAtMs < soonest.expiresAtMs) soonest = { id: credit.id, expiresAtMs };
+  }
+  return soonest?.id ?? null;
+};
+
 const consumeCodexRateLimitResetCredit = async (
   file: AuthFileItem,
-  t: TFunction
+  t: TFunction,
+  creditId?: string
 ): Promise<string> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
@@ -500,14 +518,18 @@ const consumeCodexRateLimitResetCredit = async (
   }
 
   const requestHeader = buildCodexRequestHeader(file);
+  const targetCreditId =
+    creditId || (await pickSoonestExpiringCreditId(authIndex, requestHeader, t));
 
   const result = await apiCallApi.request({
     authIndex,
     method: 'POST',
     url: CODEX_RATE_LIMIT_RESET_CREDITS_CONSUME_URL,
     header: requestHeader,
+    // `credit_id` mirrors the official Codex client's consume-by-id request.
     data: JSON.stringify({
       redeem_request_id: createCodexRedeemRequestId(),
+      ...(targetCreditId ? { credit_id: targetCreditId } : {}),
     }),
   });
 
@@ -521,9 +543,13 @@ const consumeCodexRateLimitResetCredit = async (
   return authIndex;
 };
 
-const resetCodexQuota = async (file: AuthFileItem, t: TFunction): Promise<CodexQuotaData> => {
+const resetCodexQuota = async (
+  file: AuthFileItem,
+  t: TFunction,
+  creditId?: string
+): Promise<CodexQuotaData> => {
   const assertConnection = guardConfigConnection();
-  const authIndex = await consumeCodexRateLimitResetCredit(file, t);
+  const authIndex = await consumeCodexRateLimitResetCredit(file, t, creditId);
   try {
     // Never clear a different connection's cooldown after awaiting redemption.
     assertConnection();

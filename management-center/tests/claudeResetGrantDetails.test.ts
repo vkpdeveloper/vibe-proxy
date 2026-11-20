@@ -76,6 +76,24 @@ describe('Claude reset grant details', () => {
     expect(markup).toContain('class="quotaResetCycle"');
   });
 
+  test('renders a per-grant use button only when the host supplies an action', () => {
+    const grants = [
+      grant({ id: 'first', label: 'First' }),
+      grant({ id: 'blocked', label: 'Blocked' }),
+    ];
+    const markup = renderToStaticMarkup(
+      createElement(ClaudeResetGrantDetails, {
+        grants,
+        classes,
+        onUse: () => {},
+        canUse: (id: string) => id === 'first',
+      })
+    );
+    expect(markup.match(/class="codexResetCreditUse"/g)?.length).toBe(2);
+    expect(markup.match(/class="codexResetCreditUse" disabled=""/g)?.length).toBe(1);
+    expect(render(grants)).not.toContain('codexResetCreditUse');
+  });
+
   test.each(['en', 'zh-CN', 'zh-TW', 'ru', 'vi'])(
     'translates fallback labels in %s',
     async (lng) => {

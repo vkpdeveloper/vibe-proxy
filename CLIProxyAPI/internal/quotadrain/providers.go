@@ -15,6 +15,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
@@ -71,6 +72,8 @@ func fetchProviderCapacity(ctx context.Context, manager *coreauth.Manager, auth 
 }
 
 // fetchClaudeCapacity reads the usage windows and the reset grants in one call.
+// Without the CLI User-Agent, Anthropic answers cedar_ember with
+// ineligible_reason "surface" and an empty grant list.
 func fetchClaudeCapacity(ctx context.Context, manager *coreauth.Manager, auth *coreauth.Auth, now time.Time) ([]coreauth.CapacityWindow, json.RawMessage, error) {
 	// Long-lived credentials read limits through their separate limits login;
 	// the executor picks that token for account endpoints once it is fresh.
@@ -86,6 +89,7 @@ func fetchClaudeCapacity(ctx context.Context, manager *coreauth.Manager, auth *c
 	payload, err := requestJSON(ctx, manager, auth, http.MethodGet, "https://api.anthropic.com/api/oauth/usage?cedar_ember=1", nil, http.Header{
 		"Content-Type":   []string{"application/json"},
 		"anthropic-beta": []string{"oauth-2025-04-20"},
+		"User-Agent":     []string{"claude-cli/" + helps.DefaultClaudeVersion(nil) + " (external, cli)"},
 	})
 	if err != nil {
 		return nil, nil, err

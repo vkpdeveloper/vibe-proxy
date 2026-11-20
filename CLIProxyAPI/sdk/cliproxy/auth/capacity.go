@@ -142,8 +142,9 @@ func quotaRankLess(left, right capacityRank) bool {
 	}
 	// Spend the weekly budget that would otherwise expire soonest first. Burst
 	// windows (5h) do not rank; they only exclude a credential once exhausted.
-	if left.urgencyKnown && right.urgencyKnown && math.Abs(left.urgency-right.urgency) > capacityUrgencyEpsilon {
-		return left.urgency > right.urgency
+	// Equal budget urgency stays tied even if only one account has a burst cap.
+	if left.urgencyKnown && right.urgencyKnown {
+		return left.urgency-right.urgency > capacityUrgencyEpsilon
 	}
 	commonWindows := min(len(left.windows), len(right.windows))
 	for index := 0; index < commonWindows; index++ {
@@ -167,8 +168,8 @@ func quotaRanksEqual(left, right capacityRank) bool {
 	if !left.known {
 		return true
 	}
-	if left.urgencyKnown && right.urgencyKnown && math.Abs(left.urgency-right.urgency) > capacityUrgencyEpsilon {
-		return false
+	if left.urgencyKnown && right.urgencyKnown {
+		return math.Abs(left.urgency-right.urgency) <= capacityUrgencyEpsilon
 	}
 	if len(left.windows) != len(right.windows) {
 		return false

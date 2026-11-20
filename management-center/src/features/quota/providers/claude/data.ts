@@ -38,6 +38,7 @@ export type ClaudeQuotaData = {
   windows: ClaudeQuotaWindow[];
   extraUsage?: ClaudeExtraUsage | null;
   planType?: string | null;
+  noSessionLimit: boolean;
   dollarWindows: ClaudeDollarWindow[];
   observedAt: string;
 };
@@ -170,6 +171,13 @@ export const resolveClaudePlanType = (profile: ClaudeProfileResponse | null): st
     return 'plan_team';
   }
 
+  // Anthropic still reports the former Max tier names after the Ultra rename.
+  const rateLimitTier = normalizeStringValue(profile.organization?.rate_limit_tier)
+    ?.trim()
+    .toLowerCase();
+  if (rateLimitTier === 'default_claude_max_20x') return 'plan_ultra';
+  if (rateLimitTier === 'default_claude_max_5x') return 'plan_max';
+
   // Account flags include personal subscriptions even for a Team-scoped token.
   const hasClaudeMax = normalizeFlagValue(profile.account?.has_claude_max);
   if (hasClaudeMax) return 'plan_max';
@@ -245,6 +253,11 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
     dollarWindows,
     observedAt: new Date().toISOString(),
     planType,
+    noSessionLimit:
+      payload.five_hour === null &&
+      !payload.limits?.some(
+        (limit) => normalizeStringValue(limit?.kind)?.trim().toLowerCase() === 'session'
+      ),
   };
 };
 
@@ -261,6 +274,7 @@ export const CLAUDE_CONFIG: QuotaProviderData<ClaudeQuotaState, ClaudeQuotaData>
     windows: data.windows,
     extraUsage: data.extraUsage,
     planType: data.planType,
+    noSessionLimit: data.noSessionLimit,
     dollarWindows: data.dollarWindows,
     observedAt: data.observedAt,
     stale: false,

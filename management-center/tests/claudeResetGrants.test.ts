@@ -401,13 +401,16 @@ test('all grant messages and confirmation are translated in six locales', async 
   }
 });
 
-test('card selection prefers usable recommendation and has deterministic fallback', () => {
+test('card selection spends the soonest-expiring usable grant', () => {
   const base = status();
   const a = { ...base.grants[0], id: 'a' };
   const b = { ...a, id: 'b' };
   const multiple = { ...base, grants: [b, a], nextGrantId: 'b' };
-  expect(selectResetGrant(multiple, 0)?.id).toBe('b');
-  expect(selectResetGrant({ ...multiple, nextGrantId: null }, 0)?.id).toBe('a');
+  // Undated grants tie and fall back to stable ID order; the upstream hint does not override.
+  expect(selectResetGrant(multiple, 0)?.id).toBe('a');
+  const soon = { ...b, endsAt: new Date(5000).toISOString() };
+  const later = { ...a, endsAt: new Date(9000).toISOString() };
+  expect(selectResetGrant({ ...multiple, grants: [later, a, soon] }, 0)?.id).toBe('b');
   expect(selectResetGrant({ ...multiple, grants: [a, { ...b, paused: true }] }, 0)?.id).toBe('a');
   expect(selectResetGrant({ ...multiple, eligible: false }, 0)).toBeUndefined();
   expect(selectResetGrant({ ...multiple, atLimit: false }, 0)).toBeUndefined();
@@ -430,7 +433,8 @@ test('Claude card uses Codex count and action styles and shared confirmation, no
   const hook = await Bun.file('src/features/quota/providers/claude/ClaudeResetGrants.tsx').text();
   expect(card).toContain('quotaClasses.codexPlanValue}>{claudeReset.count');
   expect(card).toContain('disabled={claudeReset.blocked}');
-  expect(card).toContain('onClick={claudeReset.confirm}');
+  expect(card).toContain('onClick={() => claudeReset.confirm()}');
+  expect(card).toContain('onUse={claudeReset.confirm}');
   expect(hook).toContain('showConfirmation({');
   expect(hook).toContain("pending ? 'claude_reset.retry_confirm'");
   expect(hook).not.toContain('<Modal');

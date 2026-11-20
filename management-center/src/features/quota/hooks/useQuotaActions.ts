@@ -70,7 +70,7 @@ export function useQuotaActions(disableControls: boolean) {
   );
 
   const resetQuota = useCallback(
-    (file: AuthFileItem, adapter: QuotaAdapter) => {
+    (file: AuthFileItem, adapter: QuotaAdapter, targetId?: string) => {
       const resetQuotaFn = adapter.resetQuota;
       if (!resetQuotaFn) return;
       if (disableControls || file.disabled) return;
@@ -88,7 +88,7 @@ export function useQuotaActions(disableControls: boolean) {
           const setQuota = getQuotaSetter(adapter);
           setResettingQuotaName(cacheKey);
           try {
-            const data = await resetQuotaFn(file, t);
+            const data = await resetQuotaFn(file, t, targetId);
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
               setQuota((prev) => ({
                 ...prev,

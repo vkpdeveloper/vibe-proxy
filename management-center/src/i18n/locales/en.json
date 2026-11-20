@@ -552,8 +552,10 @@
     "plan_free": "Free",
     "plan_pro": "Pro",
     "plan_max": "Max",
-    "plan_max5": "Max 5x",
-    "plan_max20": "Max 20x",
+    "plan_max5": "Max",
+    "plan_max20": "Ultra",
+    "plan_ultra": "Ultra",
+    "no_session_limit": "No 5-hour limit",
     "plan_team": "Team"
   },
   "codex_quota": {
@@ -1751,6 +1753,7 @@
     "windows_legend_elapsed": "elapsed",
     "windows_legend_reset_credit": "manual reset expiry",
     "soonest_row_hint": "Recovers first on this credential",
+    "use_reset": "Use",
     "windows_reset_credit": "Manual reset",
     "windows_credit_granted": "Granted",
     "windows_credit_expires": "Expires",

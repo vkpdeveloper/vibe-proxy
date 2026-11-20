@@ -13,7 +13,7 @@ import {
   ResetGrantPreflightError,
   resetGrantFailureMessageKey,
 } from './resetGrantOperations';
-import { selectResetGrant } from './selectResetGrant';
+import { selectResetGrant, usableResetGrants } from './selectResetGrant';
 
 /** Card view of the server-read grants; the session-scoped journal owns spending and ambiguous retries. */
 export function useClaudeResetGrants(
@@ -45,10 +45,17 @@ export function useClaudeResetGrants(
   const operation = resetGrantOperations.inspect(key);
   const pending = operation && !operation.code ? operation : undefined;
   const expired = Boolean(pending && now - pending.createdAt >= RETRY_WINDOW_MS);
-  const selected = pending?.grantId ?? (status ? selectResetGrant(status, now)?.id : undefined);
-  const blocked = disabled || !sessionActive || !authIndex || busy || expired || !selected;
-  const confirm = () => {
-    if (blocked || lock.current || !selected || !authIndex) return;
+  const defaultGrantId =
+    pending?.grantId ?? (status ? selectResetGrant(status, now)?.id : undefined);
+  const usableIds = new Set(status ? usableResetGrants(status, now).map((grant) => grant.id) : []);
+  const unavailable = disabled || !sessionActive || !authIndex || busy || expired;
+  // An unresolved claim can only be retried with its own grant.
+  const canUse = (grantId: string) =>
+    !unavailable && (pending ? pending.grantId === grantId : usableIds.has(grantId));
+  /** Spend `grantId` when given; otherwise the default (pending retry or soonest expiring). */
+  const confirm = (grantId?: string) => {
+    const selected = grantId ?? defaultGrantId;
+    if (!selected || !canUse(selected) || lock.current || !authIndex) return;
     const current = () => session === apiClient.getConnectionRevision();
     showConfirmation({
       title: t('claude_reset.title'),
@@ -98,7 +105,8 @@ export function useClaudeResetGrants(
     count: status?.grants.reduce((sum, grant) => sum + grant.resetsLeft, 0) ?? null,
     grants: status?.grants ?? [],
     busy,
-    blocked,
+    blocked: unavailable || !defaultGrantId,
+    canUse,
     confirm,
     message: pending ? (expired ? 'expired' : 'unknown') : '',
     buttonLabel: pending ? 'retry' : 'use',

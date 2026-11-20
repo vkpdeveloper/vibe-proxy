@@ -183,6 +183,56 @@ describe('Claude quota usage reads', () => {
     apiCallApi.request = originalRequest;
   });
 
+  test.each([
+    ['default_claude_max_20x', 'Ultra', null],
+    ['default_claude_max_20x', 'Ultra', { utilization: 15, resets_at: null }],
+    ['default_claude_max_5x', 'Max', { utilization: 15, resets_at: null }],
+  ] as const)(
+    'renders tier %s as %s with the reported session limit %j',
+    async (tier, label, session) => {
+      apiCallApi.request = async (request) =>
+        request.url === CLAUDE_USAGE_URL
+          ? result(200, {
+              five_hour: session,
+              seven_day: { utilization: 7, resets_at: '2026-11-06T02:00:00Z' },
+              limits: [
+                {
+                  kind: 'weekly_scoped',
+                  percent: 0,
+                  resets_at: '2026-11-06T02:00:00Z',
+                  scope: { model: { display_name: 'Fable' } },
+                  is_active: false,
+                },
+              ],
+            })
+          : result(200, {
+              account: { has_claude_max: true },
+              organization: { organization_type: 'claude_max', rate_limit_tier: tier },
+            });
+
+      const state = CLAUDE_CONFIG.buildSuccessState(
+        await CLAUDE_CONFIG.fetchQuota(file, translations.t)
+      );
+      expect(state.windows.map((window) => window.id)).toEqual(
+        session ? ['five-hour', 'seven-day', 'seven-day-fable'] : ['seven-day', 'seven-day-fable']
+      );
+      const markup = render(state);
+      expect(markup).toContain(`<span class="codexPlanValue">${label}</span>`);
+      expect(markup).toContain('93%');
+      expect(markup).not.toContain('Max 20x');
+      expect(markup).not.toContain('Max 5x');
+      if (session) {
+        expect(state.noSessionLimit).toBe(false);
+        expect(markup).toContain('5-hour limit');
+        expect(markup).not.toContain('No 5-hour limit');
+      } else {
+        expect(state.noSessionLimit).toBe(true);
+        expect(markup).toContain('No 5-hour limit');
+        expect(markup).not.toContain('>5-hour limit<');
+      }
+    }
+  );
+
   test('uses existing quota reads and separates dollar balances from plan windows', async () => {
     const requests: Parameters<typeof apiCallApi.request>[0][] = [];
     apiCallApi.request = async (request) => {

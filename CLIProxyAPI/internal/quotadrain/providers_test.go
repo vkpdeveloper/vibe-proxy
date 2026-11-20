@@ -112,6 +112,34 @@ func TestParseClaudeCapacity_UnscopedFableIsDisplayOnly(t *testing.T) {
 	}
 }
 
+func TestParseClaudeCapacity_WeeklyOnlyUltraHasNoSessionGate(t *testing.T) {
+	now := time.Now().UTC()
+	resetAt := now.Add(6 * 24 * time.Hour).Format(time.RFC3339)
+	windows, err := parseClaudeCapacity(map[string]any{
+		"five_hour": nil,
+		"seven_day": map[string]any{"utilization": 7.0, "resets_at": resetAt},
+		"limits": []any{
+			map[string]any{"kind": "weekly_all", "percent": 7.0, "resets_at": resetAt},
+			map[string]any{
+				"kind": "weekly_scoped", "percent": 0.0, "resets_at": resetAt,
+				"scope": map[string]any{"model": map[string]any{"id": nil, "display_name": "Fable"}},
+			},
+		},
+	}, now)
+	if err != nil {
+		t.Fatalf("parseClaudeCapacity() error = %v", err)
+	}
+	if len(windows) != 2 || windows[0].ID != "seven-day" || windows[1].ID != "seven-day-fable" {
+		t.Fatalf("windows = %#v, want weekly limits without a fabricated session gate", windows)
+	}
+	if !windows[0].Routing || windows[0].RemainingPercent != 93 || windows[0].HardExhausted || windows[0].PeriodSeconds != claudeWeeklyPeriodSeconds {
+		t.Fatalf("weekly window = %#v, want 93%% remaining routing budget", windows[0])
+	}
+	if windows[1].Routing {
+		t.Fatal("Fable without a model id must remain display-only")
+	}
+}
+
 func TestParseCodexCapacity_OnlyGeneralRateLimitRoutes(t *testing.T) {
 	now := time.Now().UTC()
 	window := func(used float64) map[string]any {

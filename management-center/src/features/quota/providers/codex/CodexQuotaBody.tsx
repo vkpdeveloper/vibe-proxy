@@ -31,7 +31,12 @@ const getPlanValueClass = (planType: string | null, classes: QuotaClassMap): str
   return classes.codexPlanValue;
 };
 
-export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaState>) {
+export function CodexQuotaBody({
+  quota,
+  classes,
+  onUseReset,
+  useResetDisabled,
+}: QuotaBodyProps<CodexQuotaState>) {
   const { t, i18n } = useTranslation();
   const now = useNow();
   const locale = i18n.resolvedLanguage;
@@ -157,6 +162,16 @@ export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaStat
                     <QuotaResetLabel display={expiresDisplay} classes={classes} soon={soon} />
                   )}
                 </span>
+                {onUseReset && credit.id && (
+                  <button
+                    type="button"
+                    className={classes.codexResetCreditUse}
+                    disabled={useResetDisabled}
+                    onClick={() => onUseReset(credit.id)}
+                  >
+                    {t('quota_management.use_reset')}
+                  </button>
+                )}
               </div>
             );
           })}

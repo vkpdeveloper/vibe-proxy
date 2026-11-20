@@ -10,7 +10,7 @@
 
 import { authFilesApi } from '@/services/api/authFiles';
 import { useQuotaStore } from '@/stores/useQuotaStore';
-import type { AuthFileItem, QuotaCapacityWindow } from '@/types';
+import type { AuthFileItem, ClaudeQuotaState, QuotaCapacityWindow } from '@/types';
 import { formatQuotaResetTime, parseIsoToMs } from '@/utils/quota';
 import { getQuotaCacheFileName, getQuotaCacheKey } from '@/utils/quota/identity';
 import { QUOTA_ADAPTERS, type QuotaCardState } from './providers';
@@ -126,7 +126,35 @@ export function mergePolledQuota(
   if (polled.size === 0) return card.state;
 
   switch (type) {
-    case 'claude':
+    case 'claude': {
+      const state = card.state as ClaudeQuotaState;
+      // A newer weekly-only snapshot supersedes a session cap saved before
+      // Anthropic removed it. Failed polls retain the last successful windows.
+      const noSessionLimit =
+        polled.has('seven-day') && !capacity?.windows?.some((window) => window.id === 'five-hour');
+      const session = polled.get('five-hour');
+      const windows = state.windows.filter((row) => !noSessionLimit || row.id !== 'five-hour');
+      if (session && !windows.some((row) => row.id === 'five-hour')) {
+        windows.unshift({
+          id: 'five-hour',
+          label: '5-hour limit',
+          labelKey: 'claude_quota.five_hour',
+          usedPercent: session.usedPercent,
+          resetLabel: formatQuotaResetTime(session.resetAt),
+          resetAtMs: session.resetAtMs,
+          periodHours: 5,
+        });
+      }
+      const merged: ClaudeQuotaState = {
+        ...state,
+        ...(session || polled.has('seven-day') ? { noSessionLimit } : {}),
+        windows: windows.map((row) => {
+          const window = polled.get(row.id);
+          return window ? mergeWindowRow(row, window) : row;
+        }),
+      };
+      return merged;
+    }
     case 'codex':
     case 'cursor':
     case 'devin-cli':

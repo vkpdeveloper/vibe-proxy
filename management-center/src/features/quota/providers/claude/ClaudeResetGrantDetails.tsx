@@ -9,10 +9,18 @@ import type { QuotaClassMap } from '../../types';
 interface ClaudeResetGrantDetailsProps {
   grants: readonly AnthropicResetGrant[];
   classes: QuotaClassMap;
+  /** Per-grant spend action; omitted on read-only hosts. */
+  onUse?: (grantId: string) => void;
+  canUse?: (grantId: string) => boolean;
 }
 
 /** Match Codex's reset-credit details without treating a multi-reset grant as one credit. */
-export function ClaudeResetGrantDetails({ grants, classes }: ClaudeResetGrantDetailsProps) {
+export function ClaudeResetGrantDetails({
+  grants,
+  classes,
+  onUse,
+  canUse,
+}: ClaudeResetGrantDetailsProps) {
   const { t, i18n } = useTranslation();
   const now = useNow();
   const remaining = grants
@@ -47,6 +55,16 @@ export function ClaudeResetGrantDetails({ grants, classes }: ClaudeResetGrantDet
                 <span className={classes.quotaReset}>{t('claude_reset.expiry_unknown')}</span>
               )}
             </span>
+            {onUse && (
+              <button
+                type="button"
+                className={classes.codexResetCreditUse}
+                disabled={!canUse?.(grant.id)}
+                onClick={() => onUse(grant.id)}
+              >
+                {t('quota_management.use_reset')}
+              </button>
+            )}
           </div>
         );
       })}

@@ -61,6 +61,65 @@ func TestQuotaDrain_PrefersExpiringWeeklyBudgetOverTighterSessionWindow(t *testi
 	}
 }
 
+func TestQuotaDrain_OptionalSessionLimitDoesNotBreakWeeklyTie(t *testing.T) {
+	now := time.Now()
+	capped := &Auth{Provider: "claude", Capacity: quotaPinTestWindows(now, 5, now.Add(time.Hour), 80, now.Add(48*time.Hour))}
+	uncapped := capped.Clone()
+	uncapped.Capacity.Windows = uncapped.Capacity.Windows[1:]
+	left := quotaCapacityRank(capped, "", now)
+	right := quotaCapacityRank(uncapped, "", now)
+	if !quotaRanksEqual(left, right) || quotaRankLess(left, right) || quotaRankLess(right, left) {
+		t.Fatal("equal weekly budgets ranked differently because one account has a session cap")
+	}
+	capped.Capacity.Windows[0].HardExhausted = true
+	if !quotaCapacityExhausted(capped, "", now) || quotaCapacityExhausted(uncapped, "", now) {
+		t.Fatal("session exhaustion must gate only the account that has a session cap")
+	}
+}
+
+func TestQuotaDrain_WeeklyOnlyAccountFailsOverAtWeeklyExhaustion(t *testing.T) {
+	for _, schedulerPath := range []bool{false, true} {
+		name := "selector"
+		if schedulerPath {
+			name = "scheduler"
+		}
+		t.Run(name, func(t *testing.T) {
+			now := time.Now()
+			max, ultra := quotaPinTestAccounts(now)
+			ultra.Capacity.Windows[0].HardExhausted = true
+			selector := &QuotaDrainSelector{}
+			scheduler := newSchedulerForTest(selector, max, ultra)
+			pick := func() string {
+				t.Helper()
+				if schedulerPath {
+					return pickClaude(t, scheduler, nil)
+				}
+				got, err := selector.Pick(context.Background(), "claude", "", cliproxyexecutor.Options{}, []*Auth{max, ultra})
+				if err != nil || got == nil {
+					t.Fatalf("Pick() = %#v, %v", got, err)
+				}
+				return got.ID
+			}
+			if got := pick(); got != max.ID {
+				t.Fatalf("session-exhausted pick = %q, want %q", got, max.ID)
+			}
+			// The next usage snapshot removes the former session limit entirely.
+			ultra.Capacity.Windows = ultra.Capacity.Windows[1:]
+			scheduler.upsertAuth(ultra)
+			if got := pick(); got != ultra.ID {
+				t.Fatalf("weekly-only pick = %q, want %q", got, ultra.ID)
+			}
+			ultra.Capacity.Windows[0].UsedPercent = 100
+			ultra.Capacity.Windows[0].RemainingPercent = 0
+			ultra.Capacity.Windows[0].HardExhausted = true
+			scheduler.upsertAuth(ultra)
+			if got := pick(); got != max.ID {
+				t.Fatalf("weekly-exhausted pick = %q, want %q", got, max.ID)
+			}
+		})
+	}
+}
+
 func TestSchedulerQuotaDrain_PinsUntilSessionExhaustedThenReturnsOnRecovery(t *testing.T) {
 	now := time.Now()
 	social, kuru := quotaPinTestAccounts(now)

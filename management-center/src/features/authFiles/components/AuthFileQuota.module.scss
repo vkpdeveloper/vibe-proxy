@@ -360,6 +360,11 @@ button.quotaMessageAction {
   color: var(--text-secondary);
 }
 
+// Auth-file cards are read-only, so this host never renders the use button.
+.codexResetCreditUse {
+  display: none;
+}
+
 .codexResetCreditsError {
   font-size: $quota-font-size;
   font-weight: 500;

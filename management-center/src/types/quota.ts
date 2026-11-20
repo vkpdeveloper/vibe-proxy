@@ -222,6 +222,7 @@ export interface ClaudeQuotaState {
   observedAt?: string | null;
   stale?: boolean;
   planType?: string | null;
+  noSessionLimit?: boolean;
   error?: string;
   errorStatus?: number;
 }

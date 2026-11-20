@@ -82,6 +82,56 @@ describe('mergePolledQuota', () => {
     routing: true,
   };
 
+  test('removes a saved session cap when a newer successful snapshot is weekly-only', () => {
+    const file = claudeFile(
+      polled('2026-10-30T10:05:00Z', [{ ...newerWindow, id: 'seven-day', used_percent: 7 }])
+    );
+    // A subsequent failed refresh still carries the last successful snapshot.
+    file.quota_capacity!.last_error = 'quota endpoint returned HTTP 429';
+    const merged = mergePolledQuota(
+      'claude',
+      readSavedQuotaCard('claude', file)!,
+      file
+    ) as ClaudeQuotaState;
+    expect(merged.noSessionLimit).toBe(true);
+    expect(merged.windows.map((window) => window.id)).toEqual(['seven-day']);
+    expect(merged.windows[0].usedPercent).toBe(7);
+    expect(claudeCard.windows[0].id).toBe('five-hour');
+  });
+
+  test('restores the session meter when a newer snapshot reports a cap', () => {
+    const file = claudeFile(polled('2026-10-30T10:05:00Z', [newerWindow]));
+    const state: ClaudeQuotaState = {
+      ...claudeCard,
+      noSessionLimit: true,
+      windows: claudeCard.windows.filter((window) => window.id !== 'five-hour'),
+    };
+    const merged = mergePolledQuota(
+      'claude',
+      { state, fetchedAtMs: Date.parse(savedAt) },
+      file
+    ) as ClaudeQuotaState;
+    expect(merged.noSessionLimit).toBe(false);
+    expect(merged.windows.map((window) => window.id)).toEqual(['five-hour', 'seven-day']);
+    expect(merged.windows[0].usedPercent).toBe(64);
+  });
+
+  test('does not infer an absent session cap from an unknown session reading', () => {
+    const file = claudeFile(
+      polled('2026-10-30T10:05:00Z', [
+        { ...newerWindow, known: false },
+        { ...newerWindow, id: 'seven-day' },
+      ])
+    );
+    const merged = mergePolledQuota(
+      'claude',
+      readSavedQuotaCard('claude', file)!,
+      file
+    ) as ClaudeQuotaState;
+    expect(merged.noSessionLimit).toBe(false);
+    expect(merged.windows[0].id).toBe('five-hour');
+  });
+
   test('takes newer poll numbers for windows with the same id and keeps the rest', () => {
     const file = claudeFile(polled('2026-10-30T10:05:00Z', [newerWindow]));
     const merged = mergePolledQuota(
