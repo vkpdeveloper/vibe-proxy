@@ -363,10 +363,11 @@ func setClaudeResponseModel(payload []byte, model string) ([]byte, bool) {
 	return updated, changed
 }
 
-// isClaudeAccountEndpoint reports whether u targets Anthropic's OAuth account
-// API (usage, profile, roles) rather than inference.
+// isClaudeAccountEndpoint reports whether u targets Anthropic's account API
+// (/api/oauth usage and profile, /api/organizations reset grants) rather than
+// inference, which lives under /v1.
 func isClaudeAccountEndpoint(u *url.URL) bool {
-	return u != nil && strings.EqualFold(u.Hostname(), "api.anthropic.com") && strings.HasPrefix(u.Path, "/api/oauth/")
+	return u != nil && strings.EqualFold(u.Hostname(), "api.anthropic.com") && strings.HasPrefix(u.Path, "/api/")
 }
 
 // PrepareRequest injects Claude credentials into the outgoing HTTP request.

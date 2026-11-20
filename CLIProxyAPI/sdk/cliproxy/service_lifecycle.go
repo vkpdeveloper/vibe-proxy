@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
+	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/quotadrain"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
@@ -242,6 +243,7 @@ func (s *Service) Run(ctx context.Context) error {
 	if s.quotaDrainCollector != nil {
 		s.quotaDrainCollector.Start(context.Background(), quotadrain.SettingsFromConfig(s.cfg.Routing))
 	}
+	go claudeauth.KeepUsageTokensFresh(ctx, s.coreManager)
 
 	select {
 	case <-ctx.Done():

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	log "github.com/sirupsen/logrus"
 )
 
 // Long-lived Claude credentials keep two token sets. access_token is the
@@ -21,7 +22,11 @@ const (
 	UsageExpiredKey      = "usage_expired"
 	AccountNameKey       = "account_name"
 
-	usageRefreshLead = 5 * time.Minute
+	// Renew well before expiry so a missed collector cycle or a short outage
+	// never lets the limits login lapse.
+	usageRefreshLead = time.Hour
+	// usageKeeperInterval must stay well below usageRefreshLead.
+	usageKeeperInterval = 15 * time.Minute
 )
 
 func metadataText(metadata map[string]any, key string) string {
@@ -86,7 +91,12 @@ func EnsureUsageToken(ctx context.Context, svc *ClaudeAuth, manager *coreauth.Ma
 		if errRefresh != nil {
 			return fmt.Errorf("refresh claude limits login: %w", errRefresh)
 		}
-		SetUsageTokens(current.Metadata, td.AccessToken, td.RefreshToken, td.Expire)
+		nextRefresh := td.RefreshToken
+		if nextRefresh == "" {
+			// Not rotated: the current refresh token stays valid.
+			nextRefresh = refreshToken
+		}
+		SetUsageTokens(current.Metadata, td.AccessToken, nextRefresh, td.Expire)
 		token = td.AccessToken
 		return nil
 	})
@@ -97,4 +107,38 @@ func EnsureUsageToken(ctx context.Context, svc *ClaudeAuth, manager *coreauth.Ma
 		return "", fmt.Errorf("claude credential %s is no longer registered", auth.ID)
 	}
 	return token, nil
+}
+
+// KeepUsageTokensFresh renews every long-lived credential's limits login ahead
+// of expiry until ctx ends. It runs regardless of routing strategy and also
+// covers disabled credentials, which the quota collector skips, so limits and
+// resets keep working without a reconnect.
+func KeepUsageTokensFresh(ctx context.Context, manager *coreauth.Manager) {
+	if manager == nil {
+		return
+	}
+	ticker := time.NewTicker(usageKeeperInterval)
+	defer ticker.Stop()
+	for {
+		renewUsageTokens(ctx, manager, func(auth *coreauth.Auth) *ClaudeAuth {
+			return NewClaudeAuthWithProxyURL(nil, auth.ProxyURL)
+		})
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func renewUsageTokens(ctx context.Context, manager *coreauth.Manager, newService func(*coreauth.Auth) *ClaudeAuth) {
+	now := time.Now()
+	for _, auth := range manager.List() {
+		if auth == nil || !strings.EqualFold(auth.Provider, "claude") || !HasUsageLogin(auth.Metadata) || usageTokenFresh(auth.Metadata, now) {
+			continue
+		}
+		if _, err := EnsureUsageToken(ctx, newService(auth), manager, auth); err != nil {
+			log.WithField("auth_id", auth.ID).Warnf("claude limits login refresh failed: %v", err)
+		}
+	}
 }

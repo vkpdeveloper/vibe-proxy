@@ -121,7 +121,7 @@ func TestEnsureUsageTokenRefreshesOnlyTheLimitsLogin(t *testing.T) {
 }
 
 func TestEnsureUsageTokenUsesFreshTokenWithoutNetwork(t *testing.T) {
-	manager, auth := registerLongLivedAuth(t, time.Now().Add(time.Hour))
+	manager, auth := registerLongLivedAuth(t, time.Now().Add(2*time.Hour))
 	svc := &ClaudeAuth{httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		t.Fatalf("unexpected request %s", req.URL)
 		return nil, nil
@@ -129,5 +129,40 @@ func TestEnsureUsageTokenUsesFreshTokenWithoutNetwork(t *testing.T) {
 	token, err := EnsureUsageToken(context.Background(), svc, manager, auth)
 	if err != nil || token != "usage-old" {
 		t.Fatalf("token = %q, err = %v, want usage-old", token, err)
+	}
+}
+
+// The keeper renews ahead of expiry, including disabled credentials the quota
+// collector skips, and keeps the refresh token when Anthropic does not rotate it.
+func TestKeeperRenewsDisabledCredentialBeforeExpiry(t *testing.T) {
+	resetClaudeRefreshState()
+	defer resetClaudeRefreshState()
+	manager, auth := registerLongLivedAuth(t, time.Now().Add(30*time.Minute))
+	auth.Disabled = true
+	if _, err := manager.Update(coreauth.WithSkipPersist(context.Background()), auth); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := &ClaudeAuth{httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.String() {
+		case RefreshTokenURL:
+			return jsonResponse(req, `{"access_token":"usage-new","expires_in":28800}`), nil
+		case ProfileURL:
+			return jsonResponse(req, `{"account":{"uuid":"acct-1","email":"user@example.com"}}`), nil
+		}
+		t.Fatalf("unexpected request %s", req.URL)
+		return nil, nil
+	})}}
+	renewUsageTokens(coreauth.WithSkipPersist(context.Background()), manager, func(*coreauth.Auth) *ClaudeAuth { return svc })
+
+	latest, _ := manager.GetByID(auth.ID)
+	if latest.Metadata[UsageAccessTokenKey] != "usage-new" {
+		t.Fatalf("usage access token = %v, want usage-new", latest.Metadata[UsageAccessTokenKey])
+	}
+	if latest.Metadata[UsageRefreshTokenKey] != "refresh-old" {
+		t.Fatalf("usage refresh token = %v, want the unrotated refresh-old kept", latest.Metadata[UsageRefreshTokenKey])
+	}
+	if latest.Metadata["access_token"] != "sk-ant-oat01-long" {
+		t.Fatal("keeper touched the long-lived token")
 	}
 }

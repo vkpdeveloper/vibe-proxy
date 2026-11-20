@@ -18,11 +18,12 @@ func TestPrepareRequestUsesLimitsLoginOnlyForAccountEndpoints(t *testing.T) {
 		},
 	}
 	cases := map[string]string{
-		"https://api.anthropic.com/v1/messages":              "Bearer sk-ant-oat01-long",
-		"https://api.anthropic.com/api/oauth/usage":          "Bearer sk-ant-oat01-usage",
-		"https://api.anthropic.com/api/oauth/profile":        "Bearer sk-ant-oat01-usage",
-		"https://example.com/api/oauth/usage":                "Bearer sk-ant-oat01-long",
-		"https://api.anthropic.com/v1/messages/count_tokens": "Bearer sk-ant-oat01-long",
+		"https://api.anthropic.com/v1/messages":                           "Bearer sk-ant-oat01-long",
+		"https://api.anthropic.com/api/oauth/usage":                       "Bearer sk-ant-oat01-usage",
+		"https://api.anthropic.com/api/oauth/profile":                     "Bearer sk-ant-oat01-usage",
+		"https://api.anthropic.com/api/organizations/o/reset_rate_limits": "Bearer sk-ant-oat01-usage",
+		"https://example.com/api/oauth/usage":                             "Bearer sk-ant-oat01-long",
+		"https://api.anthropic.com/v1/messages/count_tokens":              "Bearer sk-ant-oat01-long",
 	}
 	executor := &ClaudeExecutor{}
 	for target, want := range cases {
