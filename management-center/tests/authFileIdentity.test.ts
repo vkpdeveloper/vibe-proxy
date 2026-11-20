@@ -35,6 +35,18 @@ describe('stripJsonExtension', () => {
 });
 
 describe('deriveAuthFileIdentity', () => {
+  test('leads with the name given at login and shows the email underneath', () => {
+    expect(
+      deriveAuthFileIdentity(
+        authFile({
+          name: 'claude-user@example.com.json',
+          email: 'user@example.com',
+          accountName: 'Work',
+        })
+      )
+    ).toMatchObject({ primary: 'Work', kind: 'accountName', secondary: 'user@example.com' });
+  });
+
   test('leads with the account email and keeps the full name as the secondary row', () => {
     expect(
       deriveAuthFileIdentity(

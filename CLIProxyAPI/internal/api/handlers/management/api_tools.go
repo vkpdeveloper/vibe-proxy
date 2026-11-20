@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
@@ -295,6 +296,16 @@ func (h *Handler) resolveTokenForAuth(ctx context.Context, auth *coreauth.Auth, 
 	if strings.EqualFold(strings.TrimSpace(auth.Provider), "xai") {
 		token, errToken := h.resolveXAIToken(ctx, auth, requestProxyURL)
 		return token, errToken
+	}
+
+	// Long-lived Claude credentials only expose their limits login to account
+	// calls; the one-year token cannot read usage or profile.
+	if strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") && claudeauth.HasUsageLogin(auth.Metadata) {
+		proxyURL := strings.TrimSpace(requestProxyURL)
+		if proxyURL == "" {
+			proxyURL = auth.ProxyURL
+		}
+		return claudeauth.EnsureUsageToken(ctx, claudeauth.NewClaudeAuthWithProxyURL(h.cfg, proxyURL), h.authManager, auth)
 	}
 
 	return tokenValueForAuth(auth), nil

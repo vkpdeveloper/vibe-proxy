@@ -59,6 +59,7 @@ export const matchesAuthFileSearch = (
     file.name,
     file.type,
     file.provider,
+    file.accountName,
     file.email,
     file.projectId,
     getAuthFileStatusMessage(file),

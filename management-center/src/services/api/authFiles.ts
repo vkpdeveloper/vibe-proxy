@@ -277,6 +277,7 @@ const normalizeAuthFileEntry = (
   const email = readTextField(entry, 'email');
   // Never normalize account/account_type: API-key credentials expose secrets there.
   const projectId = readTextField(entry, 'project_id');
+  const accountName = readTextField(entry, 'account_name');
   const modified = readDateField(entry);
   const priority = readIntegerField(entry['priority']);
   const weight = readIntegerField(entry['weight']);
@@ -308,6 +309,8 @@ const normalizeAuthFileEntry = (
     ...(note ? { note } : {}),
     ...(email ? { email } : {}),
     ...(projectId ? { projectId } : {}),
+    ...(accountName ? { accountName } : {}),
+    ...(entry.long_lived === true ? { longLived: true } : {}),
   };
 };
 

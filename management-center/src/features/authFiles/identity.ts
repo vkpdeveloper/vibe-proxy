@@ -17,7 +17,7 @@
 
 import type { AuthFileItem } from '@/types';
 
-export type AuthFileIdentityKind = 'email' | 'projectId' | 'fileName';
+export type AuthFileIdentityKind = 'accountName' | 'email' | 'projectId' | 'fileName';
 
 export type AuthFileIdentity = {
   /** 卡片主行。无任何身份线索时为空串——不伪造占位符。 */
@@ -42,21 +42,33 @@ export const stripJsonExtension = (name: string): string => {
 };
 
 /**
- * 身份回落链：email → projectId → 文件名（去 .json）。
+ * 身份回落链：登录时起的名字 → email → projectId → 文件名（去 .json）。
+ * 有名字时副行显示 email，让同名之外仍能认出账号。
  * 刻意与 provider 无关：runtime-only 虚拟凭证（name === email === 频道 ID）
  * 由副行去重守卫结构性处理，比按 provider 白名单更稳。
  */
 export const deriveAuthFileIdentity = (file: AuthFileItem): AuthFileIdentity => {
   const fullName = readIdentityText(file.name);
   const base = stripJsonExtension(fullName);
+  const accountName = readIdentityText(file.accountName);
   const email = readIdentityText(file.email);
   const projectId = readIdentityText(file.projectId);
 
-  const kind: AuthFileIdentityKind = email ? 'email' : projectId ? 'projectId' : 'fileName';
-  const primary = email || projectId || base;
+  const kind: AuthFileIdentityKind = accountName
+    ? 'accountName'
+    : email
+      ? 'email'
+      : projectId
+        ? 'projectId'
+        : 'fileName';
+  const primary = accountName || email || projectId || base;
 
   const secondary =
-    kind === 'fileName' || !base || base.toLowerCase() === primary.toLowerCase() ? null : base;
+    kind === 'accountName'
+      ? email || base || null
+      : kind === 'fileName' || !base || base.toLowerCase() === primary.toLowerCase()
+        ? null
+        : base;
 
   return { primary, kind, secondary, fullName };
 };

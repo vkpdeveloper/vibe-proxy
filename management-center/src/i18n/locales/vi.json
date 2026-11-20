@@ -459,7 +459,8 @@
     "prefer_failed": "Không thể chọn tài khoản: {{message}}",
     "prefer_requires_quota_drain": "Bật chiến lược quota-drain trong Cài đặt.",
     "prefer_unavailable": "Tài khoản này không còn khả dụng. Hãy tải lại và thử lại.",
-    "prefer_priority_limit": "Mức ưu tiên đã đạt giới hạn. Hãy giảm trong cài đặt tài khoản trước."
+    "prefer_priority_limit": "Mức ưu tiên đã đạt giới hạn. Hãy giảm trong cài đặt tài khoản trước.",
+    "reconnect_limits_button": "Kết nối lại hạn mức"
   },
   "antigravity_subscription": {
     "plan_unknown": "Không rõ",
@@ -954,7 +955,11 @@
     "kimi_ai_oauth_status_success": "Xác thực thành công!",
     "kimi_ai_oauth_status_error": "Xác thực thất bại:",
     "kimi_ai_oauth_start_error": "Không thể bắt đầu đăng nhập Kimi quốc tế:",
-    "kimi_ai_oauth_polling_error": "Không thể kiểm tra trạng thái xác thực:"
+    "kimi_ai_oauth_polling_error": "Không thể kiểm tra trạng thái xác thực:",
+    "account_name_label": "Tên",
+    "account_name_placeholder": "Công việc, Cá nhân",
+    "anthropic_second_step": "Phê duyệt thêm một lần để lấy token dài hạn",
+    "anthropic_reconnect_hint": "Đăng nhập bằng {{name}} để hiển thị lại hạn mức. Yêu cầu vẫn dùng token dài hạn."
   },
   "stats": {
     "success": "Thành công",

@@ -1,6 +1,6 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useThemeStore } from '@/stores';
 import iconVertex from '@/assets/icons/vertex.svg';
@@ -20,6 +20,7 @@ import { ApiKeyImportDialog } from './components/ApiKeyImportDialog';
 import {
   useOAuthFlows,
   usePluginOAuthProviders,
+  type ClaudeReconnectTarget,
   type ProviderFlowState,
 } from './hooks/useOAuthFlows';
 import { useVertexImport } from './hooks/useVertexImport';
@@ -42,6 +43,13 @@ const OPENCODE_GO_DIALOG_ID = '__opencode_go__';
 const DEVIN_CLI_DIALOG_ID = '__devin_cli__';
 const OPENCODE_GO_ICON: ThemedIcon = { light: iconOpenCodeGoDark, dark: iconOpenCodeGoLight };
 const DEVIN_CLI_ICON: ThemedIcon = { light: iconDevinCliDark, dark: iconDevinCliLight };
+/** Claude asks for an optional name first, so its tile opens without starting. */
+const CLAUDE_PROVIDER_ID = 'anthropic';
+
+/** Router state the auth files page sends to reconnect a Claude limits login. */
+export interface OAuthPageLocationState {
+  claudeReconnect?: ClaudeReconnectTarget;
+}
 
 type DialogTarget =
   | { kind: 'oauth'; id: string }
@@ -58,6 +66,7 @@ type DialogTarget =
 export function OAuthPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const apiBase = useAuthStore((state) => state.apiBase);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const revealRef = useRevealGroup<HTMLDivElement>();
@@ -143,8 +152,33 @@ export function OAuthPage() {
     setDialog({ kind: 'oauth', id: card.id });
     setDialogOpen(true);
     // 已有进行中/失败/刚成功的尝试 → 只是重新打开查看；否则立即开始登录
-    if (!flows.states[card.id]?.status) void flows.startAuth(card.id);
+    if (!flows.states[card.id]?.status && card.id !== CLAUDE_PROVIDER_ID) {
+      void flows.startAuth(card.id);
+    }
   };
+
+  const startFromDialog = (providerId: string) => {
+    const state = flows.states[providerId] ?? {};
+    // Claude: "log in another account" goes back to the name field first.
+    if (providerId === CLAUDE_PROVIDER_ID && state.status === 'success') {
+      flows.dismissSuccess(providerId);
+      return;
+    }
+    void flows.startAuth(providerId, { name: state.accountName, reconnect: state.reconnect });
+  };
+
+  const reconnectTarget = (location.state as OAuthPageLocationState | null)?.claudeReconnect;
+  useEffect(() => {
+    if (!reconnectTarget) return;
+    // Consume the request so a reload or back navigation does not start it again.
+    navigate(location.pathname, { replace: true, state: null });
+    focusedRef.current = CLAUDE_PROVIDER_ID;
+    setDialog({ kind: 'oauth', id: CLAUDE_PROVIDER_ID });
+    setDialogOpen(true);
+    void flows.startAuth(CLAUDE_PROVIDER_ID, { reconnect: reconnectTarget });
+    // flows is recreated every render; the request is keyed on the target alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconnectTarget]);
 
   const openVertex = () => {
     focusedRef.current = VERTEX_DIALOG_ID;
@@ -289,7 +323,12 @@ export function OAuthPage() {
           text={(suffix) => flows.providerText(dialogCard.id, suffix)}
           supportsCallback={supportsManualCallback(dialogCard)}
           sponsor={sponsorOf(dialogCard)}
-          onStart={() => void flows.startAuth(dialogCard.id)}
+          onStart={() => startFromDialog(dialogCard.id)}
+          onAccountNameChange={
+            dialogCard.id === CLAUDE_PROVIDER_ID
+              ? (value) => flows.setAccountName(dialogCard.id, value)
+              : undefined
+          }
           onCancel={() => void flows.cancelAuth(dialogCard.id)}
           onCallbackChange={(value) => flows.setCallbackInput(dialogCard.id, value)}
           onCallbackSubmit={() => void flows.submitCallback(dialogCard.id)}

@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	sigcompat "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
@@ -361,12 +363,26 @@ func setClaudeResponseModel(payload []byte, model string) ([]byte, bool) {
 	return updated, changed
 }
 
+// isClaudeAccountEndpoint reports whether u targets Anthropic's OAuth account
+// API (usage, profile, roles) rather than inference.
+func isClaudeAccountEndpoint(u *url.URL) bool {
+	return u != nil && strings.EqualFold(u.Hostname(), "api.anthropic.com") && strings.HasPrefix(u.Path, "/api/oauth/")
+}
+
 // PrepareRequest injects Claude credentials into the outgoing HTTP request.
 func (e *ClaudeExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
 	if req == nil {
 		return nil
 	}
 	apiKey, _ := claudeCreds(auth)
+	// Long-lived credentials serve traffic with an inference-only token that
+	// cannot read account endpoints. Those go out with the separate limits login,
+	// which callers refresh before issuing the request.
+	if auth != nil && isClaudeAccountEndpoint(req.URL) {
+		if usageToken := claudeauth.ReadMetadataString(&auth.Metadata, claudeauth.UsageAccessTokenKey); usageToken != "" {
+			apiKey = usageToken
+		}
+	}
 	useAPIKey := auth != nil && (auth.AuthKind() == cliproxyauth.AuthKindAPIKey || (auth.Attributes != nil && strings.TrimSpace(auth.Attributes["api_key"]) != ""))
 	isAnthropicBase := isAnthropicUpstreamURL(req.URL)
 	if strings.TrimSpace(apiKey) != "" {

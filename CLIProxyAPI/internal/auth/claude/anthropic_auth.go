@@ -33,6 +33,11 @@ const (
 	ClientID         = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	RedirectURI      = "http://localhost:54545/callback"
 	ClaudeOAuthScope = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+	// ClaudeInferenceScope and LongLivedTokenSeconds reproduce `claude setup-token`:
+	// the same authorize flow restricted to inference, with the code exchange
+	// asking for a one-year access token and no refresh cycle.
+	ClaudeInferenceScope  = "user:inference"
+	LongLivedTokenSeconds = 365 * 24 * 60 * 60
 
 	claudeRefreshMinBackoff       = 5 * time.Second
 	claudeRefreshMaxBackoff       = 5 * time.Minute
@@ -154,6 +159,7 @@ type authorizationCodeExchangeRequest struct {
 	ClientID     string `json:"client_id"`
 	CodeVerifier string `json:"code_verifier"`
 	State        string `json:"state"`
+	ExpiresIn    int    `json:"expires_in,omitempty"`
 }
 
 // OAuthProfile is the account identity returned by Anthropic's OAuth profile endpoint.
@@ -210,6 +216,12 @@ func NewClaudeAuthWithProxyURL(cfg *config.Config, proxyURL string) *ClaudeAuth 
 	return &ClaudeAuth{
 		httpClient: NewAnthropicHttpClient(sdkCfg),
 	}
+}
+
+// NewClaudeAuthWithHTTPClient creates the service on a caller-owned client,
+// letting tests stand in for Anthropic's OAuth endpoints.
+func NewClaudeAuthWithHTTPClient(client *http.Client) *ClaudeAuth {
+	return &ClaudeAuth{httpClient: client}
 }
 
 func applyClaudeOAuthAxiosHeaders(req *http.Request) {
@@ -321,6 +333,17 @@ func (o *ClaudeAuth) inspectOAuthAccount(ctx context.Context, accessToken string
 //   - string: The state parameter for verification
 //   - error: An error if PKCE codes are missing or URL generation fails
 func (o *ClaudeAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string, string, error) {
+	return o.generateAuthURL(state, pkceCodes, ClaudeOAuthScope)
+}
+
+// GenerateLongLivedAuthURL creates the inference-only authorization URL used to
+// mint a one-year token, matching `claude setup-token`.
+func (o *ClaudeAuth) GenerateLongLivedAuthURL(state string, pkceCodes *PKCECodes) (string, error) {
+	authURL, _, err := o.generateAuthURL(state, pkceCodes, ClaudeInferenceScope)
+	return authURL, err
+}
+
+func (o *ClaudeAuth) generateAuthURL(state string, pkceCodes *PKCECodes, scope string) (string, string, error) {
 	if pkceCodes == nil {
 		return "", "", fmt.Errorf("PKCE codes are required")
 	}
@@ -330,7 +353,7 @@ func (o *ClaudeAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string
 		"client_id":             {ClientID},
 		"response_type":         {"code"},
 		"redirect_uri":          {RedirectURI},
-		"scope":                 {ClaudeOAuthScope},
+		"scope":                 {scope},
 		"code_challenge":        {pkceCodes.CodeChallenge},
 		"code_challenge_method": {"S256"},
 		"state":                 {state},
@@ -372,65 +395,9 @@ func (c *ClaudeAuth) parseCodeAndState(code string) (parsedCode, parsedState str
 //   - *ClaudeAuthBundle: The complete authentication bundle with tokens
 //   - error: An error if token exchange fails
 func (o *ClaudeAuth) ExchangeCodeForTokens(ctx context.Context, code, state string, pkceCodes *PKCECodes) (*ClaudeAuthBundle, error) {
-	if pkceCodes == nil {
-		return nil, fmt.Errorf("PKCE codes are required for token exchange")
-	}
-	newCode, newState := o.parseCodeAndState(code)
-
-	// Prepare token exchange request. The struct field order reproduces the key
-	// order Claude Code 2.1.220 emits on the wire; a map would be re-sorted
-	// alphabetically by encoding/json and change the serialized body bytes.
-	reqBody := authorizationCodeExchangeRequest{
-		GrantType:    "authorization_code",
-		Code:         newCode,
-		RedirectURI:  RedirectURI,
-		ClientID:     ClientID,
-		CodeVerifier: pkceCodes.CodeVerifier,
-		State:        state,
-	}
-
-	// A state fragment appended to the callback code takes precedence.
-	if newState != "" {
-		reqBody.State = newState
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
+	tokenResp, err := o.exchangeCode(ctx, code, state, pkceCodes, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	// log.Debugf("Token exchange request: %s", string(jsonBody))
-
-	req, err := http.NewRequestWithContext(ctx, "POST", TokenURL, strings.NewReader(string(jsonBody)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create token request: %w", err)
-	}
-	applyClaudeOAuthAxiosHeaders(req)
-
-	resp, err := o.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("token exchange request failed: %w", err)
-	}
-	defer func() {
-		if errClose := resp.Body.Close(); errClose != nil {
-			log.Errorf("failed to close response body: %v", errClose)
-		}
-	}()
-
-	body, err := readClaudeOAuthResponseBody(resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token response: %w", err)
-	}
-	// log.Debugf("Token response: %s", string(body))
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("token exchange failed with status %d: %s", resp.StatusCode, string(body))
-	}
-	// log.Debugf("Token response: %s", string(body))
-
-	var tokenResp tokenResponse
-	if err = json.Unmarshal(body, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", err)
+		return nil, err
 	}
 
 	deviceIDs, errDeviceIDs := GenerateDeviceIDPool()
@@ -474,6 +441,92 @@ func (o *ClaudeAuth) ExchangeCodeForTokens(ctx context.Context, code, state stri
 	}
 
 	return bundle, nil
+}
+
+// LongLivedToken is the one-year inference-only token minted by the
+// setup-token flow. Anthropic may echo the account, which callers use to
+// confirm both consents came from the same login.
+type LongLivedToken struct {
+	AccessToken string
+	Expire      string
+	AccountUUID string
+}
+
+// ExchangeCodeForLongLivedToken exchanges an inference-only authorization code
+// for a one-year access token. The native setup-token flow skips the profile and
+// roles lookups because the inference scope cannot read them.
+func (o *ClaudeAuth) ExchangeCodeForLongLivedToken(ctx context.Context, code, state string, pkceCodes *PKCECodes) (*LongLivedToken, error) {
+	tokenResp, err := o.exchangeCode(ctx, code, state, pkceCodes, LongLivedTokenSeconds)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(tokenResp.AccessToken) == "" {
+		return nil, fmt.Errorf("long-lived token exchange returned an empty access token")
+	}
+	return &LongLivedToken{
+		AccessToken: tokenResp.AccessToken,
+		Expire:      time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
+		AccountUUID: strings.TrimSpace(tokenResp.Account.UUID),
+	}, nil
+}
+
+// exchangeCode posts the authorization-code grant. expiresIn is only sent when
+// non-zero, where native Claude Code appends it as the last body key.
+func (o *ClaudeAuth) exchangeCode(ctx context.Context, code, state string, pkceCodes *PKCECodes, expiresIn int) (*tokenResponse, error) {
+	if pkceCodes == nil {
+		return nil, fmt.Errorf("PKCE codes are required for token exchange")
+	}
+	newCode, newState := o.parseCodeAndState(code)
+
+	// The struct field order reproduces the key order Claude Code emits on the
+	// wire; a map would be re-sorted alphabetically by encoding/json.
+	reqBody := authorizationCodeExchangeRequest{
+		GrantType:    "authorization_code",
+		Code:         newCode,
+		RedirectURI:  RedirectURI,
+		ClientID:     ClientID,
+		CodeVerifier: pkceCodes.CodeVerifier,
+		State:        state,
+		ExpiresIn:    expiresIn,
+	}
+	// A state fragment appended to the callback code takes precedence.
+	if newState != "" {
+		reqBody.State = newState
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", TokenURL, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token request: %w", err)
+	}
+	applyClaudeOAuthAxiosHeaders(req)
+
+	resp, err := o.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("token exchange request failed: %w", err)
+	}
+	defer func() {
+		if errClose := resp.Body.Close(); errClose != nil {
+			log.Errorf("failed to close response body: %v", errClose)
+		}
+	}()
+
+	body, err := readClaudeOAuthResponseBody(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("token exchange failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp tokenResponse
+	if err = json.Unmarshal(body, &tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to parse token response: %w", err)
+	}
+	return &tokenResp, nil
 }
 
 // RefreshTokens refreshes the access token using the refresh token.

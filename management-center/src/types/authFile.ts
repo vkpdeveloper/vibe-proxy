@@ -78,6 +78,7 @@ export interface AuthFileCooldownSnapshot {
 
 export interface AuthFileItem {
   name: string;
+  id?: string;
   siwcBindSupported?: boolean;
   useSiwc?: boolean;
   siwcBound?: boolean;
@@ -92,6 +93,10 @@ export interface AuthFileItem {
   email?: string;
   /** GCP / Vertex project ID, used when account email is absent. */
   projectId?: string;
+  /** Display name chosen at login (Claude). Shown before the email. */
+  accountName?: string;
+  /** Claude credential serving with a one-year token and a separate limits login. */
+  longLived?: boolean;
   size?: number;
   authIndex?: string | number | null;
   /** Generic plugin quota capability advertised by CPA's auth-files API. */

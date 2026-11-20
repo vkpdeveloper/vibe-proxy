@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/credentialweight"
@@ -715,6 +716,12 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 	}
 	if email := authEmail(auth); email != "" {
 		entry["email"] = email
+	}
+	if accountName := stringValue(auth.Metadata, claude.AccountNameKey); accountName != "" {
+		entry["account_name"] = accountName
+	}
+	if strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") && claude.HasUsageLogin(auth.Metadata) {
+		entry["long_lived"] = true
 	}
 	if projectID := authProjectID(auth); projectID != "" {
 		entry["project_id"] = projectID

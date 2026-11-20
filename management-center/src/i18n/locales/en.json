@@ -459,7 +459,8 @@
     "prefer_failed": "Could not select account: {{message}}",
     "prefer_requires_quota_drain": "Enable quota-drain routing in Settings to use this account until exhausted.",
     "prefer_unavailable": "This account is no longer available. Refresh and try again.",
-    "prefer_priority_limit": "Account priorities have reached the maximum. Lower them in account settings first."
+    "prefer_priority_limit": "Account priorities have reached the maximum. Lower them in account settings first.",
+    "reconnect_limits_button": "Reconnect limits"
   },
   "antigravity_subscription": {
     "plan_unknown": "Unknown",
@@ -1091,7 +1092,11 @@
     "restart_login": "Start over",
     "success_saved_hint": "The credential is saved — manage it in Auth Files.",
     "sign_up_prompt": "No account yet?",
-    "copied": "Copied"
+    "copied": "Copied",
+    "account_name_label": "Name",
+    "account_name_placeholder": "Work, Personal",
+    "anthropic_second_step": "Approve once more for the long-lived token",
+    "anthropic_reconnect_hint": "Sign in as {{name}} to show its limits again. Requests keep using the long-lived token."
   },
   "stats": {
     "success": "Success",

@@ -1,9 +1,11 @@
 import { getAuthFileRefreshKey } from '@/features/authFiles/manualRefresh';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
+  IconKey,
   IconModelCluster,
   IconNetwork,
   IconRefreshCw,
@@ -30,6 +32,7 @@ import {
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import { QuotaMeter } from '@/features/quota/components/QuotaMeter';
 import { bindQuotaClasses } from '@/features/quota/types';
+import type { OAuthPageLocationState } from '@/features/oauth/OAuthPage';
 import { AuthFileCooldownSection } from './AuthFileCooldownSection';
 import quotaStyles from './AuthFileQuota.module.scss';
 import styles from './AuthFileCard.module.scss';
@@ -158,6 +161,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const hasStatusWarning = hasAuthFileStatusWarning(file);
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   const identity = deriveAuthFileIdentity(file);
+  const navigate = useNavigate();
+  // Only long-lived Claude logins keep a separate limits login to reconnect.
+  const limitsReconnectId = file.longLived ? file.id : undefined;
 
   const stateLabel = isRuntimeOnly
     ? t('auth_files.type_virtual')
@@ -229,7 +235,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
           )}
         </span>
         <span className={styles.identity}>
-          <span className={styles.account} title={identity.kind === 'email' ? undefined : identity.primary}>
+          <span
+            className={styles.account}
+            title={identity.kind === 'email' ? undefined : identity.primary}
+          >
             {identity.kind === 'email' ? (
               <EmailPrivacyText text={identity.primary} />
             ) : (
@@ -298,7 +307,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
             onClick={() => onPreferAccount?.(file)}
             aria-pressed={accountPreferred === true}
             aria-label={t('auth_files.prefer_account_aria', { name: identity.primary })}
-            title={t(accountPreferred ? 'auth_files.account_preferred' : 'auth_files.prefer_account')}
+            title={t(
+              accountPreferred ? 'auth_files.account_preferred' : 'auth_files.prefer_account'
+            )}
             disabled={
               disableControls ||
               file.disabled ||
@@ -321,6 +332,23 @@ export function AuthFileCard(props: AuthFileCardProps) {
             disabled={disableControls}
           >
             <IconModelCluster size={15} />
+          </button>
+        )}
+        {limitsReconnectId && (
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => {
+              const state: OAuthPageLocationState = {
+                claudeReconnect: { id: limitsReconnectId, label: identity.primary },
+              };
+              navigate('/oauth', { state });
+            }}
+            aria-label={t('auth_files.reconnect_limits_button')}
+            title={t('auth_files.reconnect_limits_button')}
+            disabled={disableControls || file.disabled}
+          >
+            <IconKey size={15} />
           </button>
         )}
         {showManualRefreshButton && (

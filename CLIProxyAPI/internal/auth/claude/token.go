@@ -44,6 +44,15 @@ type ClaudeTokenStorage struct {
 	// DeviceIDs contains the single device identity assigned to this credential.
 	DeviceIDs []string `json:"claude_device_ids,omitempty"`
 
+	// UsageAccessToken, UsageRefreshToken and UsageExpire hold the full-scope
+	// login kept beside a long-lived access token. See usage_token.go.
+	UsageAccessToken  string `json:"usage_access_token,omitempty"`
+	UsageRefreshToken string `json:"usage_refresh_token,omitempty"`
+	UsageExpire       string `json:"usage_expired,omitempty"`
+
+	// AccountName is the optional display name chosen at login.
+	AccountName string `json:"account_name,omitempty"`
+
 	// Type indicates the authentication provider type, always "claude" for this storage.
 	Type string `json:"type"`
 

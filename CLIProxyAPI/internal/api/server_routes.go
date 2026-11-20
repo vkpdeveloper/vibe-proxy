@@ -159,7 +159,15 @@ func (s *Server) setupRoutes() {
 		}
 		if state != "" {
 			if cfg := s.getConfig(); cfg != nil {
-				_, _ = managementHandlers.WriteOAuthCallbackFileForPendingSession(cfg.AuthDir, "anthropic", state, code, errStr)
+				_, errWrite := managementHandlers.WriteOAuthCallbackFileForPendingSession(cfg.AuthDir, "anthropic", state, code, errStr)
+				// A long-lived login continues straight to its second consent.
+				if errWrite == nil && errStr == "" && code != "" {
+					if nextURL := managementHandlers.ClaudeChainedAuthURL(state); nextURL != "" {
+						c.Header("Cache-Control", "no-store")
+						c.Redirect(http.StatusFound, nextURL)
+						return
+					}
+				}
 			}
 		}
 		c.Header("Content-Type", "text/html; charset=utf-8")

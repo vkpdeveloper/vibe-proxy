@@ -28,6 +28,22 @@ export interface ProviderFlowState {
   callbackError?: string;
   /** 本地校验失败（未提交到后端），内联展示在输入框下。 */
   callbackValidation?: string;
+  /** Claude: optional display name typed before the login starts. */
+  accountName?: string;
+  /** Claude: replace the limits login of this credential instead of adding one. */
+  reconnect?: ClaudeReconnectTarget;
+  /** Claude long-lived login: the first consent is done, url is now the second. */
+  secondStep?: boolean;
+}
+
+export interface ClaudeReconnectTarget {
+  id: string;
+  label: string;
+}
+
+export interface StartAuthOptions {
+  name?: string;
+  reconnect?: ClaudeReconnectTarget;
 }
 
 interface UseOAuthFlowsOptions {
@@ -134,6 +150,30 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     }));
   };
 
+  /** Polling can deliver the same second-step URL many times; only switch once. */
+  const showSecondStep = (provider: string, nextUrl: string) => {
+    setStates((prev) => {
+      const current = prev[provider] ?? {};
+      if (current.url === nextUrl) return prev;
+      return {
+        ...prev,
+        [provider]: {
+          ...current,
+          url: nextUrl,
+          secondStep: true,
+          callbackUrl: '',
+          callbackStatus: undefined,
+          callbackError: undefined,
+          callbackValidation: undefined,
+        },
+      };
+    });
+  };
+
+  const setAccountName = (provider: string, value: string) => {
+    updateProviderState(provider, { accountName: value });
+  };
+
   const resetProviderAttempt = (provider: string) => {
     attempts.current.get(provider)?.invalidate();
     setStates((prev) => ({ ...prev, [provider]: {} }));
@@ -167,6 +207,7 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     attempt.poll(
       () => oauthApi.getAuthStatus(state, attempt.signal),
       (res) => {
+        if (res.status === 'wait' && res.next_url) showSecondStep(provider, res.next_url);
         if (res.status === 'ok') {
           completeProviderAuth(provider);
           notify(provider, providerText(provider, 'oauth_status_success'), 'success');
@@ -243,7 +284,7 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     startPolling(provider, state, attempt);
   };
 
-  const startAuth = async (provider: string) => {
+  const startAuth = async (provider: string, options: StartAuthOptions = {}) => {
     // A network error can stop polling while the server is still waiting. Require
     // explicit cancellation before replacing that Devin session.
     if (provider === 'devin' && states[provider]?.state) return;
@@ -262,9 +303,14 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
       callbackValidation: undefined,
       callbackUrl: '',
       callbackSubmitting: false,
+      reconnect: options.reconnect,
+      secondStep: false,
     });
     try {
-      const res = await oauthApi.startAuth(provider, attempt.signal);
+      const res = await oauthApi.startAuth(provider, attempt.signal, {
+        name: options.name,
+        reconnect: options.reconnect?.id,
+      });
       if (!attempt.isCurrent()) return;
       if (!res.state) {
         const message = t('auth_login.missing_state');
@@ -395,6 +441,7 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     recordCredentialAdded,
     providerText,
     startAuth,
+    setAccountName,
     cancelAuth,
     submitCallback,
     setCallbackInput,

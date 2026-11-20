@@ -457,7 +457,8 @@
     "prefer_failed": "无法选择账户：{{message}}",
     "prefer_requires_quota_drain": "请在设置中启用额度耗尽路由策略。",
     "prefer_unavailable": "此账户已不可用，请刷新后重试。",
-    "prefer_priority_limit": "账户优先级已达上限，请先在账户设置中降低优先级。"
+    "prefer_priority_limit": "账户优先级已达上限，请先在账户设置中降低优先级。",
+    "reconnect_limits_button": "重新连接额度"
   },
   "antigravity_subscription": {
     "plan_unknown": "未知",
@@ -1089,7 +1090,11 @@
     "restart_login": "重新开始",
     "success_saved_hint": "凭证已保存，可在认证文件页管理。",
     "sign_up_prompt": "还没有账号？",
-    "copied": "已复制"
+    "copied": "已复制",
+    "account_name_label": "名称",
+    "account_name_placeholder": "工作、个人",
+    "anthropic_second_step": "再次授权以获取长期令牌",
+    "anthropic_reconnect_hint": "以 {{name}} 登录以重新显示其额度。请求继续使用长期令牌。"
   },
   "stats": {
     "success": "成功",

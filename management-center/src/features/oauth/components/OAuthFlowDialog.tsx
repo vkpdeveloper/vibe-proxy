@@ -42,6 +42,8 @@ export interface OAuthFlowDialogProps {
   onCancel: () => void;
   onCallbackChange: (value: string) => void;
   onCallbackSubmit: () => void;
+  /** Claude only: an optional display name typed before the login starts. */
+  onAccountNameChange?: (value: string) => void;
   onViewAuthFiles: () => void;
   onClose: () => void;
 }
@@ -66,11 +68,17 @@ export function OAuthFlowDialog(props: OAuthFlowDialogProps) {
   );
 }
 
-function ProviderHint({ text, sponsor }: Pick<OAuthFlowDialogProps, 'text' | 'sponsor'>) {
+function ProviderHint({
+  text,
+  sponsor,
+  state,
+}: Pick<OAuthFlowDialogProps, 'text' | 'sponsor' | 'state'>) {
   const { t } = useTranslation();
   return (
     <p className={styles.hint}>
-      {text('oauth_hint')}
+      {state.reconnect
+        ? t('auth_login.anthropic_reconnect_hint', { name: state.reconnect.label })
+        : text('oauth_hint')}
       {sponsor && (
         <>
           {' '}
@@ -98,7 +106,14 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'succe
   if (view !== 'flow') {
     return (
       <div className={styles.stack}>
-        <ProviderHint text={text} sponsor={props.sponsor} />
+        <ProviderHint text={text} sponsor={props.sponsor} state={state} />
+        {props.onAccountNameChange && !state.reconnect && (
+          <AccountNameField
+            value={state.accountName ?? ''}
+            onChange={props.onAccountNameChange}
+            onSubmit={onStart}
+          />
+        )}
         {view === 'failed' && (
           <div className={styles.alert} role="alert">
             {text('oauth_status_error')} {state.error || ''}
@@ -115,7 +130,7 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'succe
 
   return (
     <div className={styles.stack}>
-      <ProviderHint text={text} sponsor={props.sponsor} />
+      <ProviderHint text={text} sponsor={props.sponsor} state={state} />
       {isDevin && state.state && state.status === 'error' && (
         <div className={styles.alert} role="alert">
           {t('auth_login.devin_oauth_retry_hint')}
@@ -179,13 +194,56 @@ function Step({
   );
 }
 
+function AccountNameField({
+  value,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useTranslation();
+  const inputId = useId();
+  return (
+    <form
+      className={styles.nameField}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <label className={styles.stepTitle} htmlFor={inputId}>
+        {t('auth_login.account_name_label')}
+        <span className={styles.optional}>{t('auth_login.optional_step')}</span>
+      </label>
+      <input
+        id={inputId}
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={t('auth_login.account_name_placeholder')}
+        maxLength={64}
+        autoComplete="off"
+        spellCheck={false}
+      />
+    </form>
+  );
+}
+
 function OpenStep({ state, text }: OAuthFlowDialogProps) {
   const { t } = useTranslation();
   const url = state.url;
   const parts = url ? splitAuthUrl(url) : null;
 
   return (
-    <Step title={t('auth_login.step_open_auth_page')}>
+    <Step
+      title={
+        state.secondStep
+          ? t('auth_login.anthropic_second_step')
+          : t('auth_login.step_open_auth_page')
+      }
+    >
       <div className={styles.urlField} aria-busy={!url}>
         {parts ? (
           <span className={styles.urlText} title={url}>

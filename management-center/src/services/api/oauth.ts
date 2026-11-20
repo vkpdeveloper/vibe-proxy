@@ -19,6 +19,19 @@ export interface OAuthStartResponse {
   expires_in?: number;
 }
 
+/** Claude only: a display name for a new login, or the credential whose limits login to replace. */
+export interface OAuthStartOptions {
+  name?: string;
+  reconnect?: string;
+}
+
+export interface OAuthStatusResponse {
+  status: 'ok' | 'wait' | 'error';
+  error?: string;
+  /** Claude long-lived login: the second consent, published after the first one. */
+  next_url?: string;
+}
+
 export interface OAuthCallbackResponse {
   status: 'ok';
 }
@@ -50,12 +63,15 @@ export const oauthApi = {
   startSiwcBind: (name: string, signal?: AbortSignal) =>
     apiClient.post<SiwcBindResponse>('/oauth/siwc/bind', { name }, signal ? { signal } : undefined),
 
-  startAuth: (provider: string, signal?: AbortSignal) => {
+  startAuth: (provider: string, signal?: AbortSignal, options: OAuthStartOptions = {}) => {
     const providerKey = normalizeProviderForManagementPath(provider);
     const params: Record<string, string | boolean> = { provider: providerKey };
     if (WEBUI_SUPPORTED.has(providerKey)) {
       params.is_webui = true;
     }
+    const name = options.name?.trim();
+    if (name) params.name = name;
+    if (options.reconnect) params.reconnect = options.reconnect;
     return apiClient.get<OAuthStartResponse>('/oauth/auth-url', {
       params,
       ...(signal ? { signal } : {}),
@@ -63,7 +79,7 @@ export const oauthApi = {
   },
 
   getAuthStatus: (state: string, signal?: AbortSignal) =>
-    apiClient.get<{ status: 'ok' | 'wait' | 'error'; error?: string }>(`/oauth/status`, {
+    apiClient.get<OAuthStatusResponse>(`/oauth/status`, {
       params: { state },
       ...(signal ? { signal } : {}),
     }),

@@ -457,7 +457,8 @@
     "prefer_failed": "無法選擇帳戶：{{message}}",
     "prefer_requires_quota_drain": "請在設定中啟用額度耗盡路由策略。",
     "prefer_unavailable": "此帳戶已無法使用，請重新整理後重試。",
-    "prefer_priority_limit": "帳戶優先級已達上限，請先在帳戶設定中降低優先級。"
+    "prefer_priority_limit": "帳戶優先級已達上限，請先在帳戶設定中降低優先級。",
+    "reconnect_limits_button": "重新連線額度"
   },
   "antigravity_subscription": {
     "plan_unknown": "未知",
@@ -1117,7 +1118,11 @@
     "sign_up_prompt": "還沒有帳號？",
     "copied": "已複製",
     "login_another_account": "登入另一個帳號",
-    "view_auth_files": "查看驗證檔案"
+    "view_auth_files": "查看驗證檔案",
+    "account_name_label": "名稱",
+    "account_name_placeholder": "工作、個人",
+    "anthropic_second_step": "再次授權以取得長期權杖",
+    "anthropic_reconnect_hint": "以 {{name}} 登入以重新顯示其額度。請求仍使用長期權杖。"
   },
   "stats": {
     "success": "成功",

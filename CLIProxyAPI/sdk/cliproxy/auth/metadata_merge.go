@@ -14,7 +14,9 @@ func IsAuthTokenPayloadKey(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
 	case "access_token", "refresh_token", "id_token", "session_id",
 		"expired", "last_refresh", "expires_in", "timestamp",
-		"token_type", "user_code", "verification_uri", "verification_uri_complete":
+		"token_type", "user_code", "verification_uri", "verification_uri_complete",
+		// Claude limits login kept beside a long-lived token; a new login owns it.
+		"usage_access_token", "usage_refresh_token", "usage_expired":
 		return true
 	default:
 		return false
