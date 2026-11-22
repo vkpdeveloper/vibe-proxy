@@ -69,8 +69,6 @@ import iconDevinDark from '@/assets/icons/devin-dark.svg';
 import iconOpenaiLight from '@/assets/icons/openai-light.svg';
 import iconOpenaiDark from '@/assets/icons/openai-dark.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
-import iconKimiLight from '@/assets/icons/kimi-light.svg';
-import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconGlm from '@/assets/icons/glm.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
@@ -84,7 +82,6 @@ const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: strin
   meta: iconMeta,
   gemini: iconGemini,
   qwen: iconQwen,
-  kimi: { light: iconKimiDark, dark: iconKimiLight },
   glm: iconGlm,
   grok: { light: iconGrok, dark: iconGrokDark },
   deepseek: iconDeepseek,
@@ -189,10 +186,11 @@ export function SystemPage() {
   const requestLogDirty = requestLogDraft !== requestLogEnabled;
   const canEditRequestLog = auth.connectionStatus === 'connected' && Boolean(config);
 
-  const appVersion = __APP_VERSION__ || t('system_info.version_unknown');
-  const apiVersion = auth.serverVersion || t('system_info.version_unknown');
-  const buildTime =
-    formatDateTimeValue(auth.serverBuildDate, i18n.language) || t('system_info.version_unknown');
+  const notRecorded = t('system_info.version_unknown');
+  const appVersion = __APP_COMMIT__ || notRecorded;
+  const appBuilt = formatDateTimeValue(__APP_BUILD_TIME__, i18n.language) || notRecorded;
+  const apiVersion = auth.serverVersion || notRecorded;
+  const apiBuilt = formatDateTimeValue(auth.serverBuildDate, i18n.language) || notRecorded;
 
   const tabs: Tab<SystemTab>[] = [
     { id: 'about', label: t('system_info.tab_about'), icon: InformationCircleIcon },
@@ -393,11 +391,15 @@ export function SystemPage() {
               className="flex w-full cursor-default items-center justify-between gap-6 px-4 py-3 text-left outline-none focus-visible:bg-muted/50"
               onClick={handleInfoVersionTap}
             >
-              <span className="text-muted-foreground">{t('footer.version')}</span>
+              <span className="text-muted-foreground">{t('system_info.dashboard_version')}</span>
               <span className="truncate font-mono text-xs">{appVersion}</span>
             </button>
+            <div className="flex items-center justify-between gap-6 px-4 py-3">
+              <span className="text-muted-foreground">{t('system_info.dashboard_built')}</span>
+              <span className="truncate font-mono text-xs">{appBuilt}</span>
+            </div>
             <div className="flex items-center justify-between gap-6 px-4 py-2">
-              <span className="text-muted-foreground">{t('footer.api_version')}</span>
+              <span className="text-muted-foreground">{t('system_info.proxy_version')}</span>
               <span className="flex min-w-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <span className="max-w-full truncate font-mono text-xs">{apiVersion}</span>
                 <Button
@@ -411,13 +413,11 @@ export function SystemPage() {
               </span>
             </div>
             <div className="flex items-center justify-between gap-6 px-4 py-3">
-              <span className="text-muted-foreground">{t('footer.build_date')}</span>
-              <span className="truncate font-mono text-xs">{buildTime}</span>
+              <span className="text-muted-foreground">{t('system_info.proxy_built')}</span>
+              <span className="truncate font-mono text-xs">{apiBuilt}</span>
             </div>
             <div className="flex items-center justify-between gap-6 px-4 py-3">
-              <span className="shrink-0 text-muted-foreground">
-                {t('connection.status').replace(/[:：]\s*$/, '')}
-              </span>
+              <span className="shrink-0 text-muted-foreground">{t('system_info.connection')}</span>
               <span className="flex min-w-0 flex-col items-end gap-1">
                 <span className="flex items-center gap-2">
                   <span className={cn('size-2 rounded-full', connectionDot)} />

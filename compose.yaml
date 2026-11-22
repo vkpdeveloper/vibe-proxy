@@ -4,6 +4,11 @@ services:
   cli-proxy-api:
     build:
       context: ./CLIProxyAPI
+      # Baked into the binary with ldflags. Set them on the build command, or it reports "dev".
+      args:
+        VERSION: ${GIT_VERSION:-dev}
+        COMMIT: ${GIT_COMMIT:-none}
+        BUILD_DATE: ${BUILD_TIME:-unknown}
     image: vibe-proxy/cli-proxy-api:local
     restart: always
     # MANAGEMENT_KEY from secrets.env is the only key that opens the dashboard; the
@@ -31,6 +36,7 @@ services:
       dockerfile: docker/edge.Dockerfile
       args:
         VITE_API_BASE: /api
+        GIT_COMMIT: ${GIT_COMMIT:-}
     image: vibe-proxy/nginx:local
     restart: always
     depends_on:

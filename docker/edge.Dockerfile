@@ -9,6 +9,8 @@ COPY management-center/ ./
 
 ARG VITE_API_BASE=/api
 ENV VITE_API_BASE=${VITE_API_BASE}
+# Only management-center/ is copied, so there is no .git here; vite.config.ts reads this instead.
+ARG GIT_COMMIT=
 RUN bun run build
 
 FROM nginx:1.29-alpine
