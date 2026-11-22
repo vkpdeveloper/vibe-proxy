@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import type { OAuthModelAliasEntry } from '@/types';
+import { Hint } from '@/components/ui/tooltip';
 
 interface OAuthAliasMappingRowProps {
   entry: OAuthModelAliasEntry;
@@ -85,17 +86,18 @@ export function OAuthAliasMappingRow({
             {t('oauth_model_alias.alias_fork_label')}
           </Label>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="text-muted-foreground hover:text-destructive"
-          onClick={onRemove}
-          disabled={disabled || !canRemove}
-          title={removeLabel}
-          aria-label={removeLabel}
-        >
-          <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-        </Button>
+        <Hint label={removeLabel}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={onRemove}
+            disabled={disabled || !canRemove}
+            aria-label={removeLabel}
+          >
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+          </Button>
+        </Hint>
       </div>
     </div>
   );

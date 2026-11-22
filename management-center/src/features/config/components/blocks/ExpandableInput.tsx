@@ -5,6 +5,7 @@ import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Hint } from '@/components/ui/tooltip';
 
 /** Minimum character count before the expand/collapse toggle appears. */
 const EXPAND_THRESHOLD = 30;
@@ -68,21 +69,22 @@ export function ExpandableInput({
           disabled={disabled}
         />
         {expandable && (
-          <button
-            type="button"
-            className={toggleClass}
-            disabled={disabled}
-            onClick={() => {
-              setCollapsed(false);
-              requestAnimationFrame(() => {
-                textareaRef.current?.focus();
-              });
-            }}
-            title={t('common.expand')}
-            aria-label={t('common.expand')}
-          >
-            <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} className="size-4" />
-          </button>
+          <Hint label={t('common.expand')}>
+            <button
+              type="button"
+              className={toggleClass}
+              disabled={disabled}
+              onClick={() => {
+                setCollapsed(false);
+                requestAnimationFrame(() => {
+                  textareaRef.current?.focus();
+                });
+              }}
+              aria-label={t('common.expand')}
+            >
+              <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} className="size-4" />
+            </button>
+          </Hint>
         )}
       </div>
     );
@@ -100,16 +102,17 @@ export function ExpandableInput({
         disabled={disabled}
         rows={2}
       />
-      <button
-        type="button"
-        className={toggleClass}
-        disabled={disabled}
-        onClick={() => setCollapsed(true)}
-        title={t('common.collapse')}
-        aria-label={t('common.collapse')}
-      >
-        <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} className="size-4" />
-      </button>
+      <Hint label={t('common.collapse')}>
+        <button
+          type="button"
+          className={toggleClass}
+          disabled={disabled}
+          onClick={() => setCollapsed(true)}
+          aria-label={t('common.collapse')}
+        >
+          <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} className="size-4" />
+        </button>
+      </Hint>
     </div>
   );
 }

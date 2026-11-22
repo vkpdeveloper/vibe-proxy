@@ -2,21 +2,34 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 
+const InsideProvider = React.createContext(false);
+
 function TooltipProvider({
   delayDuration = 0,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delayDuration={delayDuration}
-      {...props}
-    />
+    <InsideProvider value={true}>
+      <TooltipPrimitive.Provider
+        data-slot="tooltip-provider"
+        delayDuration={delayDuration}
+        {...props}
+      />
+    </InsideProvider>
   );
 }
 
+/**
+ * Uses the app's shared provider (one delay, instant handoff between neighbours) when there is one,
+ * and its own otherwise, so a component still renders on its own (isolated renders, tests).
+ */
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
+  const root = <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
+  return React.useContext(InsideProvider) ? (
+    root
+  ) : (
+    <TooltipPrimitive.Provider>{root}</TooltipPrimitive.Provider>
+  );
 }
 
 function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
@@ -47,4 +60,26 @@ function TooltipContent({
   );
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };
+/**
+ * Our tooltip on one element, used instead of the native `title`, which is slow and unstyled.
+ * The child must accept a ref and props (a Button, a native element, or a Radix trigger with `asChild`).
+ */
+function Hint({
+  label,
+  side,
+  children,
+}: {
+  label: React.ReactNode;
+  side?: React.ComponentProps<typeof TooltipPrimitive.Content>['side'];
+  children: React.ReactElement;
+}) {
+  if (label == null || label === '') return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side}>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export { Hint, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

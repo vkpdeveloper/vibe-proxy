@@ -39,6 +39,7 @@ import { readModelOptions, validateModelOptions } from '../../modelOptions';
 import { RuntimePolicyEditor } from './RuntimePolicyEditor';
 import { ProviderBehaviorEditor } from './ProviderBehaviorEditor';
 import { pickProviderBehavior } from '../../providerBehavior';
+import { Hint } from '@/components/ui/tooltip';
 
 /** 模块级常量，免得每次渲染都给 picker 一个新数组引用。 */
 const DISABLE_ALL_RULES = [DISABLE_ALL_RULE];
@@ -811,23 +812,24 @@ export function BaseProviderForm({
                     }
                     disabled={mutating}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label={t('common.delete')}
-                    title={t('common.delete')}
-                    disabled={mutating || headersList.length <= 1}
-                    onClick={() =>
-                      updateField(
-                        'headers',
-                        headersList.filter((_, i) => i !== idx)
-                      )
-                    }
-                  >
-                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
-                  </Button>
+                  <Hint label={t('common.delete')}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label={t('common.delete')}
+                      disabled={mutating || headersList.length <= 1}
+                      onClick={() =>
+                        updateField(
+                          'headers',
+                          headersList.filter((_, i) => i !== idx)
+                        )
+                      }
+                    >
+                      <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                    </Button>
+                  </Hint>
                 </div>
               ))}
               <Button

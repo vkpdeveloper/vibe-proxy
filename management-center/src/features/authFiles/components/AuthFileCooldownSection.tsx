@@ -8,6 +8,7 @@ import type { AuthFileCooldownSnapshot } from '@/types/authFile';
 import { createSharedClock } from '@/utils/time/sharedClock';
 import { formatDateTimeValue } from '@/utils/format';
 import { cooldownReasonKey, summarizeCooldowns } from '@/features/authFiles/cooldowns';
+import { Hint } from '@/components/ui/tooltip';
 
 // One timer for visible cooldown cards, never one interval/request per credential.
 const clock = createSharedClock({ intervalMs: 1000 });
@@ -140,17 +141,18 @@ function CooldownDetails({
         <p className="text-faint">{t('auth_files.cooldown_note')}</p>
         {onReset && (
           <div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onReset}
-              disabled={resetDisabled || resetting}
-              aria-busy={resetting || undefined}
-              title={t('auth_files.cooldown_reset_hint')}
-            >
-              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-              {t('auth_files.cooldown_reset_button')}
-            </Button>
+            <Hint label={t('auth_files.cooldown_reset_hint')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onReset}
+                disabled={resetDisabled || resetting}
+                aria-busy={resetting || undefined}
+              >
+                <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+                {t('auth_files.cooldown_reset_button')}
+              </Button>
+            </Hint>
           </div>
         )}
       </div>

@@ -47,6 +47,7 @@ import { SectionLogging } from './components/sections/SectionLogging';
 import { SectionNetwork } from './components/sections/SectionNetwork';
 import { SectionPayload } from './components/sections/SectionPayload';
 import { SectionStreaming } from './components/sections/SectionStreaming';
+import { Hint } from '@/components/ui/tooltip';
 
 const statusDot: Record<ConfigStatusTone, string> = {
   error: 'bg-destructive',
@@ -324,16 +325,17 @@ export function ConfigPage() {
         disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
         onChange={handleModeChange}
       />
-      <Button
-        variant="outline"
-        size="icon-lg"
-        onClick={doc.handleReload}
-        disabled={doc.loading || doc.saving}
-        aria-label={t('config_management.reload')}
-        title={t('config_management.reload')}
-      >
-        <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
-      </Button>
+      <Hint label={t('config_management.reload')}>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          onClick={doc.handleReload}
+          disabled={doc.loading || doc.saving}
+          aria-label={t('config_management.reload')}
+        >
+          <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+        </Button>
+      </Hint>
     </div>
   );
 

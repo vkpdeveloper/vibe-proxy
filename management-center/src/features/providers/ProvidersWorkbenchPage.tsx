@@ -33,6 +33,7 @@ import {
   type ProvidersWorkbenchUiState,
 } from './uiState';
 import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
+import { Hint } from '@/components/ui/tooltip';
 
 /** Sign-up partners come after the regular providers in the tab list. */
 const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = ['fennoAI', 'qiniuCloud'];
@@ -398,19 +399,20 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     : t('providersPage.actions.refresh');
   const actions = (
     <div className="flex shrink-0 items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        className="h-9 px-3 sm:px-4"
-        onClick={() => void handleRefresh()}
-        disabled={workbench.isFetching}
-        aria-label={refreshLabel}
-        title={t('providersPage.header.updatedAt', { time: updatedAtLabel })}
-      >
-        <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-        <span className="max-sm:hidden">{refreshLabel}</span>
-      </Button>
+      <Hint label={t('providersPage.header.updatedAt', { time: updatedAtLabel })}>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="h-9 px-3 sm:px-4"
+          onClick={() => void handleRefresh()}
+          disabled={workbench.isFetching}
+          aria-label={refreshLabel}
+        >
+          <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+          <span className="max-sm:hidden">{refreshLabel}</span>
+        </Button>
+      </Hint>
       {!fixedBrand ? (
         <Button
           type="button"

@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import type { ProviderResource } from '../types';
 import { isMultiProtocolSponsorBrand } from '../sponsorDefinitions';
+import { Hint } from '@/components/ui/tooltip';
 
 interface ProviderResourceListProps {
   resources: ProviderResource[];
@@ -123,18 +124,19 @@ export function ProviderResourceList({
     onClick: () => void,
     options: { disabled?: boolean; destructive?: boolean } = {}
   ): ReactNode => (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={label}
-      title={label}
-      disabled={options.disabled}
-      onClick={onClick}
-      className={cn(options.destructive && 'hover:text-destructive')}
-    >
-      <HugeiconsIcon icon={icon} strokeWidth={1.75} />
-    </Button>
+    <Hint label={label}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        disabled={options.disabled}
+        onClick={onClick}
+        className={cn(options.destructive && 'hover:text-destructive')}
+      >
+        <HugeiconsIcon icon={icon} strokeWidth={1.75} />
+      </Button>
+    </Hint>
   );
 
   return (

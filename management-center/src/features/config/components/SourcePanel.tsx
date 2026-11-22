@@ -11,6 +11,7 @@ import {
   InputGroupInput,
 } from '@/components/ui/input-group';
 import type { UseSourceSearchResult } from '../hooks/useSourceSearch';
+import { Hint } from '@/components/ui/tooltip';
 
 const LazyConfigSourceEditor = lazy(() => import('./ConfigSourceEditor'));
 
@@ -69,26 +70,28 @@ export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
         </InputGroupAddon>
       </InputGroup>
       <ButtonGroup>
-        <Button
-          variant="outline"
-          size="icon-lg"
-          onClick={handlePrevMatch}
-          disabled={stepDisabled}
-          aria-label={t('config_management.search_prev')}
-          title={t('config_management.search_prev')}
-        >
-          <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon-lg"
-          onClick={handleNextMatch}
-          disabled={stepDisabled}
-          aria-label={t('config_management.search_next')}
-          title={t('config_management.search_next')}
-        >
-          <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} />
-        </Button>
+        <Hint label={t('config_management.search_prev')}>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            onClick={handlePrevMatch}
+            disabled={stepDisabled}
+            aria-label={t('config_management.search_prev')}
+          >
+            <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} />
+          </Button>
+        </Hint>
+        <Hint label={t('config_management.search_next')}>
+          <Button
+            variant="outline"
+            size="icon-lg"
+            onClick={handleNextMatch}
+            disabled={stepDisabled}
+            aria-label={t('config_management.search_next')}
+          >
+            <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} />
+          </Button>
+        </Hint>
       </ButtonGroup>
     </div>
   );

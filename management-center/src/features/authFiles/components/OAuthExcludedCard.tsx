@@ -15,6 +15,7 @@ import { Section } from '@/components/layout/Page';
 import type { OAuthConfigLoadError } from '@/features/authFiles/constants';
 import { OAuthConfigEmpty } from './OAuthConfigEmpty';
 import { ProviderLogo } from './ProviderLogo';
+import { Hint } from '@/components/ui/tooltip';
 
 export type OAuthExcludedCardProps = {
   disableControls: boolean;
@@ -69,26 +70,28 @@ export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="gap-0">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('common.edit')}
-                  title={t('common.edit')}
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => onEdit(provider)}
-                >
-                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('oauth_excluded.delete')}
-                  title={t('oauth_excluded.delete')}
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={() => onDelete(provider)}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                </Button>
+                <Hint label={t('common.edit')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('common.edit')}
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => onEdit(provider)}
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
+                <Hint label={t('oauth_excluded.delete')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('oauth_excluded.delete')}
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => onDelete(provider)}
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
               </ItemActions>
             </Item>
           ))}

@@ -225,10 +225,8 @@ describe('cooldown section rendering', () => {
 
     const available = render(snapshot, { onReset: () => {} });
     expect(available).toContain(i18n.t('auth_files.cooldown_reset_button'));
-    const hintMarkup = renderToStaticMarkup(
-      createElement('span', null, i18n.t('auth_files.cooldown_reset_hint'))
-    );
-    expect(available).toContain(hintMarkup.slice('<span>'.length, -'</span>'.length));
+    // The longer explanation lives in a tooltip, which only mounts on hover or focus.
+    expect(available).toContain('data-slot="tooltip-trigger"');
     expect(available).not.toContain('disabled=""');
 
     const pending = render(snapshot, { onReset: () => {}, resetting: true });

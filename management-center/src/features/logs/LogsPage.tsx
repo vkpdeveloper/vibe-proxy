@@ -47,7 +47,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Toggle } from '@/components/ui/toggle';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Hint, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { lockScroll, unlockScroll } from '@/components/legacy/scrollLock';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -699,23 +699,24 @@ export function LogsPage() {
             </span>
           )}
           {line.requestId && (
-            <Badge
-              variant="secondary"
-              asChild
-              className="shrink-0 font-mono font-normal max-sm:hidden"
-            >
-              <button
-                type="button"
-                title={t('logs.view_request', { id: line.requestId })}
-                aria-label={t('logs.view_request', { id: line.requestId })}
-                onClick={() =>
-                  void openErrorLog({ name: `request-${line.requestId}.log` }, line.requestId)
-                }
-                className="cursor-pointer hover:text-foreground"
+            <Hint label={t('logs.view_request', { id: line.requestId })}>
+              <Badge
+                variant="secondary"
+                asChild
+                className="shrink-0 font-mono font-normal max-sm:hidden"
               >
-                {line.requestId}
-              </button>
-            </Badge>
+                <button
+                  type="button"
+                  aria-label={t('logs.view_request', { id: line.requestId })}
+                  onClick={() =>
+                    void openErrorLog({ name: `request-${line.requestId}.log` }, line.requestId)
+                  }
+                  className="cursor-pointer hover:text-foreground"
+                >
+                  {line.requestId}
+                </button>
+              </Badge>
+            </Hint>
           )}
           {line.ip && <span className="shrink-0 text-faint max-lg:hidden">{line.ip}</span>}
           {line.source && (
@@ -735,16 +736,17 @@ export function LogsPage() {
         <span className="w-16 shrink-0 text-right text-muted-foreground tabular-nums max-sm:hidden">
           {line.latency}
         </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="-my-0.5 shrink-0 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100 max-sm:hidden pointer-coarse:opacity-100 motion-reduce:transition-none"
-          title={t('logs.copy_line')}
-          onClick={() => void copyLogLine(line.raw)}
-          aria-label={t('logs.copy_line')}
-        >
-          <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
-        </Button>
+        <Hint label={t('logs.copy_line')}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="-my-0.5 shrink-0 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100 max-sm:hidden pointer-coarse:opacity-100 motion-reduce:transition-none"
+            onClick={() => void copyLogLine(line.raw)}
+            aria-label={t('logs.copy_line')}
+          >
+            <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
+          </Button>
+        </Hint>
       </div>
     );
   };
@@ -789,15 +791,16 @@ export function LogsPage() {
                 />
                 <InputGroupAddon align="inline-end">
                   {searchQuery ? (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => setSearchQuery('')}
-                      title={t('logs.clear_search')}
-                      aria-label={t('logs.clear_search')}
-                    >
-                      <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
-                    </Button>
+                    <Hint label={t('logs.clear_search')}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => setSearchQuery('')}
+                        aria-label={t('logs.clear_search')}
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                      </Button>
+                    </Hint>
                   ) : (
                     <Kbd className="max-sm:hidden">/</Kbd>
                   )}

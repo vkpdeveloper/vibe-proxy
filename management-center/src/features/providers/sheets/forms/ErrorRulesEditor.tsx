@@ -21,6 +21,7 @@ import {
   type ErrorRuleDraft,
 } from '../../errorRules';
 import { FormSelect } from './FormControls';
+import { Hint } from '@/components/ui/tooltip';
 
 export interface ErrorRulesEditorProps {
   rules: ErrorRuleDraft[];
@@ -78,43 +79,47 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
               </span>
               <div className="flex items-center gap-0.5">
                 {([-1, 1] as const).map((direction) => (
-                  <Button
+                  <Hint
                     key={direction}
+                    label={t(`${key}.${direction === -1 ? 'moveUp' : 'moveDown'}`)}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={
+                        disabled || (direction === -1 ? index === 0 : index === rules.length - 1)
+                      }
+                      aria-label={t(`${key}.${direction === -1 ? 'moveUp' : 'moveDown'}`)}
+                      onClick={() => {
+                        pendingFocus.current = statusId(rule.id);
+                        onChange(moveErrorRule(rules, rule.id, direction));
+                      }}
+                    >
+                      <HugeiconsIcon
+                        icon={direction === -1 ? ArrowUp01Icon : ArrowDown01Icon}
+                        strokeWidth={1.75}
+                      />
+                    </Button>
+                  </Hint>
+                ))}
+                <Hint label={t(`${key}.removeRule`)}>
+                  <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    disabled={
-                      disabled || (direction === -1 ? index === 0 : index === rules.length - 1)
-                    }
-                    aria-label={t(`${key}.${direction === -1 ? 'moveUp' : 'moveDown'}`)}
-                    title={t(`${key}.${direction === -1 ? 'moveUp' : 'moveDown'}`)}
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={disabled}
+                    aria-label={t(`${key}.removeRule`)}
                     onClick={() => {
-                      pendingFocus.current = statusId(rule.id);
-                      onChange(moveErrorRule(rules, rule.id, direction));
+                      const neighbor = rules[index + 1] ?? rules[index - 1];
+                      pendingFocus.current = neighbor ? statusId(neighbor.id) : `${id}-add-rule`;
+                      onChange(rules.filter((item) => item.id !== rule.id));
                     }}
                   >
-                    <HugeiconsIcon
-                      icon={direction === -1 ? ArrowUp01Icon : ArrowDown01Icon}
-                      strokeWidth={1.75}
-                    />
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
                   </Button>
-                ))}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
-                  disabled={disabled}
-                  aria-label={t(`${key}.removeRule`)}
-                  title={t(`${key}.removeRule`)}
-                  onClick={() => {
-                    const neighbor = rules[index + 1] ?? rules[index - 1];
-                    pendingFocus.current = neighbor ? statusId(neighbor.id) : `${id}-add-rule`;
-                    onChange(rules.filter((item) => item.id !== rule.id));
-                  }}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                </Button>
+                </Hint>
               </div>
             </div>
             <div className="grid gap-3 @sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
@@ -220,27 +225,29 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
                       </FieldDescription>
                     )}
                   </Field>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="mt-6 text-muted-foreground hover:text-destructive"
-                    disabled={disabled}
-                    aria-label={t(`${key}.removeMatch`)}
-                    title={t(`${key}.removeMatch`)}
-                    onClick={() => {
-                      const neighbor = rule.matches[matchIndex + 1] ?? rule.matches[matchIndex - 1];
-                      pendingFocus.current = neighbor
-                        ? matchId(neighbor.id)
-                        : `${id}-${rule.id}-add-match`;
-                      update({
-                        ...rule,
-                        matches: rule.matches.filter((item) => item.id !== match.id),
-                      });
-                    }}
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                  </Button>
+                  <Hint label={t(`${key}.removeMatch`)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="mt-6 text-muted-foreground hover:text-destructive"
+                      disabled={disabled}
+                      aria-label={t(`${key}.removeMatch`)}
+                      onClick={() => {
+                        const neighbor =
+                          rule.matches[matchIndex + 1] ?? rule.matches[matchIndex - 1];
+                        pendingFocus.current = neighbor
+                          ? matchId(neighbor.id)
+                          : `${id}-${rule.id}-add-match`;
+                        update({
+                          ...rule,
+                          matches: rule.matches.filter((item) => item.id !== match.id),
+                        });
+                      }}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                    </Button>
+                  </Hint>
                 </div>
               );
             })}

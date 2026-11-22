@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ProviderSortBy, SortDir } from '../types';
+import { Hint } from '@/components/ui/tooltip';
 
 const SORT_OPTIONS: ReadonlyArray<{ value: ProviderSortBy; labelKey: string }> = [
   { value: 'name', labelKey: 'providersPage.toolbar.sort.name' },
@@ -102,19 +103,20 @@ export function ProviderResourceToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-          aria-label={directionLabel}
-          title={directionLabel}
-        >
-          <HugeiconsIcon
-            icon={sortDir === 'asc' ? SortingAZ02Icon : SortingZA01Icon}
-            strokeWidth={1.75}
-          />
-        </Button>
+        <Hint label={directionLabel}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            aria-label={directionLabel}
+          >
+            <HugeiconsIcon
+              icon={sortDir === 'asc' ? SortingAZ02Icon : SortingZA01Icon}
+              strokeWidth={1.75}
+            />
+          </Button>
+        </Hint>
       </div>
 
       <Popover>

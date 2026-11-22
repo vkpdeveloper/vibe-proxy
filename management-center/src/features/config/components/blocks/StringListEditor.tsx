@@ -5,6 +5,7 @@ import { Add01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { makeClientId } from '@/types/visualConfig';
 import { ExpandableInput } from './ExpandableInput';
+import { Hint } from '@/components/ui/tooltip';
 
 export const StringListEditor = memo(function StringListEditor({
   value,
@@ -53,17 +54,18 @@ export const StringListEditor = memo(function StringListEditor({
             onChange={(nextValue) => updateItem(index, nextValue)}
             disabled={disabled}
           />
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => removeItem(index)}
-            disabled={disabled}
-            aria-label={t('config_management.visual.common.delete')}
-            title={t('config_management.visual.common.delete')}
-          >
-            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-          </Button>
+          <Hint label={t('config_management.visual.common.delete')}>
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => removeItem(index)}
+              disabled={disabled}
+              aria-label={t('config_management.visual.common.delete')}
+            >
+              <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+            </Button>
+          </Hint>
         </div>
       ))}
       <div>

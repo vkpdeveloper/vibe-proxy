@@ -14,6 +14,7 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import type { AliasNode, SourceNode } from './ModelMappingDiagramTypes';
+import { Hint } from '@/components/ui/tooltip';
 
 function DiagramDialog({
   open,
@@ -172,16 +173,17 @@ function LinkRow({
             onCheckedChange={(value) => onToggleFork(source.provider, source.name, alias, value)}
           />
         </label>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="text-destructive hover:text-destructive"
-          onClick={() => onUnlink(source.provider, source.name, alias)}
-          aria-label={unlinkLabel}
-          title={unlinkLabel}
-        >
-          <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-        </Button>
+        <Hint label={unlinkLabel}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => onUnlink(source.provider, source.name, alias)}
+            aria-label={unlinkLabel}
+          >
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+          </Button>
+        </Hint>
       </div>
     </div>
   );

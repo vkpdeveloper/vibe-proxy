@@ -28,6 +28,7 @@ import { quotaClasses } from './quotaClasses';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { ClaudeResetGrantDetails } from '../providers/claude/ClaudeResetGrantDetails';
 import { hasClaudeUsageData } from '../providers/claude/data';
+import { Hint } from '@/components/ui/tooltip';
 
 interface StoredQuotaSnapshot {
   state: QuotaCapacityState;
@@ -231,16 +232,21 @@ export function QuotaCard({
                 {t('codex_quota.reset_button')}
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onRefresh}
-              disabled={isQuotaRefreshDisabled(canRefresh, loading, resetting || claudeReset.busy)}
-              title={t('auth_files.quota_refresh_hint')}
-              aria-label={t('auth_files.quota_refresh_single')}
-            >
-              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
-            </Button>
+            <Hint label={t('auth_files.quota_refresh_hint')}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onRefresh}
+                disabled={isQuotaRefreshDisabled(
+                  canRefresh,
+                  loading,
+                  resetting || claudeReset.busy
+                )}
+                aria-label={t('auth_files.quota_refresh_single')}
+              >
+                <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+              </Button>
+            </Hint>
           </div>
         )}
       </header>

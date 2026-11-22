@@ -15,6 +15,7 @@ import {
   getResetDisplayValue,
   useQuotaResetDisplayStore,
 } from './resetDisplayFormats';
+import { Hint } from '@/components/ui/tooltip';
 
 export interface QuotaResetLabelProps {
   display: ResetDisplay;
@@ -35,21 +36,22 @@ export function QuotaResetLabel({ display, classes, soon = false }: QuotaResetLa
   }
 
   return (
-    <button
-      type="button"
-      className={
-        soon
-          ? `${classes.quotaResetCycle} ${classes.quotaResetRelativeSoon}`
-          : classes.quotaResetCycle
-      }
-      onClick={(event) => {
-        event.stopPropagation();
-        cycleMode();
-      }}
-      aria-label={t('quota_management.cycle_reset_time')}
-      title={t('quota_management.cycle_reset_time')}
-    >
-      {value}
-    </button>
+    <Hint label={t('quota_management.cycle_reset_time')}>
+      <button
+        type="button"
+        className={
+          soon
+            ? `${classes.quotaResetCycle} ${classes.quotaResetRelativeSoon}`
+            : classes.quotaResetCycle
+        }
+        onClick={(event) => {
+          event.stopPropagation();
+          cycleMode();
+        }}
+        aria-label={t('quota_management.cycle_reset_time')}
+      >
+        {value}
+      </button>
+    </Hint>
   );
 }

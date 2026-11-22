@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { ModelAdvancedFields } from './ModelAdvancedFields';
 import { SwitchField } from './FormControls';
 import type { ModelEntryInput, ProviderBrand } from '../../types';
+import { Hint } from '@/components/ui/tooltip';
 
 const COLLAPSED_LIMIT = 10;
 
@@ -100,37 +101,39 @@ export function ModelEntriesEditor({
                 {!oauthAliasOnly && supportsThinking && !expanded && hasThinking ? (
                   <Badge variant="secondary">{t('providersPage.form.modelBadgeThinking')}</Badge>
                 ) : null}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setExpandedIdx(expanded ? null : idx)}
-                  title={expanded ? t('common.collapse') : t('common.expand')}
-                  aria-label={expanded ? t('common.collapse') : t('common.expand')}
-                  aria-expanded={expanded}
-                  disabled={mutating}
-                >
-                  <HugeiconsIcon
-                    icon={ArrowDown01Icon}
-                    strokeWidth={1.75}
-                    className={cn(
-                      'transition-transform duration-200 ease-out motion-reduce:transition-none',
-                      expanded && 'rotate-180'
-                    )}
-                  />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive"
-                  aria-label={t('providersPage.modelOptions.removeModel')}
-                  title={t('providersPage.modelOptions.removeModel')}
-                  disabled={mutating || removeDisabled}
-                  onClick={() => handleRemove(idx)}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
-                </Button>
+                <Hint label={expanded ? t('common.collapse') : t('common.expand')}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setExpandedIdx(expanded ? null : idx)}
+                    aria-label={expanded ? t('common.collapse') : t('common.expand')}
+                    aria-expanded={expanded}
+                    disabled={mutating}
+                  >
+                    <HugeiconsIcon
+                      icon={ArrowDown01Icon}
+                      strokeWidth={1.75}
+                      className={cn(
+                        'transition-transform duration-200 ease-out motion-reduce:transition-none',
+                        expanded && 'rotate-180'
+                      )}
+                    />
+                  </Button>
+                </Hint>
+                <Hint label={t('providersPage.modelOptions.removeModel')}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={t('providersPage.modelOptions.removeModel')}
+                    disabled={mutating || removeDisabled}
+                    onClick={() => handleRemove(idx)}
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
               </div>
             </div>
             {expanded ? (

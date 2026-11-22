@@ -19,6 +19,7 @@ import {
   normalizeProviderKey,
 } from '@/features/authFiles/constants';
 import { namedModels } from '@/utils/modelNames';
+import { Hint } from '@/components/ui/tooltip';
 
 export type AuthFileModelsModalProps = {
   open: boolean;
@@ -75,14 +76,8 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
               const excludedModel = isModelExcluded(model.id, fileType, excluded);
               return (
                 <li key={model.id}>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ease-out hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none motion-reduce:transition-none',
-                      excludedModel && 'text-muted-foreground'
-                    )}
-                    onClick={() => onCopyText(model.id)}
-                    title={
+                  <Hint
+                    label={
                       excludedModel
                         ? t('auth_files.models_excluded_hint', {
                             defaultValue: '此 OAuth 模型已被禁用',
@@ -90,20 +85,29 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
                         : t('common.copy', { defaultValue: '点击复制' })
                     }
                   >
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className={cn('truncate', excludedModel && 'line-through')}>
-                        {model.name}
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ease-out hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none motion-reduce:transition-none',
+                        excludedModel && 'text-muted-foreground'
+                      )}
+                      onClick={() => onCopyText(model.id)}
+                    >
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className={cn('truncate', excludedModel && 'line-through')}>
+                          {model.name}
+                        </span>
+                        <span className="truncate font-mono text-xs text-muted-foreground">
+                          {model.id}
+                        </span>
                       </span>
-                      <span className="truncate font-mono text-xs text-muted-foreground">
-                        {model.id}
-                      </span>
-                    </span>
-                    {excludedModel && (
-                      <Badge variant="outline" className="shrink-0 text-warning">
-                        {t('auth_files.models_excluded_badge', { defaultValue: '已禁用' })}
-                      </Badge>
-                    )}
-                  </button>
+                      {excludedModel && (
+                        <Badge variant="outline" className="shrink-0 text-warning">
+                          {t('auth_files.models_excluded_badge', { defaultValue: '已禁用' })}
+                        </Badge>
+                      )}
+                    </button>
+                  </Hint>
                 </li>
               );
             })}

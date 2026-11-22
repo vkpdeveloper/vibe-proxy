@@ -67,6 +67,7 @@ import {
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
+import { Hint } from '@/components/ui/tooltip';
 
 const PAGE_SIZE = 50;
 const SKELETON_ROW_COUNT = 4;
@@ -467,33 +468,35 @@ export function AuthFilesPage() {
       title={t('nav.auth_files')}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            onClick={() => void handleHeaderRefresh()}
-            disabled={loading || refreshing}
-            aria-label={t('common.refresh')}
-            title={t('common.refresh')}
-          >
-            <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="h-9 px-3 max-sm:w-9 max-sm:px-0"
-            onClick={handleRefreshAllCredentials}
-            disabled={
-              disableControls ||
-              loading ||
-              refreshingAllCredentials ||
-              Object.keys(manualRefreshing).length > 0
-            }
-            aria-label={t('auth_files.refresh_all_button')}
-            title={t('auth_files.refresh_all_button')}
-          >
-            <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} data-icon="inline-start" />
-            <span className="max-sm:hidden">{t('auth_files.refresh_all_button')}</span>
-          </Button>
+          <Hint label={t('common.refresh')}>
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              onClick={() => void handleHeaderRefresh()}
+              disabled={loading || refreshing}
+              aria-label={t('common.refresh')}
+            >
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+            </Button>
+          </Hint>
+          <Hint label={t('auth_files.refresh_all_button')}>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              onClick={handleRefreshAllCredentials}
+              disabled={
+                disableControls ||
+                loading ||
+                refreshingAllCredentials ||
+                Object.keys(manualRefreshing).length > 0
+              }
+              aria-label={t('auth_files.refresh_all_button')}
+            >
+              <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} data-icon="inline-start" />
+              <span className="max-sm:hidden">{t('auth_files.refresh_all_button')}</span>
+            </Button>
+          </Hint>
           <Button
             size="lg"
             className="h-9 px-4 max-sm:w-9 max-sm:px-0"

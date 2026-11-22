@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Hint } from '@/components/ui/tooltip';
 
 // Canvas-style cards: rounded-xl on black with a hairline border, like VM Bridge's Canvas nodes.
 const COLUMN = 'z-[2] flex flex-none flex-col gap-3';
@@ -74,19 +75,20 @@ export function ProviderColumn({
                 onContextMenu(e, 'provider', provider);
               }}
             >
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="text-muted-foreground"
-                onClick={() => onToggleCollapse(provider)}
-                aria-label={collapsed ? expandLabel : collapseLabel}
-                title={collapsed ? expandLabel : collapseLabel}
-              >
-                <HugeiconsIcon
-                  icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
-                  strokeWidth={1.75}
-                />
-              </Button>
+              <Hint label={collapsed ? expandLabel : collapseLabel}>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  onClick={() => onToggleCollapse(provider)}
+                  aria-label={collapsed ? expandLabel : collapseLabel}
+                >
+                  <HugeiconsIcon
+                    icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
+                    strokeWidth={1.75}
+                  />
+                </Button>
+              </Hint>
               <span
                 className="size-2 shrink-0 rounded-full"
                 style={{ background: getProviderColor(provider) }}

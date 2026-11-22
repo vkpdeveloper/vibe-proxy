@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Add01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Hint } from '@/components/ui/tooltip';
 
 /* Small shared pieces for the rule editors (payload rules, store auth, ICE servers). */
 
@@ -50,18 +51,19 @@ export function RemoveButton({
   className?: string;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-lg"
-      className={cn('shrink-0 text-muted-foreground hover:text-destructive', className)}
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-    >
-      <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-    </Button>
+    <Hint label={label}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-lg"
+        className={cn('shrink-0 text-muted-foreground hover:text-destructive', className)}
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+      >
+        <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+      </Button>
+    </Hint>
   );
 }
 

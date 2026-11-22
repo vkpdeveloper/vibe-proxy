@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { animate, useReducedMotion } from 'motion/react';
 import styles from './EmailPrivacyText.module.scss';
+import { Hint } from '@/components/ui/tooltip';
 
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const AUTH_FILE_SUFFIX_PATTERN = /\.(?:json|ya?ml)$/i;
@@ -92,20 +93,21 @@ function PrivateEmail({ email }: { email: string }) {
   }, [isRevealed, prefersReducedMotion]);
 
   return (
-    <button
-      ref={emailRef}
-      type="button"
-      className={`${styles.email} ${isRevealed ? styles.revealed : styles.concealed}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (!isRevealed) revealEmail(email);
-      }}
-      aria-label={isRevealed ? email : revealLabel}
-      title={isRevealed ? undefined : revealLabel}
-      tabIndex={isRevealed ? -1 : 0}
-    >
-      {email}
-    </button>
+    <Hint label={isRevealed ? undefined : revealLabel}>
+      <button
+        ref={emailRef}
+        type="button"
+        className={`${styles.email} ${isRevealed ? styles.revealed : styles.concealed}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!isRevealed) revealEmail(email);
+        }}
+        aria-label={isRevealed ? email : revealLabel}
+        tabIndex={isRevealed ? -1 : 0}
+      >
+        {email}
+      </button>
+    </Hint>
   );
 }
 

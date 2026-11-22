@@ -24,6 +24,7 @@ import type { OAuthModelAliasEntry } from '@/types';
 import type { AuthFileModelItem, OAuthConfigLoadError } from '@/features/authFiles/constants';
 import { OAuthConfigEmpty } from './OAuthConfigEmpty';
 import { ProviderLogo } from './ProviderLogo';
+import { Hint } from '@/components/ui/tooltip';
 
 type ViewMode = 'diagram' | 'list';
 
@@ -127,16 +128,17 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
         <div className="flex flex-col gap-3 rounded-xl border p-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-medium">{t('oauth_model_alias.chart_title')}</h3>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => diagramRef.current?.collapseAll()}
-              disabled={unavailable}
-              title={t('oauth_model_alias.diagram_collapse')}
-              aria-label={t('oauth_model_alias.diagram_collapse')}
-            >
-              <HugeiconsIcon icon={ArrowShrink02Icon} strokeWidth={1.75} />
-            </Button>
+            <Hint label={t('oauth_model_alias.diagram_collapse')}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => diagramRef.current?.collapseAll()}
+                disabled={unavailable}
+                aria-label={t('oauth_model_alias.diagram_collapse')}
+              >
+                <HugeiconsIcon icon={ArrowShrink02Icon} strokeWidth={1.75} />
+              </Button>
+            </Hint>
           </div>
           <ModelMappingDiagram
             ref={diagramRef}
@@ -168,26 +170,28 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="gap-0">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('common.edit')}
-                  title={t('common.edit')}
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => onEditProvider(provider)}
-                >
-                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('oauth_model_alias.delete')}
-                  title={t('oauth_model_alias.delete')}
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={() => onDeleteProvider(provider)}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                </Button>
+                <Hint label={t('common.edit')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('common.edit')}
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => onEditProvider(provider)}
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
+                <Hint label={t('oauth_model_alias.delete')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('oauth_model_alias.delete')}
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteProvider(provider)}
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
               </ItemActions>
             </Item>
           ))}

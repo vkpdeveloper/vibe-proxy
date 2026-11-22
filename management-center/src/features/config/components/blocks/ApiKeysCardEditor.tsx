@@ -20,6 +20,7 @@ import { generateSecureApiKey } from '@/utils/apiKey';
 import { maskApiKey } from '@/utils/format';
 import { isValidApiKeyCharset } from '@/utils/validation';
 import { ApiKeyStrengthMeter } from './ApiKeyStrengthMeter';
+import { Hint } from '@/components/ui/tooltip';
 
 interface ApiKeysCardEditorProps {
   value: string;
@@ -198,39 +199,42 @@ function ScopedApiKeysCardEditor({
                 </span>
               </span>
               <span className="flex shrink-0 items-center">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={iconButtonClass}
-                  onClick={() => handleCopy(key)}
-                  disabled={disabled}
-                  aria-label={t('common.copy')}
-                  title={t('common.copy')}
-                >
-                  <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={iconButtonClass}
-                  onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
-                  disabled={disabled}
-                  aria-label={t('config_management.visual.common.edit')}
-                  title={t('config_management.visual.common.edit')}
-                >
-                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
-                  disabled={disabled}
-                  aria-label={t('config_management.visual.common.delete')}
-                  title={t('config_management.visual.common.delete')}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                </Button>
+                <Hint label={t('common.copy')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={iconButtonClass}
+                    onClick={() => handleCopy(key)}
+                    disabled={disabled}
+                    aria-label={t('common.copy')}
+                  >
+                    <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
+                <Hint label={t('config_management.visual.common.edit')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={iconButtonClass}
+                    onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
+                    disabled={disabled}
+                    aria-label={t('config_management.visual.common.edit')}
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
+                <Hint label={t('config_management.visual.common.delete')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
+                    disabled={disabled}
+                    aria-label={t('config_management.visual.common.delete')}
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                  </Button>
+                </Hint>
               </span>
             </li>
           ))}

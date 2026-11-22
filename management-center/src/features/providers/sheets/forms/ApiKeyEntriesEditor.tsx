@@ -13,6 +13,7 @@ import type { ApiKeyEntryInput } from '../../types';
 import type { ConnectivityState, ConnectivityStatus } from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import { SecretInput } from './FormControls';
+import { Hint } from '@/components/ui/tooltip';
 
 const COLLAPSED_LIMIT = 10;
 
@@ -154,35 +155,37 @@ export function ApiKeyEntriesEditor({
               >
                 {t('providersPage.connectivity.test')}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setExpandedIdx(expanded ? null : idx)}
-                title={expanded ? t('common.collapse') : t('common.expand')}
-                aria-label={expanded ? t('common.collapse') : t('common.expand')}
-              >
-                <HugeiconsIcon
-                  icon={ArrowDown01Icon}
-                  strokeWidth={1.75}
-                  className={cn(
-                    'transition-transform duration-200 ease-out motion-reduce:transition-none',
-                    expanded && 'rotate-180'
-                  )}
-                />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-destructive"
-                disabled={mutating || removeDisabled}
-                aria-label={t('common.delete')}
-                title={t('common.delete')}
-                onClick={() => handleRemove(idx)}
-              >
-                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
-              </Button>
+              <Hint label={expanded ? t('common.collapse') : t('common.expand')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setExpandedIdx(expanded ? null : idx)}
+                  aria-label={expanded ? t('common.collapse') : t('common.expand')}
+                >
+                  <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    strokeWidth={1.75}
+                    className={cn(
+                      'transition-transform duration-200 ease-out motion-reduce:transition-none',
+                      expanded && 'rotate-180'
+                    )}
+                  />
+                </Button>
+              </Hint>
+              <Hint label={t('common.delete')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  disabled={mutating || removeDisabled}
+                  aria-label={t('common.delete')}
+                  onClick={() => handleRemove(idx)}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                </Button>
+              </Hint>
             </div>
             {status.state === 'error' ? (
               <p role="alert" className="border-t px-3 py-2 text-sm text-destructive">

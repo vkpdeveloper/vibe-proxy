@@ -46,6 +46,7 @@ import { quotaClasses } from '@/features/quota/components/quotaClasses';
 import type { OAuthPageLocationState } from '@/features/oauth/OAuthPage';
 import { AuthFileCooldownSection } from './AuthFileCooldownSection';
 import { ProviderLogo } from './ProviderLogo';
+import { Hint } from '@/components/ui/tooltip';
 
 const MIN_MEANINGFUL_DATE_MS = Date.UTC(2000, 0, 1);
 
@@ -130,16 +131,17 @@ function IconAction({
   ...props
 }: React.ComponentProps<typeof Button> & { icon: IconSvgElement; label: string }) {
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={label}
-      title={label}
-      className={cn('text-muted-foreground hover:text-foreground', className)}
-      {...props}
-    >
-      <HugeiconsIcon icon={icon} strokeWidth={1.75} />
-    </Button>
+    <Hint label={label}>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        className={cn('text-muted-foreground hover:text-foreground', className)}
+        {...props}
+      >
+        <HugeiconsIcon icon={icon} strokeWidth={1.75} />
+      </Button>
+    </Hint>
   );
 }
 

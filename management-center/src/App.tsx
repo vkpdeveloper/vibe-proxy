@@ -56,7 +56,7 @@ function App() {
   }, [language]);
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delayDuration={150}>
       <RouterProvider router={router} />
       <Toaster position="bottom-right" />
     </TooltipProvider>
