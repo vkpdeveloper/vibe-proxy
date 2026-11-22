@@ -463,6 +463,7 @@ export function AuthFilesPage() {
 
   return (
     <Page
+      wide
       title={t('nav.auth_files')}
       actions={
         <div className="flex items-center gap-2">
@@ -622,7 +623,10 @@ export function AuthFilesPage() {
         )}
 
         {loading ? (
-          <div className="flex flex-col gap-3" aria-hidden="true">
+          <div
+            className="grid grid-cols-[repeat(auto-fill,minmax(min(30rem,100%),1fr))] items-start gap-3"
+            aria-hidden="true"
+          >
             {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
               <div key={index} className="h-28 rounded-xl border bg-card" />
             ))}
@@ -658,7 +662,10 @@ export function AuthFilesPage() {
             </EmptyContent>
           </Empty>
         ) : (
-          <div role="list" className="flex flex-col gap-3">
+          <div
+            role="list"
+            className="grid grid-cols-[repeat(auto-fill,minmax(min(30rem,100%),1fr))] items-start gap-3"
+          >
             {pageItems.map((file) => (
               <AuthFileCard
                 key={getQuotaCacheKey(file)}

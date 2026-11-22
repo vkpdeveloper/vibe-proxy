@@ -31,6 +31,7 @@ import { useNow } from '@/hooks/useNow';
 import type { AuthFileItem, QuotaCapacityState, QuotaCapacityWindow } from '@/types';
 import { formatRelativeInstant } from '@/utils/quota/relativeTime';
 import {
+  describeAuthFileStatusMessage,
   getAuthFileStatusMessage,
   hasAuthFileStatusWarning,
   getTypeLabel,
@@ -181,8 +182,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const successCount = file.successCount ?? 0;
   const failureCount = file.failureCount ?? 0;
   const authIndexKey = typeof file.authIndex === 'string' ? file.authIndex : null;
-  const statusMessage = getAuthFileStatusMessage(file);
-  const hasStatusWarning = hasAuthFileStatusWarning(file);
+  const statusError = hasAuthFileStatusWarning(file)
+    ? describeAuthFileStatusMessage(getAuthFileStatusMessage(file))
+    : null;
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   const identity = deriveAuthFileIdentity(file);
   // Only long-lived Claude logins keep a separate limits login to reconnect.
@@ -193,14 +195,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
     ? t('auth_files.type_virtual')
     : disabled
       ? t('auth_files.health_status_disabled')
-      : hasStatusWarning
+      : statusError
         ? t('auth_files.health_status_warning')
         : t('auth_files.status_toggle_label');
   const stateDot = isRuntimeOnly
     ? 'bg-primary'
     : disabled
       ? 'bg-faint'
-      : hasStatusWarning
+      : statusError
         ? 'bg-warning'
         : 'bg-success';
 
@@ -285,9 +287,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
             </span>
           )}
         </div>
-        {statusMessage && hasStatusWarning && (
-          <p className="line-clamp-2 text-xs text-warning" title={statusMessage}>
-            {statusMessage}
+        {statusError && (
+          <p className="line-clamp-2 text-xs text-warning" title={statusError.message}>
+            {statusError.kind && <span className="font-medium">{statusError.kind}: </span>}
+            {statusError.message}
           </p>
         )}
       </ItemContent>

@@ -20,6 +20,7 @@ import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
+import { isRecord } from '@/utils/helpers';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
 import { parseTimestamp } from '@/utils/timestamp';
 import { TYPE_COLORS } from '@/utils/quota';
@@ -141,6 +142,54 @@ export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
   if (typeof raw === 'string') return raw.trim();
   if (raw == null) return '';
   return String(raw).trim();
+};
+
+const firstText = (...values: unknown[]) =>
+  values.find((value): value is string => typeof value === 'string' && value.trim() !== '')?.trim();
+
+/** "rate_limit_error" -> "Rate limit", "RESOURCE_EXHAUSTED" -> "Resource exhausted". */
+const humanizeErrorKind = (value: string) => {
+  const words = value
+    .replace(/_?error$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return words && words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/**
+ * Upstream failures are often stored as the provider's raw JSON body, sometimes after an
+ * HTTP status such as "429 Too Many Requests: {...}". Pull out the readable parts:
+ * Anthropic and OpenAI use `error.type`/`error.code`, Google uses `error.status`.
+ * Anything that isn't JSON is shown as-is.
+ */
+export const describeAuthFileStatusMessage = (raw: string): { kind?: string; message: string } => {
+  const start = raw.search(/[[{]/);
+  if (start === -1) return { message: raw };
+
+  let body: unknown;
+  try {
+    body = JSON.parse(raw.slice(start));
+  } catch {
+    return { message: raw };
+  }
+  if (Array.isArray(body)) body = body[0];
+  if (!isRecord(body)) return { message: raw };
+
+  const error = isRecord(body.error) ? body.error : body;
+  const message = firstText(error.message, error.detail, body.message, body.detail);
+  if (!message) return { message: raw };
+
+  const prefix = raw.slice(0, start).replace(/[\s:-]+$/, '');
+  const kind = firstText(
+    ...[error.type, error.status, error.code].map((value) =>
+      typeof value === 'string' && value.toLowerCase() !== 'error'
+        ? humanizeErrorKind(value)
+        : undefined
+    ),
+    prefix
+  );
+  return kind ? { kind, message } : { message };
 };
 
 /** 这些 status_message 视为健康，不触发告警态。 */
