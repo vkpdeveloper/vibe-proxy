@@ -1,14 +1,13 @@
-import type { ComponentType } from 'react';
+import type { IconSvgElement } from '@hugeicons/react';
 import {
-  IconCode,
-  IconKey,
-  IconNetwork,
-  IconSatellite,
-  IconScrollText,
-  IconShield,
-  IconSlidersHorizontal,
-  type IconProps,
-} from '@/components/ui/icons';
+  CodeIcon,
+  GlobalIcon,
+  Key01Icon,
+  NoteIcon,
+  Shield01Icon,
+  SlidersHorizontalIcon,
+  WaveIcon,
+} from '@hugeicons/core-free-icons';
 import type { VisualConfigFieldPath } from '@/types/visualConfig';
 import type { VisualSectionId } from './searchIndex';
 
@@ -39,14 +38,14 @@ export const SECTION_INDEX_LABELS: Record<VisualSectionId, string> = {
   payload: '06',
 };
 
-export const CONFIG_TAB_ICONS: Record<ConfigTabId, ComponentType<IconProps>> = {
-  common: IconSlidersHorizontal,
-  connectivity: IconKey,
-  network: IconNetwork,
-  logging: IconScrollText,
-  streaming: IconSatellite,
-  advanced: IconShield,
-  payload: IconCode,
+export const CONFIG_TAB_ICONS: Record<ConfigTabId, IconSvgElement> = {
+  common: SlidersHorizontalIcon,
+  connectivity: Key01Icon,
+  network: GlobalIcon,
+  logging: NoteIcon,
+  streaming: WaveIcon,
+  advanced: Shield01Icon,
+  payload: CodeIcon,
 };
 
 /** 常用 tab 的 6 个字段（原简单模式），渲染源与正典分区共享（fields/sharedFields.tsx）。 */
@@ -204,10 +203,6 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   payloadOverrideRawRules: ['payloadOverrideRawRules'],
   payloadFilterRules: ['payloadFilterRules'],
 };
-
-/** tab / tabpanel 的 DOM id：单点定义，ConfigTabs 与页面侧面板用同一函数生成 aria 关联。 */
-export const configTabDomId = (id: ConfigTabId) => `config-tab-${id}`;
-export const configPanelDomId = (id: ConfigTabId) => `config-panel-${id}`;
 
 /** localStorage 键：mode 沿用旧键（'visual' | 'source' 值域不变）；section 为新键。 */
 export const CONFIG_MODE_STORAGE_KEY = 'config-management:tab';

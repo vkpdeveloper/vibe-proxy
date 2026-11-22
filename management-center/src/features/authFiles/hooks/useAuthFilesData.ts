@@ -64,7 +64,7 @@ export type UseAuthFilesDataResult = {
   loadFiles: (options?: LoadFilesOptions) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleDelete: (name: string) => void;
+  handleDelete: (name: string) => Promise<void>;
   handleDeleteAll: (options: DeleteAllOptions) => void;
   handleDownload: (name: string) => Promise<void>;
   handleManualRefresh: (item: AuthFileItem) => Promise<void>;
@@ -372,30 +372,23 @@ export function useAuthFilesData(options?: UseAuthFilesDataOptions): UseAuthFile
     [loadFiles, showNotification, t]
   );
 
+  /** Deletes one credential; the row's AlertDialog asks first. */
   const handleDelete = useCallback(
-    (name: string) => {
-      showConfirmation({
-        title: t('auth_files.delete_title', { defaultValue: 'Delete File' }),
-        message: `${t('auth_files.delete_confirm')} "${name}" ?`,
-        variant: 'danger',
-        confirmText: t('common.confirm'),
-        onConfirm: async () => {
-          setDeleting(name);
-          try {
-            const result = await authFilesApi.deleteFile(name);
-            showNotification(t('auth_files.delete_success'), 'success');
-            applyDeletedFiles(result.files.length > 0 ? result.files : [name]);
-            if (result.deleted > 0) notifyAuthFilesChanged();
-          } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : '';
-            showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
-          } finally {
-            setDeleting(null);
-          }
-        },
-      });
+    async (name: string) => {
+      setDeleting(name);
+      try {
+        const result = await authFilesApi.deleteFile(name);
+        showNotification(t('auth_files.delete_success'), 'success');
+        applyDeletedFiles(result.files.length > 0 ? result.files : [name]);
+        if (result.deleted > 0) notifyAuthFilesChanged();
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : '';
+        showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
+      } finally {
+        setDeleting(null);
+      }
     },
-    [applyDeletedFiles, showConfirmation, showNotification, t]
+    [applyDeletedFiles, showNotification, t]
   );
 
   const handleDeleteAll = useCallback(

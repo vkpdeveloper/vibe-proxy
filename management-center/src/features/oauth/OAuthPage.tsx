@@ -1,7 +1,7 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useRevealGroup } from '@/hooks/motion';
+import { Page, Section } from '@/components/layout/Page';
 import { useAuthStore, useThemeStore } from '@/stores';
 import iconVertex from '@/assets/icons/vertex.svg';
 import iconCodex from '@/assets/icons/codex.svg';
@@ -10,10 +10,10 @@ import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
 import iconDevinCliLight from '@/assets/icons/devin-cli-light.svg';
 import { KIMI_DISPLAY_NAME } from '@/features/providers/kimi';
-import { OAuthHeader } from './components/OAuthHeader';
 import { ProviderTile } from './components/ProviderTile';
 import { SponsorCard, type SponsorCardSite } from './components/SponsorCard';
-import { OAuthFlowDialog, type DialogHeading } from './components/OAuthFlowDialog';
+import { OAuthFlowDialog } from './components/OAuthFlowDialog';
+import type { DialogHeading } from './components/FlowDialogParts';
 import { VertexImportDialog } from './components/VertexImportDialog';
 import { SiwcBindDialog } from './components/SiwcBindDialog';
 import { ApiKeyImportDialog } from './components/ApiKeyImportDialog';
@@ -34,7 +34,6 @@ import {
   type OAuthProviderCard,
   type ThemedIcon,
 } from './providers';
-import styles from './OAuthPage.module.scss';
 
 /** 对话框焦点标识：Vertex 不是 OAuth 提供商，用保留 id 避免与提供商冲突。 */
 const VERTEX_DIALOG_ID = '__vertex__';
@@ -58,10 +57,11 @@ type DialogTarget =
   | { kind: 'devin-cli' };
 
 /**
- * OAuth 登录：提供商画廊（一屏看全）+ 聚焦的授权对话框。
+ * OAuth sign-in: a gallery of provider tiles and one focused sign-in dialog.
  *
- * 点磁贴即开始登录；对话框可随时关闭，授权在后台继续，磁贴副行实时反映进度。
- * 对话框关闭后保留最后一个目标，让退出动画期间内容不消失。
+ * A tile starts the sign-in right away (Claude first asks for a name). The dialog can close at
+ * any time; the sign-in keeps going and the tile caption shows its progress. The last target
+ * stays mounted after close so the dialog keeps its content during the exit animation.
  */
 export function OAuthPage() {
   const { t } = useTranslation();
@@ -69,8 +69,6 @@ export function OAuthPage() {
   const location = useLocation();
   const apiBase = useAuthStore((state) => state.apiBase);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
-  const revealRef = useRevealGroup<HTMLDivElement>();
-  const otherMethodsId = useId();
 
   const pluginProviders = usePluginOAuthProviders(apiBase);
   const providerCards = useMemo<OAuthProviderCard[]>(
@@ -131,6 +129,7 @@ export function OAuthPage() {
         : t(card.titleKey),
     caption: captionOf(card),
     icon: iconOf(card),
+    flush: card.kind === 'builtin' && card.flush,
   });
 
   const sponsorOf = (card: OAuthProviderCard) =>
@@ -216,11 +215,12 @@ export function OAuthPage() {
 
   const dialogCard =
     dialog?.kind === 'oauth' ? providerCards.find((card) => card.id === dialog.id) : undefined;
-  const providerCount = providerCards.length;
   const sponsorCards = providerCards.filter(isSponsor);
   const regularCards = providerCards.filter((card) => !isSponsor(card));
-  // 赞助商卡占级联的第 0 位，其余磁贴顺延
-  const tileIndexOffset = sponsorCards.length > 0 ? 1 : 0;
+  const isOpen = (kind: DialogTarget['kind'], id?: string) =>
+    dialogOpen && dialog?.kind === kind && (dialog.kind !== 'oauth' || dialog.id === id);
+  const isActive = (card: OAuthProviderCard) =>
+    isOpen('oauth', card.id) || flows.states[card.id]?.status === 'waiting';
 
   const sponsorSites: SponsorCardSite[] = sponsorCards.map((card) => {
     const status = flows.states[card.id]?.status;
@@ -229,90 +229,109 @@ export function OAuthPage() {
       name: labelOf(card),
       region: t(card.sponsor.siteKey),
       domain: card.domain ?? '',
+      active: isActive(card),
       status,
       statusLabel: tileStatusLabel(status),
       signUpUrl: card.sponsor.signUpUrl,
     };
   });
 
-  const renderTile = (card: OAuthProviderCard, index: number) => {
-    const status = flows.states[card.id]?.status;
-    return (
-      <ProviderTile
-        key={card.id}
-        label={labelOf(card)}
-        caption={captionOf(card)}
-        icon={iconOf(card)}
-        index={index + tileIndexOffset}
-        status={status}
-        statusLabel={tileStatusLabel(status)}
-        onOpen={() => openProvider(card)}
-      />
-    );
-  };
   const waitingCount = Object.values(flows.states).filter(
     (state) => state.status === 'waiting'
   ).length;
 
   return (
-    <div className={styles.page} ref={revealRef}>
-      <OAuthHeader
-        providerCount={providerCount}
-        waitingCount={waitingCount}
-        addedCount={flows.addedCount}
-      />
-
-      {/* 赞助商独占首行：一张品牌卡收拢两站入口，其余提供商在下方紧凑网格 */}
+    <Page
+      title={t('nav.oauth', { defaultValue: 'OAuth' })}
+      actions={
+        (waitingCount > 0 || flows.addedCount > 0) && (
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {waitingCount > 0 && (
+              <span className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
+                {t('auth_login.meta_waiting', { count: waitingCount })}
+              </span>
+            )}
+            {flows.addedCount > 0 && (
+              <span className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-success" aria-hidden="true" />
+                {t('auth_login.meta_added', { count: flows.addedCount })}
+              </span>
+            )}
+          </div>
+        )
+      }
+    >
       {sponsorCards.length > 0 && (
-        <SponsorCard
-          title={KIMI_DISPLAY_NAME}
-          caption={t('auth_login.sponsor_kimi_caption')}
-          icon={iconOf(sponsorCards[0])}
-          signUpLabel={t('auth_login.sponsor_sign_up')}
-          sites={sponsorSites}
-          onOpen={(siteId) => {
-            const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
-            if (card) openProvider(card);
-          }}
-        />
+        <Section title={t('auth_login.recommended_provider_section')}>
+          <SponsorCard
+            title={KIMI_DISPLAY_NAME}
+            caption={t('auth_login.sponsor_kimi_caption')}
+            icon={iconOf(sponsorCards[0])}
+            signUpLabel={t('auth_login.sponsor_sign_up')}
+            sites={sponsorSites}
+            onOpen={(siteId) => {
+              const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
+              if (card) openProvider(card);
+            }}
+          />
+        </Section>
       )}
-      <div className={styles.grid}>{regularCards.map(renderTile)}</div>
 
-      <section className={styles.section} aria-labelledby={otherMethodsId}>
-        <h2 className={styles.sectionLabel} id={otherMethodsId} data-reveal>
-          {t('auth_login.other_login_methods')}
-        </h2>
-        <div className={styles.grid}>
+      <Section title={t('auth_login.other_oauth_providers')}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {regularCards.map((card) => {
+            const status = flows.states[card.id]?.status;
+            return (
+              <ProviderTile
+                key={card.id}
+                label={labelOf(card)}
+                caption={captionOf(card)}
+                icon={iconOf(card)}
+                flush={card.kind === 'builtin' && card.flush}
+                active={isActive(card)}
+                status={status}
+                statusLabel={tileStatusLabel(status)}
+                onOpen={() => openProvider(card)}
+              />
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title={t('auth_login.other_login_methods')}>
+        <div className="grid gap-2 sm:grid-cols-2">
           <ProviderTile
             label={VERTEX_LABEL}
             caption={t('vertex_import.file_label')}
             icon={iconVertex}
-            index={regularCards.length + tileIndexOffset}
+            active={isOpen('vertex')}
             onOpen={openVertex}
           />
           <ProviderTile
             label={t('siwc.bind')}
             caption={t('siwc.tile_caption')}
             icon={iconCodex}
-            index={regularCards.length + tileIndexOffset + 1}
+            flush
+            active={siwcOpen}
             onOpen={openSiwc}
           />
           <ProviderTile
             label={t('opencode_go_login.title')}
             caption={t('opencode_go_login.api_key_label')}
             icon={resolveThemedIcon(OPENCODE_GO_ICON, resolvedTheme)}
-            index={regularCards.length + tileIndexOffset + 2}
+            active={isOpen('opencode-go')}
             onOpen={openOpenCodeGo}
           />
           <ProviderTile
             label={t('devin_cli_login.title')}
             caption={t('devin_cli_login.api_key_label')}
             icon={resolveThemedIcon(DEVIN_CLI_ICON, resolvedTheme)}
-            index={regularCards.length + tileIndexOffset + 3}
+            active={isOpen('devin-cli')}
             onOpen={openDevinCli}
           />
         </div>
-      </section>
+      </Section>
 
       {dialogCard && (
         <OAuthFlowDialog
@@ -419,6 +438,6 @@ export function OAuthPage() {
           onViewAuthFiles={viewAuthFiles}
         />
       )}
-    </div>
+    </Page>
   );
 }

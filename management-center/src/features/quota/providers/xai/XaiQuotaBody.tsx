@@ -95,12 +95,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
   const grokBotUsed =
     grokBot?.usedPercent == null ? null : Math.max(0, Math.min(100, grokBot.usedPercent));
   const grokBotRemaining = grokBotUsed === null ? null : 100 - grokBotUsed;
-  const grokBotResetDisplay = buildResetDisplay(
-    null,
-    grokBot?.resetAtMs ?? null,
-    now,
-    locale
-  );
+  const grokBotResetDisplay = buildResetDisplay(null, grokBot?.resetAtMs ?? null, now, locale);
 
   if (!billing) {
     return <div className={classes.quotaMessage}>{t('xai_quota.empty_data')}</div>;

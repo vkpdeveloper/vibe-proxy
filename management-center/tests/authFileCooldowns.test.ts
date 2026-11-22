@@ -233,7 +233,7 @@ describe('cooldown section rendering', () => {
 
     const pending = render(snapshot, { onReset: () => {}, resetting: true });
     expect(pending).toContain('disabled=""');
-    expect(pending).toContain('loading-spinner');
+    expect(pending).toContain('aria-busy="true"');
   });
 
   test('shows elapsed / refresh confirmation and safely escapes model keys', () => {

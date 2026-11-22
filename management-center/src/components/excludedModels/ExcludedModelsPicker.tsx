@@ -1,6 +1,10 @@
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconAlertTriangle, IconChevronDown, IconLoader2 } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert02Icon, ArrowDown01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { ExcludedModelChipRow, ExcludedModelRuleChip } from './ExcludedModelRuleChip';
 import { ExcludedModelsPanel, type ExcludedModelCandidate } from './ExcludedModelsPanel';
 import {
@@ -13,7 +17,6 @@ import {
   summarizeExclusion,
   toggleExcludedRule,
 } from './excludedModelRules';
-import styles from './ExcludedModelsPicker.module.scss';
 
 export type { ExcludedModelCandidate };
 
@@ -150,11 +153,11 @@ export function ExcludedModelsPicker({
   };
 
   return (
-    <div className={`${styles.root} ${className ?? ''}`.trim()}>
+    <div className={cn('flex min-w-0 flex-col gap-2', className)}>
       <button
         ref={triggerRef}
         type="button"
-        className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`.trim()}
+        className="relative flex h-9 w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-input bg-input/30 px-2.5 text-left text-sm transition-colors outline-none hover:bg-input/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' && !open) {
@@ -171,16 +174,29 @@ export function ExcludedModelsPicker({
         aria-labelledby={labelledBy}
         disabled={disabled}
       >
-        <span className={styles.triggerText}>
+        <span className="flex min-w-0 items-center gap-1.5 truncate">
           {catalogState === 'loading' ? (
-            <IconLoader2 size={13} className={styles.triggerSpinner} aria-hidden="true" />
+            <HugeiconsIcon
+              icon={Loading03Icon}
+              strokeWidth={2}
+              className="size-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none"
+              aria-hidden="true"
+            />
           ) : null}
-          {summaryText()}
+          <span className="truncate">{summaryText()}</span>
         </span>
-        <IconChevronDown size={14} className={styles.chevron} aria-hidden="true" />
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          strokeWidth={1.75}
+          className={cn(
+            'size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
+            open && 'rotate-180'
+          )}
+          aria-hidden="true"
+        />
         {hasCatalog ? (
           <span
-            className={styles.meter}
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-accent"
             role="img"
             aria-label={t('excluded_models.meter_aria', {
               excluded: stats.excluded,
@@ -188,18 +204,23 @@ export function ExcludedModelsPicker({
             })}
           >
             <span
-              className={styles.meterFill}
+              className="block h-full bg-primary transition-[width] duration-200 ease-out motion-reduce:transition-none"
               style={{ width: `${stats.total ? (stats.excluded / stats.total) * 100 : 0}%` }}
             />
           </span>
         ) : null}
       </button>
 
+      {/* Inline disclosure: the grid row goes 0fr to 1fr, so filtering the list re-solves the
+          height on every keystroke without measuring. */}
       <div
         id={panelId}
-        className={`${styles.disclosure} ${open ? styles.disclosureOpen : ''}`.trim()}
+        className={cn(
+          'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        )}
       >
-        <div className={styles.disclosureInner} inert={!open}>
+        <div className="min-h-0 overflow-hidden" inert={!open}>
           {catalogState === 'ready' || candidates.length > 0 ? (
             <ExcludedModelsPanel
               rules={rules}
@@ -214,7 +235,7 @@ export function ExcludedModelsPicker({
               onDismiss={dismissPanel}
             />
           ) : (
-            <div className={styles.catalogNotice}>
+            <div className="mt-1.5 flex items-center justify-between gap-2 rounded-xl border bg-card px-3.5 py-3 text-[13px] text-muted-foreground">
               <span>
                 {catalogState === 'loading'
                   ? t('excluded_models.catalog_loading')
@@ -223,9 +244,9 @@ export function ExcludedModelsPicker({
                     : t('excluded_models.catalog_unavailable')}
               </span>
               {onRetryCatalog && catalogState !== 'loading' ? (
-                <button type="button" className={styles.retryButton} onClick={onRetryCatalog}>
+                <Button type="button" variant="outline" size="xs" onClick={onRetryCatalog}>
                   {t('excluded_models.catalog_retry')}
-                </button>
+                </Button>
               ) : null}
             </div>
           )}
@@ -254,7 +275,7 @@ export function ExcludedModelsPicker({
             />
           ))}
           {derivedModels.length > DERIVED_CHIP_LIMIT ? (
-            <span className={styles.chipsMore}>
+            <span className="self-center text-xs text-faint">
               {t('excluded_models.chips_more', { n: derivedModels.length - DERIVED_CHIP_LIMIT })}
             </span>
           ) : null}
@@ -273,13 +294,13 @@ export function ExcludedModelsPicker({
       ) : null}
 
       {showRuleEditor ? (
-        <div className={styles.ruleEditor}>
-          <label className={styles.ruleLabel} htmlFor={`${baseId}-rules`}>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium" htmlFor={`${baseId}-rules`}>
             {t('excluded_models.rules_label')}
           </label>
-          <textarea
+          <Textarea
             id={`${baseId}-rules`}
-            className="input"
+            className="font-mono text-xs md:text-xs"
             value={formatExcludedRulesText(customRules)}
             placeholder={t('excluded_models.rules_placeholder')}
             rows={3}
@@ -289,20 +310,24 @@ export function ExcludedModelsPicker({
           />
 
           {reservedHit ? (
-            <p className={styles.ruleWarning}>
-              <IconAlertTriangle size={12} aria-hidden="true" />
+            <p className="flex items-center gap-1.5 text-xs text-warning">
+              <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-3.5" />
               {reservedRuleMessage ?? t('excluded_models.rules_reserved')}
             </p>
           ) : null}
 
-          {hasCatalog ? (
-            <ul className={styles.ruleMatches}>
+          {hasCatalog && ruleSummaries.length > 0 ? (
+            <ul className="flex flex-col gap-0.5">
               {ruleSummaries.map((summary) => (
                 <li
                   key={summary.rule.toLowerCase()}
-                  className={summary.matchCount === 0 ? styles.ruleMatchNone : undefined}
+                  className={cn(
+                    'flex items-center gap-1.5 text-xs text-muted-foreground',
+                    // No match is a warning, not an error: a rule may name a model the catalog lacks.
+                    summary.matchCount === 0 && 'text-warning'
+                  )}
                 >
-                  <code>{summary.rule}</code>
+                  <code className="font-mono text-foreground">{summary.rule}</code>
                   {summary.matchCount === 0
                     ? t('excluded_models.rules_match_none')
                     : t('excluded_models.rules_match_count', { n: summary.matchCount })}
@@ -311,7 +336,7 @@ export function ExcludedModelsPicker({
             </ul>
           ) : null}
 
-          <p className="hint">{t('excluded_models.rules_hint')}</p>
+          <p className="text-sm text-muted-foreground">{t('excluded_models.rules_hint')}</p>
         </div>
       ) : null}
     </div>

@@ -5,7 +5,5 @@ export type ConfigSectionProps = {
   values: VisualConfigValues;
   validationErrors?: VisualConfigValidationErrors;
   disabled: boolean;
-  /** 仅首载入场为 true（页面挂载时捕获），tab 切换不重播。 */
-  animateIn?: boolean;
   onChange: (patch: Partial<VisualConfigValues>) => void;
 };

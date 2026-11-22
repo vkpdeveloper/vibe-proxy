@@ -1,10 +1,16 @@
 import { Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { IconChevronDown, IconChevronUp, IconSearch } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowDown01Icon, ArrowUp01Icon, Search01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 import type { UseSourceSearchResult } from '../hooks/useSourceSearch';
-import styles from './SourcePanel.module.scss';
 
 const LazyConfigSourceEditor = lazy(() => import('./ConfigSourceEditor'));
 
@@ -13,7 +19,7 @@ export type SourceSearchBarProps = {
   disabled: boolean;
 };
 
-/** 源码模式的搜索条：占据工具栏行的搜索槽位（与可视化模式的字段搜索同位置）。 */
+/** Search for source mode: takes the toolbar slot the field search uses in visual mode. */
 export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
   const { t } = useTranslation();
   const {
@@ -26,60 +32,64 @@ export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
     handlePrevMatch,
     handleNextMatch,
   } = search;
+  const searched = Boolean(searchQuery) && lastSearchedQuery === searchQuery;
+  const stepDisabled = !searched || searchResults.total === 0;
 
   return (
-    <div className={styles.searchBar}>
-      <div className={styles.searchInputWrapper}>
-        <Input
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <InputGroup className="h-9 min-w-0 flex-1">
+        <InputGroupAddon>
+          <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+        </InputGroupAddon>
+        <InputGroupInput
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           onKeyDown={handleSearchKeyDown}
           placeholder={t('config_management.search_placeholder')}
+          aria-label={t('config_management.search_placeholder')}
           disabled={disabled}
-          className={styles.searchInput}
-          rightElement={
-            <div className={styles.searchRight}>
-              {searchQuery && lastSearchedQuery === searchQuery && (
-                <span className={styles.searchCount}>
-                  {searchResults.total > 0
-                    ? `${searchResults.current} / ${searchResults.total}`
-                    : t('config_management.search_no_results')}
-                </span>
-              )}
-              <button
-                type="button"
-                className={styles.searchButton}
-                onClick={() => executeSearch('next')}
-                disabled={!searchQuery || disabled}
-                title={t('config_management.search_button')}
-              >
-                <IconSearch size={16} />
-              </button>
-            </div>
-          }
         />
-      </div>
-
-      <div className={styles.searchActions}>
+        <InputGroupAddon align="inline-end">
+          {searched ? (
+            <span className="font-mono text-xs text-muted-foreground tabular-nums">
+              {searchResults.total > 0
+                ? `${searchResults.current} / ${searchResults.total}`
+                : t('config_management.search_no_results')}
+            </span>
+          ) : null}
+          <InputGroupButton
+            size="icon-xs"
+            onClick={() => executeSearch('next')}
+            disabled={!searchQuery || disabled}
+            aria-label={t('config_management.search_button')}
+            title={t('config_management.search_button')}
+          >
+            <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <ButtonGroup>
         <Button
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="icon-lg"
           onClick={handlePrevMatch}
-          disabled={!searchQuery || lastSearchedQuery !== searchQuery || searchResults.total === 0}
+          disabled={stepDisabled}
+          aria-label={t('config_management.search_prev')}
           title={t('config_management.search_prev')}
         >
-          <IconChevronUp size={16} />
+          <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} />
         </Button>
         <Button
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="icon-lg"
           onClick={handleNextMatch}
-          disabled={!searchQuery || lastSearchedQuery !== searchQuery || searchResults.total === 0}
+          disabled={stepDisabled}
+          aria-label={t('config_management.search_next')}
           title={t('config_management.search_next')}
         >
-          <IconChevronDown size={16} />
+          <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} />
         </Button>
-      </div>
+      </ButtonGroup>
     </div>
   );
 }
@@ -88,22 +98,20 @@ export type SourcePanelProps = {
   search: UseSourceSearchResult;
   value: string;
   onChange: (value: string) => void;
-  theme: 'light' | 'dark';
   editable: boolean;
 };
 
-/** YAML 源码编辑面板：lazy CodeMirror（含语法高亮/折叠/内置搜索快捷键）。 */
-export function SourcePanel({ search, value, onChange, theme, editable }: SourcePanelProps) {
+/** The YAML source editor: a lazy CodeMirror with highlighting, folding and search keys. */
+export function SourcePanel({ search, value, onChange, editable }: SourcePanelProps) {
   const { t } = useTranslation();
 
   return (
-    <div className={styles.editorWrapper}>
+    <div className="min-h-0 flex-1 overflow-hidden">
       <Suspense fallback={null}>
         <LazyConfigSourceEditor
           editorRef={search.editorRef}
           value={value}
           onChange={onChange}
-          theme={theme}
           editable={editable}
           placeholder={t('config_management.editor_placeholder')}
         />

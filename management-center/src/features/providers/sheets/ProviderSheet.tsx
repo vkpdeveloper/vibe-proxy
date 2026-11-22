@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useId, useImperativeHandle, useState, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sheet } from '@/components/ui/Sheet';
-import { IconLoader2, IconPencil } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { PencilEdit02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import type { ProviderRecentUsageMap } from '@/components/providers/utils';
 import { useNotificationStore } from '@/stores';
 import { PROVIDER_DESCRIPTORS } from '../descriptors';
@@ -11,7 +14,6 @@ import type { UseProviderWorkbenchResult } from '../useProviderWorkbench';
 import { BaseProviderForm } from './forms/BaseProviderForm';
 import { ResourceDetailView } from './ResourceDetailView';
 import { SponsorProviderForm } from './forms/SponsorProviderForm';
-import styles from './forms/sharedForm.module.scss';
 
 type SheetMode = 'detail' | 'create' | 'edit';
 
@@ -56,7 +58,7 @@ export function ProviderSheet({
   const [isDirty, setIsDirty] = useState(false);
 
   // Reset dirty flag whenever the sheet is closed or the editing target
-  // (brand / resource / mode) changes — the child form will re-mount and
+  // (brand / resource / mode) changes; the child form will re-mount and
   // re-report its own dirty state.
   useEffect(() => {
     setIsDirty(false);
@@ -171,92 +173,83 @@ export function ProviderSheet({
     );
   };
 
+  const footerButton = 'h-9 px-4';
   const footer =
     state.mode === 'detail' ? (
-      state.resource ? (
-        <>
-          <button
-            type="button"
-            className={`${styles.footerBtn} ${styles.footerBtnGhost}`}
-            onClick={onClose}
-          >
-            {t('providersPage.actions.cancel')}
-          </button>
-          <button
-            type="button"
-            className={`${styles.footerBtn} ${styles.footerBtnPrimary}`}
-            onClick={onSwitchToEdit}
-            disabled={formMutating}
-          >
-            <IconPencil size={14} />
-            {t('providersPage.actions.edit')}
-          </button>
-        </>
-      ) : (
-        <button
+      <>
+        <Button
           type="button"
-          className={`${styles.footerBtn} ${styles.footerBtnPrimary}`}
+          variant="outline"
+          size="lg"
+          className={footerButton}
           onClick={onClose}
         >
           {t('providersPage.actions.cancel')}
-        </button>
-      )
+        </Button>
+        {state.resource ? (
+          <Button
+            type="button"
+            size="lg"
+            className={footerButton}
+            onClick={onSwitchToEdit}
+            disabled={formMutating}
+          >
+            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} data-icon="inline-start" />
+            {t('providersPage.actions.edit')}
+          </Button>
+        ) : null}
+      </>
     ) : (
       <>
-        <button
+        <Button
           type="button"
-          className={`${styles.footerBtn} ${styles.footerBtnGhost}`}
+          variant="outline"
+          size="lg"
+          className={footerButton}
           onClick={handleCancelClick}
           disabled={submitting}
         >
           {t('providersPage.actions.cancel')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           form={formId}
-          className={`${styles.footerBtn} ${styles.footerBtnPrimary}`}
+          size="lg"
+          className={footerButton}
           disabled={submitDisabled}
         >
-          {submitting ? <IconLoader2 size={14} /> : null}
           {state.mode === 'create'
             ? t('providersPage.actions.create')
             : t('providersPage.actions.save')}
-        </button>
+        </Button>
       </>
     );
 
+  // Closing by overlay, Escape or the close button asks before discarding unsaved edits.
+  const handleOpenChange = (open: boolean) => {
+    if (open || submitting) return;
+    void confirmDiscardIfDirty().then((ok) => {
+      if (ok) onClose();
+    });
+  };
+
   return (
-    <Sheet
-      open={state.open}
-      onClose={onClose}
-      size={descriptor.sheetSize}
-      eyebrow={
-        state.mode === 'detail'
-          ? t('providersPage.detail.title')
-          : state.mode === 'create'
-            ? t('providersPage.form.createEyebrow')
-            : t('providersPage.form.editEyebrow')
-      }
-      title={titleText}
-      description={t('providersPage.table.description', {
-        route:
-          state.brand === 'openaiCompatibility'
-            ? '/ai-providers/openai'
-            : state.brand === 'apikeyFun'
-              ? '/quick-start'
-              : state.brand === 'fennoAI'
-                ? '/ai-providers/fennoai'
-                : state.brand === 'qiniuCloud'
-                  ? '/ai-providers/qiniu'
-                  : state.brand === 'kimi'
-                    ? '/ai-providers/kimi'
-                    : `/ai-providers/${state.brand}`,
-      })}
-      footer={footer}
-      closeDisabled={submitting}
-      confirmClose={confirmDiscardIfDirty}
-    >
-      {renderBody()}
+    <Sheet open={state.open} onOpenChange={handleOpenChange}>
+      <SheetContent
+        aria-describedby={undefined}
+        className={cn(
+          'gap-0 data-[side=right]:w-full',
+          descriptor.sheetSize === 'md'
+            ? 'data-[side=right]:sm:max-w-xl'
+            : 'data-[side=right]:sm:max-w-2xl'
+        )}
+      >
+        <SheetHeader className="border-b px-6 py-5 pr-14">
+          <SheetTitle className="truncate">{titleText}</SheetTitle>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">{renderBody()}</div>
+        <SheetFooter className="mt-0 flex-row justify-end border-t px-6 py-4">{footer}</SheetFooter>
+      </SheetContent>
     </Sheet>
   );
 }

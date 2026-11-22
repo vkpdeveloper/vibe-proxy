@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -186,18 +185,6 @@ describe('OAuth provider gallery', () => {
       expect(messages.sponsor_kimi_caption).toBeTruthy();
       expect(messages.sponsor_sign_up).toBeTruthy();
     }
-  });
-
-  test('overrides per-pool animations with equal specificity under reduced motion', () => {
-    const styles = readFileSync('src/features/oauth/components/SponsorCard.module.scss', 'utf8');
-    const reducedMotionStart = styles.indexOf('@media (prefers-reduced-motion: reduce)');
-    const poolAnimationStart = styles.indexOf(".pool[data-pool='#{$name}']");
-    expect(poolAnimationStart).toBeGreaterThanOrEqual(0);
-    expect(reducedMotionStart).toBeGreaterThan(poolAnimationStart);
-    // 属性选择器与每个光池的动画规则保持同等优先级；仅 .pool 无法覆盖动画。
-    expect(styles.slice(reducedMotionStart)).toMatch(
-      /\.pool\[data-pool\]\s*,[^{}]*\{\s*animation:\s*none;/
-    );
   });
 
   test('keeps both Kimi registration links as safe external links', async () => {

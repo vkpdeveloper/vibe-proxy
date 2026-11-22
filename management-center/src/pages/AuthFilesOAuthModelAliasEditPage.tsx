@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { IconInfo, IconNetwork, IconPlus } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Page, Section } from '@/components/layout/Page';
 import { OAuthEditorProviderCard } from '@/features/authFiles/components/OAuthEditorProviderCard';
 import { OAuthAliasMappingRow } from '@/features/authFiles/components/OAuthAliasMappingRow';
-import { SecondaryScreenShell } from '@/components/common/SecondaryScreenShell';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useAuthStore, useNotificationStore } from '@/stores';
@@ -19,7 +25,6 @@ import {
 } from '@/features/authFiles/oauthEditorState';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { generateId, getErrorMessage } from '@/utils/helpers';
-import styles from '@/features/authFiles/components/OAuthEditor.module.scss';
 
 type AuthFileModelItem = { id: string; display_name?: string; type?: string; owned_by?: string };
 
@@ -392,111 +397,99 @@ export function AuthFilesOAuthModelAliasEditPage() {
     initialLoadError === null;
 
   return (
-    <SecondaryScreenShell
-      ref={swipeRef}
-      title={title}
-      onBack={handleBack}
-      backLabel={t('common.back')}
-      backAriaLabel={t('common.back')}
-      contentClassName={styles.pageContent}
-      topBarClassName={styles.topBar}
-      rightAction={
-        <Button size="sm" onClick={handleSave} loading={saving} disabled={!canSave}>
-          {t('oauth_model_alias.save')}
-        </Button>
-      }
-      isLoading={initialLoading}
-      loadingLabel={t('common.loading')}
-    >
-      {modelAliasUnsupported ? (
-        <Card>
-          <EmptyState
-            title={t('oauth_model_alias.upgrade_required_title')}
-            description={t('oauth_model_alias.upgrade_required_desc')}
-          />
-        </Card>
-      ) : initialLoadError !== null ? (
-        <Card>
-          <EmptyState
-            title={t('notification.refresh_failed')}
-            description={initialLoadError || t('notification.refresh_failed')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void loadInitialData()}>
+    <div ref={swipeRef} className="h-full">
+      <Page
+        title={title}
+        actions={
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              onClick={handleBack}
+              aria-label={t('common.back')}
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={1.75} data-icon="inline-start" />
+              <span className="max-sm:hidden">{t('common.back')}</span>
+            </Button>
+            <Button size="lg" className="h-9 px-4" onClick={handleSave} disabled={!canSave}>
+              {t('oauth_model_alias.save')}
+            </Button>
+          </div>
+        }
+      >
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        ) : modelAliasUnsupported ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>{t('oauth_model_alias.upgrade_required_title')}</EmptyTitle>
+              <EmptyDescription>{t('oauth_model_alias.upgrade_required_desc')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : initialLoadError !== null ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>{t('notification.refresh_failed')}</EmptyTitle>
+              <EmptyDescription>
+                {initialLoadError || t('notification.refresh_failed')}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button variant="outline" onClick={() => void loadInitialData()}>
                 {t('common.refresh')}
               </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <>
-          <div className={styles.intro}>
-            <span className={styles.introIcon}>
-              <IconNetwork size={22} aria-hidden="true" />
-            </span>
-            <div>
-              <h1 className={styles.introTitle}>{t('oauth_model_alias.title')}</h1>
-              <p className={styles.description}>{t('oauth_model_alias.editor_description')}</p>
-            </div>
-          </div>
-
-          <OAuthEditorProviderCard
-            provider={provider}
-            options={providerOptions}
-            onChange={updateProvider}
-            disabled={disableControls || saving}
-            translationPrefix="oauth_model_alias"
-          />
-
-          <Card className={styles.settingsCard}>
-            <div className={styles.editorHeader}>
-              <div className={styles.sectionHeading}>
-                <span className={styles.stepNumber} aria-hidden="true">
-                  02
-                </span>
-                <div className={styles.headingCopy}>
-                  <h2 className={styles.sectionTitle}>{t('oauth_model_alias.alias_label')}</h2>
-                  <p className={styles.description}>{t('oauth_model_alias.mapping_hint')}</p>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <>
+            <OAuthEditorProviderCard
+              provider={provider}
+              options={providerOptions}
+              onChange={updateProvider}
+              disabled={disableControls || saving}
+              translationPrefix="oauth_model_alias"
+            />
+            <Section
+              title={t('oauth_model_alias.alias_label')}
+              actions={
+                <Button
+                  variant="outline"
+                  onClick={addMappingEntry}
+                  disabled={disableControls || saving || modelAliasUnsupported}
+                >
+                  <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+                  {t('oauth_model_alias.add_alias')}
+                </Button>
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">{headerHint}</p>
+                <div className="flex flex-col divide-y rounded-xl border">
+                  {mappings.map((entry, index) => (
+                    <OAuthAliasMappingRow
+                      key={entry.id}
+                      entry={entry}
+                      index={index}
+                      options={modelsList.map((model) => ({
+                        value: model.id,
+                        label:
+                          model.display_name && model.display_name !== model.id
+                            ? model.display_name
+                            : undefined,
+                      }))}
+                      disabled={disableControls || saving}
+                      canRemove={mappings.length > 1}
+                      onChange={(field, value) => updateMappingEntry(index, field, value)}
+                      onRemove={() => removeMappingEntry(index)}
+                    />
+                  ))}
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={addMappingEntry}
-                disabled={disableControls || saving || modelAliasUnsupported}
-              >
-                <IconPlus size={14} aria-hidden="true" />
-                {t('oauth_model_alias.add_alias')}
-              </Button>
-            </div>
-
-            <div className={styles.catalogHint}>
-              <IconInfo size={15} aria-hidden="true" />
-              <p className={styles.description}>{headerHint}</p>
-            </div>
-
-            <div className={styles.mappingsBody}>
-              {mappings.map((entry, index) => (
-                <OAuthAliasMappingRow
-                  key={entry.id}
-                  entry={entry}
-                  index={index}
-                  options={modelsList.map((model) => ({
-                    value: model.id,
-                    label:
-                      model.display_name && model.display_name !== model.id
-                        ? model.display_name
-                        : undefined,
-                  }))}
-                  disabled={disableControls || saving}
-                  canRemove={mappings.length > 1}
-                  onChange={(field, value) => updateMappingEntry(index, field, value)}
-                  onRemove={() => removeMappingEntry(index)}
-                />
-              ))}
-            </div>
-          </Card>
-        </>
-      )}
-    </SecondaryScreenShell>
+            </Section>
+          </>
+        )}
+      </Page>
+    </div>
   );
 }

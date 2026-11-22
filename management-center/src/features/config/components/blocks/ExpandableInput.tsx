@@ -1,9 +1,16 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from './Blocks.module.scss';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 /** Minimum character count before the expand/collapse toggle appears. */
 const EXPAND_THRESHOLD = 30;
+
+const toggleClass =
+  'absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50';
 
 /** Auto-expanding textarea that collapses back to a single-line input on demand. */
 export function ExpandableInput({
@@ -47,21 +54,23 @@ export function ExpandableInput({
     }
   }, [collapsed, value, autoResize]);
 
+  const expandable = value.length > EXPAND_THRESHOLD;
+
   if (collapsed) {
     return (
-      <div className={styles.expandableInputWrapper}>
-        <input
-          className={`input ${className ?? ''}`}
+      <div className="relative min-w-0 flex-1">
+        <Input
+          className={cn('h-9', expandable && 'pr-9', className)}
           placeholder={placeholder}
           aria-label={ariaLabel}
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/[\r\n]/g, ''))}
           disabled={disabled}
         />
-        {value.length > EXPAND_THRESHOLD && (
+        {expandable && (
           <button
             type="button"
-            className={styles.expandableToggle}
+            className={toggleClass}
             disabled={disabled}
             onClick={() => {
               setCollapsed(false);
@@ -72,7 +81,7 @@ export function ExpandableInput({
             title={t('common.expand')}
             aria-label={t('common.expand')}
           >
-            ▼
+            <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} className="size-4" />
           </button>
         )}
       </div>
@@ -80,10 +89,10 @@ export function ExpandableInput({
   }
 
   return (
-    <div className={`${styles.expandableInputWrapper} ${styles.expandableInputExpanded}`}>
-      <textarea
+    <div className="relative min-w-0 flex-1">
+      <Textarea
         ref={textareaRef}
-        className={`input ${styles.expandableTextarea} ${className ?? ''}`}
+        className={cn('min-h-9 resize-none pr-9 break-all', className)}
         placeholder={placeholder}
         aria-label={ariaLabel}
         value={value}
@@ -93,13 +102,13 @@ export function ExpandableInput({
       />
       <button
         type="button"
-        className={styles.expandableToggle}
+        className={toggleClass}
         disabled={disabled}
         onClick={() => setCollapsed(true)}
         title={t('common.collapse')}
         aria-label={t('common.collapse')}
       >
-        ▲
+        <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={1.75} className="size-4" />
       </button>
     </div>
   );

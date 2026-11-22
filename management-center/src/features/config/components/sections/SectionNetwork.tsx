@@ -1,13 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import type { VisualConfigValues } from '@/types/visualConfig';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
+import { Section } from '@/components/layout/Page';
 import { SelectSetting, SettingList, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
 import { ProxyUrlField } from '../fields/sharedFields';
 import { getValidationMessage } from '../blocks/shared';
-
-const Icon = CONFIG_TAB_ICONS.network;
 
 type RoutingStrategy = VisualConfigValues['routingStrategy'];
 type DisableImageGeneration = VisualConfigValues['disableImageGeneration'];
@@ -17,7 +14,6 @@ export function SectionNetwork({
   values,
   validationErrors,
   disabled,
-  animateIn,
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
@@ -61,15 +57,9 @@ export function SectionNetwork({
   ];
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.network}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.network.title')}
-      description={t('config_management.visual.sections.network.description')}
-      animateIn={animateIn}
-    >
+    <Section title={t('config_management.visual.sections.network.title')}>
       <SettingList>
-        <ProxyUrlField values={values} disabled={disabled} onChange={onChange} wide />
+        <ProxyUrlField values={values} disabled={disabled} onChange={onChange} />
         <TextSetting
           fieldId="requestRetry"
           size="sm"
@@ -267,6 +257,6 @@ export function SectionNetwork({
           onChange={(wsAuth) => onChange({ wsAuth })}
         />
       </SettingList>
-    </SectionCard>
+    </Section>
   );
 }

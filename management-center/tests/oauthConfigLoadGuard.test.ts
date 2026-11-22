@@ -1,12 +1,24 @@
 import { describe, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import '../src/i18n/index';
+import i18n from '../src/i18n/index';
 import { OAuthExcludedCard } from '../src/features/authFiles/components/OAuthExcludedCard';
 import { OAuthModelAliasCard } from '../src/features/authFiles/components/OAuthModelAliasCard';
 
 const noop = () => {};
 const noopAsync = async () => {};
+
+// The add button is the only control besides retry; it must be disabled while the
+// config failed to load, and the empty state must offer a retry.
+function expectRetryAndBlockedWrites(markup: string) {
+  expect(markup).toContain('data-slot="empty-content"');
+  expect(markup).toContain(`>${i18n.t('common.refresh')}</button>`);
+  expect(markup).toContain(i18n.t('notification.refresh_failed'));
+  const buttons = markup.match(/<button[^>]*>/g) ?? [];
+  const retry = buttons.filter((tag) => !tag.includes('disabled=""'));
+  expect(retry).toHaveLength(1);
+  expect(buttons.length).toBeGreaterThan(1);
+}
 
 describe('OAuth configuration load guards', () => {
   test('disables excluded-model writes and exposes retry after a load failure', () => {
@@ -22,8 +34,7 @@ describe('OAuth configuration load guards', () => {
       })
     );
 
-    expect(markup).toContain('disabled=""');
-    expect(markup).toContain('empty-action');
+    expectRetryAndBlockedWrites(markup);
   });
 
   test('disables model-alias writes and exposes retry after a load failure', () => {
@@ -47,7 +58,6 @@ describe('OAuth configuration load guards', () => {
       })
     );
 
-    expect(markup).toContain('disabled=""');
-    expect(markup).toContain('empty-action');
+    expectRetryAndBlockedWrites(markup);
   });
 });

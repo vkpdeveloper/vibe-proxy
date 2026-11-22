@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { SettingGroup } from '../fields/SettingGroup';
 import type { ConfigSectionProps } from '../../types';
 import { CodexLiveICEServersEditor } from '../blocks/CodexLiveICEServersEditor';
 import { getValidationMessage } from '../blocks/shared';
@@ -20,7 +20,7 @@ export function SectionOAuthBehavior({
 }: ConfigSectionProps) {
   const { t } = useTranslation();
   return (
-    <Collapsible
+    <SettingGroup
       label={t('config_management.visual.additions.oauthTitle')}
       hint={t('config_management.visual.additions.oauthHint')}
     >
@@ -126,7 +126,6 @@ export function SectionOAuthBehavior({
         <SettingList title={t('config_management.visual.additions.antigravityTitle')}>
           <ToggleSetting
             fieldId="antigravityConnectionPoolEnabled"
-            wide
             label={t('config_management.visual.additions.antigravityConnectionPoolEnabled.label')}
             description={t(
               'config_management.visual.additions.antigravityConnectionPoolEnabled.hint'
@@ -282,6 +281,6 @@ export function SectionOAuthBehavior({
           </BlockSetting>
         </SettingList>
       </FieldStack>
-    </Collapsible>
+    </SettingGroup>
   );
 }

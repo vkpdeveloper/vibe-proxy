@@ -1,23 +1,69 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
-import { Select } from '@/components/ui/Select';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  IconAlertTriangle,
-  IconDownload,
-  IconExternalLink,
-  IconGithub,
-  IconPlug,
-  IconRefreshCw,
-  IconSearch,
-  IconSettings,
-  IconShield,
-} from '@/components/ui/icons';
+  Alert02Icon,
+  Download04Icon,
+  GithubIcon,
+  LinkSquare02Icon,
+  RefreshIcon,
+  Search01Icon,
+  Shield01Icon,
+  Store01Icon,
+} from '@hugeicons/core-free-icons';
+import { Page, Section } from '@/components/layout/Page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from '@/components/ui/item';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { cn } from '@/lib/utils';
 import { pluginStoreApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
@@ -30,6 +76,7 @@ import {
   resolvePluginAssetURL,
 } from './pluginResources';
 import { PluginInstallGateModal } from './components/PluginInstallGateModal';
+import { Notice, PluginLogo } from './components/PluginParts';
 import {
   buildGitHubReleasesPageURL,
   fetchPluginReleaseVersions,
@@ -38,7 +85,6 @@ import {
   type PluginReleaseVersion,
 } from './pluginReleaseVersions';
 import { waitForPluginStoreState } from './pluginPolling';
-import styles from './PluginStorePage.module.scss';
 
 type StoreStatusFilter = 'all' | 'installed' | 'notInstalled' | 'updates';
 type InstallVersionMode = 'latest' | 'release' | 'manual';
@@ -89,17 +135,6 @@ const formatReleaseDate = (value: string, locale: string) => {
     day: '2-digit',
   }).format(date);
 };
-
-function StoreCardLogo({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
-
-  return showImage ? (
-    <img src={src} alt="" onError={() => setFailed(true)} />
-  ) : (
-    <IconPlug size={18} />
-  );
-}
 
 interface PluginInstallOptionsModalProps {
   entry: PluginStoreEntry | null;
@@ -281,181 +316,195 @@ function PluginInstallOptionsModal({
     onClose();
   };
 
+  const versionModes: Array<{
+    mode: InstallVersionMode;
+    title: string;
+    hint: string;
+    disabled: boolean;
+  }> = [
+    {
+      mode: 'latest',
+      title: t('plugin_store.install_version_latest_mode'),
+      hint: t('plugin_store.install_version_latest_hint', { version: latestVersionLabel }),
+      disabled: installing,
+    },
+    ...(supportsVersionSelection
+      ? [
+          {
+            mode: 'release' as const,
+            title: t('plugin_store.install_version_release_mode'),
+            hint: releaseLoading
+              ? t('plugin_store.install_versions_loading')
+              : t('plugin_store.install_version_release_hint'),
+            disabled: releaseModeDisabled,
+          },
+          {
+            mode: 'manual' as const,
+            title: t('plugin_store.install_version_manual_mode'),
+            hint: t('plugin_store.install_version_manual_hint'),
+            disabled: installing,
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <Modal open={Boolean(entry)} onClose={handleClose} title={title} closeDisabled={installing}>
-      <div className={styles.installOptions}>
-        <p className={styles.installMessage}>{message}</p>
-        <div className={styles.installVersionField}>
-          <span className={styles.installVersionLabel} id="plugin-store-install-version-mode">
+    <Dialog
+      open={Boolean(entry)}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg"
+        showCloseButton={!installing}
+        onEscapeKeyDown={(event) => installing && event.preventDefault()}
+        onInteractOutside={(event) => installing && event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{message}</DialogDescription>
+        </DialogHeader>
+        <FieldSet>
+          <FieldLegend variant="label" id="plugin-store-install-version-mode">
             {t('plugin_store.install_version_label')}
-          </span>
-          <div
-            className={styles.installVersionModes}
-            role="radiogroup"
+          </FieldLegend>
+          <RadioGroup
+            value={versionMode}
+            onValueChange={(next) => handleVersionModeChange(next as InstallVersionMode)}
             aria-labelledby="plugin-store-install-version-mode"
           >
-            <label
-              className={`${styles.installVersionMode} ${
-                versionMode === 'latest' ? styles.installVersionModeActive : ''
-              } ${installing ? styles.installVersionModeDisabled : ''}`}
-            >
-              <input
-                type="radio"
-                name="plugin-store-install-version-mode"
-                checked={versionMode === 'latest'}
-                onChange={() => handleVersionModeChange('latest')}
-                disabled={installing}
-              />
-              <span className={styles.installVersionModeText}>
-                <strong>{t('plugin_store.install_version_latest_mode')}</strong>
-                <small>
-                  {t('plugin_store.install_version_latest_hint', {
-                    version: latestVersionLabel,
-                  })}
-                </small>
-              </span>
-            </label>
-            {supportsVersionSelection ? (
-              <>
-                <label
-                  className={`${styles.installVersionMode} ${
-                    versionMode === 'release' ? styles.installVersionModeActive : ''
-                  } ${releaseModeDisabled ? styles.installVersionModeDisabled : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="plugin-store-install-version-mode"
-                    checked={versionMode === 'release'}
-                    onChange={() => handleVersionModeChange('release')}
-                    disabled={releaseModeDisabled}
+            {versionModes.map((item) => (
+              <FieldLabel
+                key={item.mode}
+                htmlFor={`plugin-store-install-version-${item.mode}`}
+                className={cn(item.disabled && 'pointer-events-none opacity-50')}
+              >
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldTitle>{item.title}</FieldTitle>
+                    <FieldDescription>{item.hint}</FieldDescription>
+                  </FieldContent>
+                  <RadioGroupItem
+                    id={`plugin-store-install-version-${item.mode}`}
+                    value={item.mode}
+                    disabled={item.disabled}
                   />
-                  <span className={styles.installVersionModeText}>
-                    <strong>{t('plugin_store.install_version_release_mode')}</strong>
-                    <small>
-                      {releaseLoading
-                        ? t('plugin_store.install_versions_loading')
-                        : t('plugin_store.install_version_release_hint')}
-                    </small>
-                  </span>
-                </label>
-                <label
-                  className={`${styles.installVersionMode} ${
-                    versionMode === 'manual' ? styles.installVersionModeActive : ''
-                  } ${installing ? styles.installVersionModeDisabled : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="plugin-store-install-version-mode"
-                    checked={versionMode === 'manual'}
-                    onChange={() => handleVersionModeChange('manual')}
-                    disabled={installing}
-                  />
-                  <span className={styles.installVersionModeText}>
-                    <strong>{t('plugin_store.install_version_manual_mode')}</strong>
-                    <small>{t('plugin_store.install_version_manual_hint')}</small>
-                  </span>
-                </label>
-              </>
-            ) : null}
-          </div>
+                </Field>
+              </FieldLabel>
+            ))}
+          </RadioGroup>
 
           {supportsVersionSelection && versionMode === 'release' ? (
-            <div className={styles.installVersionPanel}>
+            <Field>
               {releaseError ? (
-                <p className={styles.installVersionWarning}>
+                <FieldError>
                   {t('plugin_store.install_versions_load_failed')}: {releaseError}
-                </p>
+                </FieldError>
               ) : null}
               {!releaseLoading && !releaseError && releaseVersions.length === 0 ? (
-                <p className={styles.installVersionHint}>
-                  {t('plugin_store.install_versions_empty')}
-                </p>
+                <FieldDescription>{t('plugin_store.install_versions_empty')}</FieldDescription>
               ) : null}
               {!releaseLoading &&
               !releaseError &&
               releaseVersions.length > 0 &&
               visibleReleaseVersions.length === 0 ? (
-                <p className={styles.installVersionHint}>
+                <FieldDescription>
                   {t('plugin_store.install_versions_only_prerelease')}
-                </p>
+                </FieldDescription>
               ) : null}
               <Select
                 value={version}
-                options={releaseOptions}
-                onChange={onVersionChange}
-                placeholder={t('plugin_store.install_version_release_placeholder')}
+                onValueChange={onVersionChange}
                 disabled={installing || releaseLoading || releaseOptions.length === 0}
-                ariaLabel={t('plugin_store.install_version_release_select')}
-              />
+              >
+                <SelectTrigger
+                  aria-label={t('plugin_store.install_version_release_select')}
+                  className="w-full data-[size=default]:h-9"
+                >
+                  <SelectValue
+                    placeholder={t('plugin_store.install_version_release_placeholder')}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {releaseOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {hasPrereleaseVersions ? (
-                <label className={styles.installVersionCheckbox}>
-                  <input
-                    type="checkbox"
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="plugin-store-show-prerelease"
                     checked={showPrerelease}
-                    onChange={(event) => setShowPrerelease(event.target.checked)}
+                    onCheckedChange={(checked) => setShowPrerelease(checked === true)}
                     disabled={installing}
                   />
-                  <span>{t('plugin_store.install_version_show_prerelease')}</span>
-                </label>
+                  <FieldLabel htmlFor="plugin-store-show-prerelease" className="font-normal">
+                    {t('plugin_store.install_version_show_prerelease')}
+                  </FieldLabel>
+                </Field>
               ) : null}
-            </div>
+            </Field>
           ) : null}
 
           {supportsVersionSelection && versionMode === 'manual' ? (
-            <div className={styles.installVersionPanel}>
+            <Field data-invalid={manualVersionInvalid || undefined}>
               <Input
                 id="plugin-store-install-version"
+                className="h-9 font-mono"
                 value={version}
                 onChange={(event) => onVersionChange(event.target.value)}
                 placeholder={t('plugin_store.install_version_manual_placeholder')}
                 disabled={installing}
                 autoComplete="off"
                 spellCheck={false}
+                aria-label={t('plugin_store.install_version_manual_mode')}
                 aria-invalid={manualVersionInvalid}
               />
               {manualVersionInvalid ? (
-                <p className={styles.installVersionWarning}>
-                  {t('plugin_store.install_version_manual_error')}
-                </p>
+                <FieldError>{t('plugin_store.install_version_manual_error')}</FieldError>
               ) : null}
-            </div>
+            </Field>
           ) : null}
 
           {currentVersionSelected ? (
-            <p className={styles.installVersionWarning}>
+            <FieldError>
               {t('plugin_store.install_version_current_selected', {
                 version: formatPluginVersion(entry.installedVersion),
               })}
-            </p>
+            </FieldError>
           ) : null}
 
           {supportsVersionSelection && releasePageURL ? (
             <a
-              className={styles.installReleaseLink}
+              className="inline-flex w-fit items-center gap-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
               href={releasePageURL}
               target="_blank"
               rel="noreferrer"
             >
               {t('plugin_store.install_version_releases_link')}
-              <IconExternalLink size={12} />
+              <HugeiconsIcon icon={LinkSquare02Icon} className="size-3.5" strokeWidth={1.75} />
             </a>
           ) : null}
-        </div>
-        <div className={styles.installDialogActions}>
-          <Button variant="ghost" onClick={handleClose} disabled={installing}>
+        </FieldSet>
+        <DialogFooter>
+          <Button variant="outline" size="lg" onClick={handleClose} disabled={installing}>
             {t('common.cancel')}
           </Button>
           <Button
-            variant={isOfficialPlugin(entry) ? 'primary' : 'danger'}
+            variant={isOfficialPlugin(entry) ? 'default' : 'destructive'}
+            size="lg"
             onClick={onConfirm}
-            disabled={confirmDisabled}
-            loading={installing}
+            disabled={confirmDisabled || installing}
           >
             {isUpdate ? t('plugin_store.update') : t('plugin_store.install')}
           </Button>
-        </div>
-      </div>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -829,348 +878,361 @@ export function PluginStorePage() {
     const actionDisabled = !connected || missingAuth || (hasPendingInstall && !isInstalling);
     const actionTitle = missingAuth ? t('plugin_store.auth_required_hint') : undefined;
 
+    const linkButton = (href: string, label: string, icon: typeof GithubIcon) => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button asChild variant="ghost" size="icon" aria-label={label}>
+            <a href={href} target="_blank" rel="noreferrer">
+              <HugeiconsIcon icon={icon} strokeWidth={1.75} />
+            </a>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    );
+
     return (
-      <article key={entryKey} className={styles.card}>
-        <div className={styles.cardHeader}>
-          <div className={styles.logoBox} aria-hidden="true">
-            <StoreCardLogo src={logo} />
-          </div>
-          <div className={styles.cardTitleBlock}>
-            <h2 className={styles.cardTitle}>{getStoreEntryTitle(entry)}</h2>
-            <span className={styles.cardId}>{entry.id}</span>
-          </div>
-          <div className={styles.cardBadges}>
+      <Item key={entryKey} variant="outline" className="items-start bg-card">
+        <PluginLogo src={logo} />
+        <ItemContent className="min-w-0">
+          <ItemTitle className="max-w-full flex-wrap">
+            <span className="min-w-0 truncate">{getStoreEntryTitle(entry)}</span>
             {!isOfficial ? (
-              <span className={styles.badgeUntrusted}>
-                <IconAlertTriangle size={11} />
+              <Badge variant="outline" className="text-warning">
+                <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} />
                 {t('plugin_store.badge_untrusted')}
-              </span>
+              </Badge>
             ) : null}
             {isUpdate ? (
-              <span className={styles.badgeWarning}>{t('plugin_store.badge_update')}</span>
+              <Badge variant="outline" className="text-primary">
+                {t('plugin_store.badge_update')}
+              </Badge>
             ) : entry.installed ? (
-              <span className={styles.badgeSuccess}>{t('plugin_store.badge_installed')}</span>
-            ) : null}
-            {entry.installed && entry.effectiveEnabled ? (
-              <span className={styles.badge}>{t('plugin_store.badge_effective')}</span>
+              <Badge variant="secondary" className="gap-1.5">
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    entry.effectiveEnabled ? 'bg-success' : 'bg-faint'
+                  )}
+                />
+                {entry.effectiveEnabled
+                  ? t('plugin_store.badge_effective')
+                  : t('plugin_store.badge_installed')}
+              </Badge>
             ) : null}
             {entry.authRequired ? (
-              <span className={entry.authConfigured ? styles.badge : styles.badgeWarning}>
+              <Badge
+                variant={entry.authConfigured ? 'secondary' : 'outline'}
+                className={cn(!entry.authConfigured && 'text-warning')}
+              >
                 {authText}
-              </span>
+              </Badge>
             ) : null}
-          </div>
-        </div>
-
-        {entry.description ? (
-          <div className={styles.cardDescBlock}>
-            <p
-              id={descriptionID}
-              ref={(node) => registerDescriptionRef(entryKey, node)}
-              className={`${styles.cardDesc} ${
-                isDescriptionExpanded ? styles.cardDescExpanded : ''
-              }`}
-            >
-              {entry.description}
-            </p>
-            {isDescriptionOverflowing ? (
-              <button
-                type="button"
-                className={styles.cardDescToggle}
-                onClick={() => toggleDescription(entryKey)}
-                aria-expanded={isDescriptionExpanded}
-                aria-controls={descriptionID}
-              >
-                {t(
-                  isDescriptionExpanded
-                    ? 'plugin_store.description_show_less'
-                    : 'plugin_store.description_show_more'
+          </ItemTitle>
+          <span className="truncate font-mono text-xs text-faint">{entry.id}</span>
+          {entry.description ? (
+            <div className="flex flex-col items-start gap-0.5">
+              <p
+                id={descriptionID}
+                ref={(node) => registerDescriptionRef(entryKey, node)}
+                className={cn(
+                  'text-sm leading-normal text-muted-foreground',
+                  !isDescriptionExpanded && 'line-clamp-2'
                 )}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {metaItems.length > 0 || installTypeText || platformText ? (
-          <div className={styles.cardMeta}>
-            {installTypeText ? (
-              <span className={styles.metaItem}>
-                {t('plugin_store.install_type', { type: installTypeText })}
-              </span>
-            ) : null}
-            {platformText ? <span className={styles.metaItem}>{platformText}</span> : null}
-            {metaItems.map((item, index) => (
-              <span key={`${entryKey}-meta-${index}`} className={styles.metaItem}>
-                {index > 0 ? <span className={styles.metaDot} aria-hidden="true" /> : null}
-                {index === 0 && versionText ? <strong>{item}</strong> : item}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        {entry.tags.length > 0 ? (
-          <div className={styles.tagRow}>
-            {entry.tags.map((tag) => (
-              <span key={`${entryKey}-tag-${tag}`} className={styles.tag}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        <div className={styles.cardFooter}>
-          <div className={styles.cardActions}>
-            {!entry.installed ? (
-              <Button
-                size="sm"
-                onClick={() => handleInstall(entry)}
-                disabled={actionDisabled}
-                loading={isInstalling}
-                title={actionTitle}
               >
-                <IconDownload size={14} />
-                {t('plugin_store.install')}
-              </Button>
-            ) : (
-              <>
-                {entry.updateAvailable ? (
-                  <Button
-                    size="sm"
-                    onClick={() => handleInstall(entry)}
-                    disabled={actionDisabled}
-                    loading={isInstalling}
-                    title={actionTitle}
-                  >
-                    <IconRefreshCw size={14} />
-                    {t('plugin_store.update')}
-                  </Button>
-                ) : null}
-                <Button variant="secondary" size="sm" onClick={() => navigate('/plugins')}>
-                  <IconSettings size={14} />
-                  {t('plugin_store.manage')}
-                </Button>
-              </>
-            )}
-          </div>
-          <div className={styles.cardLinks}>
-            {repositoryURL ? (
-              <a
-                className={styles.iconLink}
-                href={repositoryURL}
-                target="_blank"
-                rel="noreferrer"
-                title={t('plugin_store.open_repository')}
-                aria-label={t('plugin_store.open_repository')}
-              >
-                <IconGithub size={14} />
-              </a>
-            ) : null}
-            {homepageURL ? (
-              <a
-                className={styles.iconLink}
-                href={homepageURL}
-                target="_blank"
-                rel="noreferrer"
-                title={t('plugin_store.open_homepage')}
-                aria-label={t('plugin_store.open_homepage')}
-              >
-                <IconExternalLink size={14} />
-              </a>
-            ) : null}
-          </div>
-        </div>
-      </article>
+                {entry.description}
+              </p>
+              {isDescriptionOverflowing ? (
+                <button
+                  type="button"
+                  className="text-xs text-faint transition-colors hover:text-foreground"
+                  onClick={() => toggleDescription(entryKey)}
+                  aria-expanded={isDescriptionExpanded}
+                  aria-controls={descriptionID}
+                >
+                  {t(
+                    isDescriptionExpanded
+                      ? 'plugin_store.description_show_less'
+                      : 'plugin_store.description_show_more'
+                  )}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {metaItems.length > 0 || installTypeText || platformText ? (
+            <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              {metaItems.map((item, index) => (
+                <span
+                  key={`${entryKey}-meta-${index}`}
+                  className={cn(index === 0 && versionText && 'font-mono text-foreground')}
+                >
+                  {item}
+                </span>
+              ))}
+              {installTypeText ? (
+                <span>{t('plugin_store.install_type', { type: installTypeText })}</span>
+              ) : null}
+              {platformText ? <span>{platformText}</span> : null}
+            </p>
+          ) : null}
+          {entry.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {entry.tags.map((tag) => (
+                <Badge
+                  key={`${entryKey}-tag-${tag}`}
+                  variant="outline"
+                  className="font-normal text-muted-foreground"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </ItemContent>
+        <ItemActions className="gap-0.5 max-sm:w-full max-sm:justify-end">
+          {repositoryURL
+            ? linkButton(repositoryURL, t('plugin_store.open_repository'), GithubIcon)
+            : null}
+          {homepageURL
+            ? linkButton(homepageURL, t('plugin_store.open_homepage'), LinkSquare02Icon)
+            : null}
+          {!entry.installed || entry.updateAvailable ? (
+            <Button
+              variant={entry.installed ? 'default' : 'outline'}
+              className="ml-1.5"
+              onClick={() => handleInstall(entry)}
+              disabled={actionDisabled || isInstalling}
+              title={actionTitle}
+            >
+              <HugeiconsIcon
+                icon={entry.installed ? RefreshIcon : Download04Icon}
+                data-icon="inline-start"
+                strokeWidth={1.75}
+              />
+              {entry.installed ? t('plugin_store.update') : t('plugin_store.install')}
+            </Button>
+          ) : null}
+          {entry.installed ? (
+            <Button variant="outline" className="ml-1.5" onClick={() => navigate('/plugins')}>
+              {t('plugin_store.manage')}
+            </Button>
+          ) : null}
+        </ItemActions>
+      </Item>
     );
   };
 
   return (
-    <div className={styles.page}>
-      {/* ── Page Header ── */}
-      <div className={styles.pageHeader}>
-        <h1 className={styles.title}>{t('plugin_store.title')}</h1>
-        <p className={styles.description}>{t('plugin_store.description')}</p>
-      </div>
-
-      {/* ── Security Banner ── */}
-      <div className={styles.securityBanner} role="note">
-        <IconShield size={20} />
-        <div className={styles.securityBannerText}>
-          <strong>{t('plugin_store.security_banner_title')}</strong>
-          <p>{t('plugin_store.security_banner_text')}</p>
-        </div>
-      </div>
-
-      {/* ── Alerts ── */}
-      {error ? (
-        <div className={styles.errorBox}>
-          <span>{error.message}</span>
-          {error.kind !== 'unsupported' ? (
-            <Button variant="secondary" size="sm" onClick={loadStore} disabled={loading}>
-              {t('plugin_store.retry')}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {data?.sourceErrors.length ? (
-        <div className={styles.warningBox}>
-          <strong>{t('plugin_store.source_errors_title')}</strong>
-          <ul className={styles.sourceErrorList}>
-            {data.sourceErrors.map((sourceError, index) => {
-              const sourceLabel =
-                sourceError.sourceName || sourceError.sourceUrl || sourceError.sourceId;
-              return (
-                <li key={`${sourceError.sourceId}-${sourceError.sourceUrl}-${index}`}>
-                  <span>{sourceLabel}</span>
-                  {sourceError.message ? <small>{sourceError.message}</small> : null}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
-
-      {data && !data.pluginsEnabled ? (
-        <div className={styles.warningBox}>{t('plugin_store.global_disabled_hint')}</div>
-      ) : null}
-
-      {restartNames.length > 0 ? (
-        <div className={styles.warningBox}>
-          {t('plugin_store.restart_required_banner', { plugins: restartNames.join(', ') })}
-        </div>
-      ) : null}
-
-      {/* ── Status Bar ── */}
-      {data ? (
-        <div className={styles.statusBar}>
-          <div className={styles.statusPill}>
-            <span
-              className={`${styles.statusDot} ${
-                data.pluginsEnabled ? styles.statusDotOn : styles.statusDotOff
-              }`}
-            />
-            <span className={styles.statusLabel}>{t('plugin_store.global_status')}</span>
-            <span className={styles.statusValue}>
-              {data.pluginsEnabled
-                ? t('plugin_store.global_enabled')
-                : t('plugin_store.global_disabled')}
-            </span>
-          </div>
-
-          <span className={styles.statusDivider} />
-
-          <div className={styles.statusPill}>
-            <span className={styles.statusLabel}>{t('plugin_store.plugins_dir')}</span>
-            <span
-              className={`${styles.statusValue} ${styles.statusPathValue}`}
-              title={data.pluginsDir || 'plugins'}
-            >
-              {data.pluginsDir || 'plugins'}
-            </span>
-          </div>
-
-          <span className={styles.statusDivider} />
-
-          <div className={styles.statusPill}>
-            <span className={styles.statusLabel}>{t('plugin_store.stat_available')}</span>
-            <span className={styles.statusValue}>{stats.total}</span>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ── Toolbar ── */}
-      <div className={styles.toolbar}>
-        <Input
-          type="search"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-          placeholder={t('plugin_store.search_placeholder')}
-          aria-label={t('plugin_store.search_label')}
-          rightElement={<IconSearch size={16} />}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={loadStore}
-          disabled={!connected || loading}
-          loading={loading}
-        >
-          <IconRefreshCw size={16} />
-          {t('plugin_store.refresh')}
-        </Button>
-      </div>
-
-      {/* ── Status Filter Chips ── */}
-      <div className={styles.filterChips} role="group" aria-label={t('plugin_store.filter_label')}>
-        {statusFilters.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={`${styles.filterChip} ${
-              statusFilter === item.key ? styles.filterChipActive : ''
-            }`}
-            onClick={() => setStatusFilter(item.key)}
-            aria-pressed={statusFilter === item.key}
-          >
-            {item.label}
-            <span className={styles.filterChipCount}>{item.count}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── Plugin Cards ── */}
-      {loading ? (
-        <div className={styles.cardGrid}>
-          {Array.from({ length: 6 }, (_, index) => (
-            <div key={index} className={styles.skeletonCard}>
-              <div className={styles.skeletonHeader}>
-                <div className={styles.skeletonAvatar} />
-                <div className={styles.skeletonText}>
-                  <div className={styles.skeletonLine} />
-                  <div className={styles.skeletonLine} />
-                </div>
-              </div>
-              <div className={styles.skeletonBody} />
-            </div>
-          ))}
-        </div>
-      ) : visiblePlugins.length === 0 ? (
-        !error ? (
-          stats.total === 0 ? (
-            <EmptyState
-              title={t('plugin_store.no_plugins')}
-              description={t('plugin_store.no_plugins_desc')}
-              action={
-                <Button variant="secondary" size="sm" onClick={loadStore} disabled={!connected}>
-                  <IconRefreshCw size={16} />
-                  {t('plugin_store.refresh')}
+    <>
+      <Page
+        title={t('plugin_store.title')}
+        actions={
+          <div className="flex items-center gap-2">
+            {data ? (
+              <Badge variant="secondary" className="gap-1.5 max-sm:hidden">
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    data.pluginsEnabled ? 'bg-success' : 'bg-faint'
+                  )}
+                />
+                {data.pluginsEnabled
+                  ? t('plugin_store.global_enabled')
+                  : t('plugin_store.global_disabled')}
+              </Badge>
+            ) : null}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-lg"
+                  aria-label={t('plugin_store.refresh')}
+                  onClick={loadStore}
+                  disabled={!connected || loading}
+                >
+                  <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
                 </Button>
-              }
+              </TooltipTrigger>
+              <TooltipContent>{t('plugin_store.refresh')}</TooltipContent>
+            </Tooltip>
+          </div>
+        }
+      >
+        <Section
+          title={t('plugin_store.stat_available')}
+          actions={
+            data && stats.total > 0 ? (
+              <Badge variant="secondary" className="tabular-nums">
+                {stats.total}
+              </Badge>
+            ) : null
+          }
+        >
+          <Item variant="muted" size="sm" role="note" className="items-start">
+            <HugeiconsIcon
+              icon={Shield01Icon}
+              className="mt-0.5 size-[18px] shrink-0 text-warning"
+              strokeWidth={1.75}
             />
+            <ItemContent>
+              <ItemTitle>{t('plugin_store.security_banner_title')}</ItemTitle>
+              <ItemDescription className="line-clamp-none">
+                {t('plugin_store.security_banner_text')}
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+
+          {error ? (
+            <Notice tone="error" className="flex items-center justify-between gap-3">
+              <span>{error.message}</span>
+              {error.kind !== 'unsupported' ? (
+                <Button variant="outline" size="sm" onClick={loadStore} disabled={loading}>
+                  {t('plugin_store.retry')}
+                </Button>
+              ) : null}
+            </Notice>
+          ) : null}
+
+          {data?.sourceErrors.length ? (
+            <Notice tone="warning">
+              <p className="font-medium">{t('plugin_store.source_errors_title')}</p>
+              <ul className="mt-1 flex flex-col gap-0.5">
+                {data.sourceErrors.map((sourceError, index) => {
+                  const sourceLabel =
+                    sourceError.sourceName || sourceError.sourceUrl || sourceError.sourceId;
+                  return (
+                    <li key={`${sourceError.sourceId}-${sourceError.sourceUrl}-${index}`}>
+                      <span>{sourceLabel}</span>
+                      {sourceError.message ? (
+                        <span className="text-warning/80">: {sourceError.message}</span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Notice>
+          ) : null}
+
+          {data && !data.pluginsEnabled ? (
+            <Notice tone="warning">{t('plugin_store.global_disabled_hint')}</Notice>
+          ) : null}
+
+          {restartNames.length > 0 ? (
+            <Notice tone="warning">
+              {t('plugin_store.restart_required_banner', { plugins: restartNames.join(', ') })}
+            </Notice>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <InputGroup className="h-9 min-w-48 flex-1">
+              <InputGroupAddon>
+                <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+              </InputGroupAddon>
+              <InputGroupInput
+                type="search"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t('plugin_store.search_placeholder')}
+                aria-label={t('plugin_store.search_label')}
+              />
+            </InputGroup>
+            <ButtonGroup aria-label={t('plugin_store.filter_label')} className="max-sm:hidden">
+              {statusFilters.map((item) => (
+                <Button
+                  key={item.key}
+                  variant={statusFilter === item.key ? 'secondary' : 'outline'}
+                  size="lg"
+                  className="h-9"
+                  onClick={() => setStatusFilter(item.key)}
+                  aria-pressed={statusFilter === item.key}
+                >
+                  {item.label}
+                  <span className="text-xs text-muted-foreground tabular-nums">{item.count}</span>
+                </Button>
+              ))}
+            </ButtonGroup>
+            <Select
+              value={statusFilter}
+              onValueChange={(next) => setStatusFilter(next as StoreStatusFilter)}
+            >
+              <SelectTrigger
+                aria-label={t('plugin_store.filter_label')}
+                className="w-full data-[size=default]:h-9 sm:hidden"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusFilters.map((item) => (
+                  <SelectItem key={item.key} value={item.key}>
+                    {item.label}
+                    <span className="text-muted-foreground tabular-nums">{item.count}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loading && !data ? (
+            <ItemGroup className="gap-2">
+              {Array.from({ length: 4 }, (_, index) => (
+                <Item key={index} variant="outline" aria-hidden="true">
+                  <div className="size-9 rounded-lg bg-muted" />
+                  <ItemContent className="gap-2">
+                    <div className="h-3.5 w-40 rounded bg-muted" />
+                    <div className="h-3 w-64 max-w-full rounded bg-muted/60" />
+                  </ItemContent>
+                </Item>
+              ))}
+            </ItemGroup>
+          ) : visiblePlugins.length === 0 ? (
+            !error ? (
+              <Empty className="border border-dashed">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <HugeiconsIcon icon={Store01Icon} strokeWidth={1.75} />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {stats.total === 0
+                      ? t('plugin_store.no_plugins')
+                      : t('plugin_store.no_matches')}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {stats.total === 0
+                      ? t('plugin_store.no_plugins_desc')
+                      : t('plugin_store.no_matches_desc')}
+                  </EmptyDescription>
+                </EmptyHeader>
+                {stats.total > 0 && hasActiveFilters ? (
+                  <EmptyContent>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setFilter('');
+                        setStatusFilter('all');
+                      }}
+                    >
+                      {t('plugin_store.clear_filters')}
+                    </Button>
+                  </EmptyContent>
+                ) : null}
+              </Empty>
+            ) : null
           ) : (
-            <EmptyState
-              title={t('plugin_store.no_matches')}
-              description={t('plugin_store.no_matches_desc')}
-              action={
-                hasActiveFilters ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setFilter('');
-                      setStatusFilter('all');
-                    }}
-                  >
-                    {t('plugin_store.clear_filters')}
-                  </Button>
-                ) : undefined
-              }
-            />
-          )
-        ) : null
-      ) : (
-        <div className={styles.cardGrid}>{visiblePlugins.map((entry) => renderCard(entry))}</div>
-      )}
+            <ItemGroup className="gap-2">
+              {visiblePlugins.map((entry) => renderCard(entry))}
+            </ItemGroup>
+          )}
+
+          {data ? (
+            <p className="text-[13px] text-muted-foreground">
+              {t('plugin_store.plugins_dir')}:{' '}
+              <span className="font-mono text-xs text-foreground">
+                {data.pluginsDir || 'plugins'}
+              </span>
+            </p>
+          ) : null}
+        </Section>
+      </Page>
 
       <PluginInstallGateModal
         open={gateOpen}
@@ -1191,6 +1253,6 @@ export function PluginStorePage() {
         onClose={handleInstallOptionsClose}
         onConfirm={handleInstallOptionsConfirm}
       />
-    </div>
+    </>
   );
 }

@@ -1,44 +1,93 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import i18n from '../src/i18n/index';
+import {
+  AuthFileCard,
+  type AuthFileCardProps,
+} from '../src/features/authFiles/components/AuthFileCard';
+import type { AuthFileItem } from '../src/types';
 
-// The row binds CSS-module classes at import time, which Bun cannot render.
-// Keep these source contracts small; browser checks cover the actual row.
-const source = readFileSync(
-  new URL('../src/features/authFiles/components/AuthFileCard.tsx', import.meta.url),
-  'utf8'
-);
-const styles = readFileSync(
-  new URL('../src/features/authFiles/components/AuthFileCard.module.scss', import.meta.url),
-  'utf8'
-);
+const noop = () => {};
+const file: AuthFileItem = {
+  name: 'claude-person@example.com.json',
+  type: 'claude',
+  email: 'person@example.com',
+  authIndex: 'idx-1',
+} as AuthFileItem;
 
-describe('auth file row contract', () => {
+function render(overrides: Partial<AuthFileCardProps> = {}) {
+  const props: AuthFileCardProps = {
+    file,
+    selected: false,
+    disableControls: false,
+    deleting: null,
+    statusUpdating: {},
+    manualRefreshing: {},
+    cooldownResetting: {},
+    onShowModels: noop,
+    onManualRefresh: noop,
+    onCooldownReset: noop,
+    onOpenPrefixProxyEditor: noop,
+    onDelete: noop,
+    onToggleStatus: noop,
+    onToggleSelect: noop,
+    ...overrides,
+  };
+  return renderToStaticMarkup(
+    createElement(MemoryRouter, null, createElement(AuthFileCard, props))
+  );
+}
+
+describe('auth file row', () => {
   test('leads with the blurred account, never the file name', () => {
-    expect(source).toContain('<EmailPrivacyText text={identity.primary} />');
-    expect(source).not.toContain('file.name}</');
-    expect(source).not.toContain('identity.secondary');
+    const markup = render();
+    expect(markup).toMatch(/<span role="button"[^>]*blur-\[5px\][^>]*>person@example\.com<\/span>/);
+    expect(markup).not.toContain('claude-person@example.com.json');
   });
 
-  test('has one enable toggle named after the account', () => {
-    expect(source.match(/<ToggleSwitch/g)).toHaveLength(1);
-    expect(source).toContain("t('auth_files.card_toggle', { name: identity.primary })");
-    expect(source).toContain('checked={!file.disabled}');
+  test('has one enable switch named after the account and reflecting the state', () => {
+    const toggleLabel = i18n.t('auth_files.card_toggle', { name: 'person@example.com' });
+    const enabled = render();
+    expect(enabled.match(/role="switch"/g)).toHaveLength(1);
+    expect(enabled).toMatch(new RegExp(`role="switch"[^>]*aria-checked="true"`));
+    expect(enabled).toContain(`aria-label="${toggleLabel}"`);
+    const disabled = render({ file: { ...file, disabled: true } });
+    expect(disabled).toMatch(/role="switch"[^>]*aria-checked="false"/);
   });
 
   test('dims a disabled row but keeps its controls clear', () => {
-    expect(source).toContain("file.disabled === true ? styles.rowDisabled : ''");
-    expect(styles).toMatch(/\.rowDisabled\s*>\s*:not\(\.actions\)\s*\{\s*opacity:/);
+    const markup = render({ file: { ...file, disabled: true } });
+    expect(markup).toMatch(/data-slot="item-content"[^>]*class="[^"]*opacity-60/);
+    const actions = markup.match(/<div data-slot="item-actions"[^>]*>/g) ?? [];
+    expect(actions.length).toBeGreaterThan(0);
+    for (const tag of actions) expect(tag).not.toContain('opacity-');
   });
 
-  test('keeps the per-credential actions', () => {
-    for (const handler of [
-      'onShowModels(file)',
-      'onManualRefresh(file)',
-      'onCooldownReset(file)',
-      'onOpenPrefixProxyEditor(file)',
-      'onDelete(file.name)',
+  test('keeps the per-credential actions, each with an accessible name', () => {
+    const markup = render();
+    for (const key of [
+      'auth_files.models_button',
+      'auth_files.manual_refresh_button',
+      'auth_files.prefix_proxy_button',
+      'auth_files.delete_button',
     ]) {
-      expect(source).toContain(handler);
+      expect(markup).toContain(`aria-label="${i18n.t(key)}"`);
     }
+    expect(markup).toContain(
+      `aria-label="${i18n.t('auth_files.card_select', { name: 'person@example.com' })}"`
+    );
+  });
+
+  test('locks the actions while controls are disabled', () => {
+    const markup = render({ disableControls: true });
+    const label = i18n.t('auth_files.delete_button');
+    expect(markup).toMatch(
+      new RegExp(
+        `<button[^>]*disabled=""[^>]*aria-label="${label}"|<button[^>]*aria-label="${label}"[^>]*disabled=""`
+      )
+    );
+    expect(markup).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
   });
 });

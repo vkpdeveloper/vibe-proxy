@@ -1,12 +1,28 @@
-import { useCallback, type MouseEvent } from 'react';
+import { useCallback, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
-import { Sheet } from '@/components/ui/Sheet';
-import { Button } from '@/components/ui/Button';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Input } from '@/components/ui/Input';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
+import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Private } from '@/components/ui/private';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { useNotificationStore } from '@/stores';
 import type {
   PrefixProxyEditorField,
@@ -22,7 +38,6 @@ import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import { AuthFileExcludedModelsField } from './AuthFileExcludedModelsField';
 import { AuthFilePolicyFields } from './AuthFilePolicyFields';
 import { credentialPolicyError, readCredentialPolicy } from '../credentialPolicy';
-import styles from './AuthFileDetailsSheet.module.scss';
 
 export type AuthFileDetailsSheetProps = {
   disableControls: boolean;
@@ -33,18 +48,21 @@ export type AuthFileDetailsSheetProps = {
   onChange: (field: PrefixProxyEditorField, value: PrefixProxyEditorFieldValue) => void;
 };
 
+type ToggleField = 'disableCooling' | 'websockets' | 'useSiwc' | 'usingApi';
+
 /**
- * 凭证详情/编辑抽屉：替代旧的居中 Modal，与提供商工作台的 Sheet 模式一致。
- * 脏状态下关闭（Escape/遮罩/×/取消）先走确认对话框。
+ * Credential details and settings. Closing with unsaved changes (Escape, overlay, close button,
+ * cancel) asks first.
  */
 export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { disableControls, editor, dirty, onClose, onSave, onChange } = props;
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
+  const saving = editor?.saving === true;
 
-  const confirmClose = useCallback((): boolean | Promise<boolean> => {
-    if (!dirty || editor?.saving === true) return true;
+  const confirmClose = useCallback((): Promise<boolean> => {
+    if (!dirty || saving) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       showConfirmation({
         title: t('providersPage.unsavedChanges.title'),
@@ -56,52 +74,230 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
         onCancel: () => resolve(false),
       });
     });
-  }, [dirty, editor?.saving, showConfirmation, t]);
+  }, [dirty, saving, showConfirmation, t]);
 
-  const handleCancelClick = useCallback(() => {
-    void Promise.resolve(confirmClose()).then((ok) => {
+  const requestClose = useCallback(() => {
+    if (saving) return;
+    void confirmClose().then((ok) => {
       if (ok) onClose();
     });
-  }, [confirmClose, onClose]);
+  }, [confirmClose, onClose, saving]);
 
   const handleSettingsLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
-      if (editor?.saving) return;
-
-      void Promise.resolve(confirmClose()).then((ok) => {
+      if (saving) return;
+      void confirmClose().then((ok) => {
         if (ok) void navigate('/config?field=routingStrategy');
       });
     },
-    [confirmClose, editor?.saving, navigate]
+    [confirmClose, navigate, saving]
   );
 
+  const fieldDisabled = disableControls || saving || !editor?.json;
+
+  const toggle = (field: ToggleField, label: string, hint: string): ReactNode =>
+    editor && (
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor={`auth-file-${field}`}>{label}</FieldLabel>
+          <FieldDescription>{hint}</FieldDescription>
+        </FieldContent>
+        <Switch
+          id={`auth-file-${field}`}
+          checked={editor[field]}
+          onCheckedChange={(value) => onChange(field, value)}
+          disabled={fieldDisabled}
+        />
+      </Field>
+    );
+
   return (
-    <Sheet
-      open={Boolean(editor)}
-      onClose={onClose}
-      confirmClose={confirmClose}
-      size="md"
-      closeDisabled={editor?.saving === true}
-      eyebrow={t('auth_files.prefix_proxy_button')}
-      title={
-        <EmailPrivacyText text={editor?.fileName ?? ''} fallback={t('auth_files.prefix_proxy_button')} />
-      }
-      footer={
-        <>
-          <Button
-            variant="secondary"
-            onClick={handleCancelClick}
-            disabled={editor?.saving === true}
-          >
+    <Sheet open={Boolean(editor)} onOpenChange={(open) => !open && requestClose()}>
+      <SheetContent
+        side="right"
+        className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+      >
+        <SheetHeader className="border-b pr-12">
+          <SheetDescription>{t('auth_files.prefix_proxy_button')}</SheetDescription>
+          <SheetTitle className="truncate">
+            {editor?.fileName ? (
+              <Private>{editor.fileName}</Private>
+            ) : (
+              t('auth_files.prefix_proxy_button')
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {editor &&
+            (editor.loading ? (
+              <p className="text-muted-foreground">{t('auth_files.prefix_proxy_loading')}</p>
+            ) : (
+              <FieldGroup className="gap-5">
+                {editor.error && (
+                  <p role="alert" className="text-destructive">
+                    {editor.error}
+                  </p>
+                )}
+                {!editor.json ? (
+                  <p role="alert" className="text-destructive">
+                    {t('auth_files.prefix_proxy_invalid_content_label')}
+                  </p>
+                ) : (
+                  <>
+                    <Field>
+                      <FieldLabel htmlFor="auth-file-prefix">
+                        {t('auth_files.prefix_label')}
+                      </FieldLabel>
+                      <Input
+                        id="auth-file-prefix"
+                        value={editor.prefix}
+                        disabled={fieldDisabled}
+                        onChange={(e) => onChange('prefix', e.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="auth-file-proxy">
+                        {t('auth_files.proxy_url_label')}
+                      </FieldLabel>
+                      <Input
+                        id="auth-file-proxy"
+                        value={editor.proxyUrl}
+                        placeholder={t('auth_files.proxy_url_placeholder')}
+                        disabled={fieldDisabled}
+                        onChange={(e) => onChange('proxyUrl', e.target.value)}
+                      />
+                    </Field>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="auth-file-priority">
+                          {t('auth_files.priority_label')}
+                        </FieldLabel>
+                        <Input
+                          id="auth-file-priority"
+                          value={editor.priority}
+                          placeholder={t('auth_files.priority_placeholder')}
+                          disabled={fieldDisabled}
+                          onChange={(e) => onChange('priority', e.target.value)}
+                        />
+                        <FieldDescription>{t('auth_files.priority_hint')}</FieldDescription>
+                      </Field>
+                      <Field data-invalid={Boolean(editor.weightError) || undefined}>
+                        <FieldLabel htmlFor="auth-file-weight">
+                          {t('auth_files.weight_label')}
+                        </FieldLabel>
+                        <Input
+                          id="auth-file-weight"
+                          type="number"
+                          step="1"
+                          max={MAX_CREDENTIAL_WEIGHT}
+                          value={editor.weight}
+                          placeholder="1"
+                          aria-invalid={Boolean(editor.weightError)}
+                          disabled={fieldDisabled}
+                          onChange={(e) => onChange('weight', e.target.value)}
+                        />
+                        {editor.weightError ? (
+                          <FieldError>{editor.weightError}</FieldError>
+                        ) : (
+                          <FieldDescription>
+                            <Trans
+                              i18nKey="auth_files.weight_hint"
+                              components={{
+                                settingsLink: (
+                                  <Link
+                                    to="/config?field=routingStrategy"
+                                    onClick={handleSettingsLinkClick}
+                                  />
+                                ),
+                              }}
+                            />
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    </div>
+
+                    <FieldSeparator />
+                    {toggle(
+                      'disableCooling',
+                      t('auth_files.disable_cooling_label'),
+                      t('auth_files.disable_cooling_hint')
+                    )}
+                    {supportsAuthFileWebsockets(editor.providerKey) &&
+                      toggle(
+                        'websockets',
+                        t('auth_files.websockets_label'),
+                        t('auth_files.websockets_hint')
+                      )}
+                    {supportsAuthFileSiwc(editor.providerKey) &&
+                      toggle(
+                        'useSiwc',
+                        t('auth_files.use_siwc_label'),
+                        t('auth_files.use_siwc_hint')
+                      )}
+                    {supportsAuthFileUsingApi(editor.providerKey) &&
+                      toggle(
+                        'usingApi',
+                        t('auth_files.using_api_label'),
+                        t('auth_files.using_api_hint')
+                      )}
+                    <FieldSeparator />
+
+                    <AuthFileExcludedModelsField
+                      fileName={editor.fileName}
+                      value={editor.excludedModelsText}
+                      disabled={fieldDisabled}
+                      onChange={(value) => onChange('excludedModelsText', value)}
+                    />
+                    <Field data-invalid={Boolean(editor.headersError) || undefined}>
+                      <FieldLabel htmlFor="auth-file-headers">
+                        {t('auth_files.headers_label')}
+                      </FieldLabel>
+                      <Textarea
+                        id="auth-file-headers"
+                        className="min-h-24 font-mono text-xs"
+                        value={editor.headersText}
+                        placeholder={t('auth_files.headers_placeholder')}
+                        rows={4}
+                        aria-invalid={Boolean(editor.headersError)}
+                        disabled={fieldDisabled}
+                        onChange={(e) => onChange('headersText', e.target.value)}
+                      />
+                      {editor.headersError && <FieldError>{editor.headersError}</FieldError>}
+                      <FieldDescription>{t('auth_files.headers_hint')}</FieldDescription>
+                    </Field>
+                    <AuthFilePolicyFields
+                      draft={editor.policy ?? readCredentialPolicy(editor.json)}
+                      disabled={disableControls || saving}
+                      onChange={onChange}
+                    />
+                    <Field>
+                      <FieldLabel htmlFor="auth-file-note">{t('auth_files.note_label')}</FieldLabel>
+                      <Input
+                        id="auth-file-note"
+                        value={editor.note}
+                        placeholder={t('auth_files.note_placeholder')}
+                        disabled={fieldDisabled}
+                        onChange={(e) => onChange('note', e.target.value)}
+                      />
+                      <FieldDescription>{t('auth_files.note_hint')}</FieldDescription>
+                    </Field>
+                  </>
+                )}
+              </FieldGroup>
+            ))}
+        </div>
+
+        <SheetFooter className="flex-row justify-end border-t">
+          <Button variant="outline" onClick={requestClose} disabled={saving}>
             {dirty ? t('common.cancel') : t('common.close')}
           </Button>
           <Button
             onClick={onSave}
-            loading={editor?.saving === true}
             disabled={
               disableControls ||
-              editor?.saving === true ||
+              saving ||
               !dirty ||
               !editor?.json ||
               Boolean(editor?.headersTouched && editor.headersError) ||
@@ -111,157 +307,8 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
           >
             {t('common.save')}
           </Button>
-        </>
-      }
-    >
-      {editor && (
-        <div className={styles.editor}>
-          {editor.loading ? (
-            <div className={styles.loading}>
-              <LoadingSpinner size={14} />
-              <span>{t('auth_files.prefix_proxy_loading')}</span>
-            </div>
-          ) : (
-            <>
-              {editor.error && <div className={styles.error}>{editor.error}</div>}
-              {!editor.json && (
-                <div className={styles.error}>
-                  {t('auth_files.prefix_proxy_invalid_content_label')}
-                </div>
-              )}
-              {editor.json && (
-                <div className={styles.fields}>
-                  <Input
-                    label={t('auth_files.prefix_label')}
-                    value={editor.prefix}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(e) => onChange('prefix', e.target.value)}
-                  />
-                  <Input
-                    label={t('auth_files.proxy_url_label')}
-                    value={editor.proxyUrl}
-                    placeholder={t('auth_files.proxy_url_placeholder')}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(e) => onChange('proxyUrl', e.target.value)}
-                  />
-                  <Input
-                    label={t('auth_files.priority_label')}
-                    value={editor.priority}
-                    placeholder={t('auth_files.priority_placeholder')}
-                    hint={t('auth_files.priority_hint')}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(e) => onChange('priority', e.target.value)}
-                  />
-                  <Input
-                    label={t('auth_files.weight_label')}
-                    type="number"
-                    step="1"
-                    max={MAX_CREDENTIAL_WEIGHT}
-                    value={editor.weight}
-                    placeholder="1"
-                    hint={
-                      <Trans
-                        i18nKey="auth_files.weight_hint"
-                        components={{
-                          settingsLink: (
-                            <Link
-                              className={styles.settingsLink}
-                              to="/config?field=routingStrategy"
-                              onClick={handleSettingsLinkClick}
-                            />
-                          ),
-                        }}
-                      />
-                    }
-                    error={editor.weightError ?? undefined}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(e) => onChange('weight', e.target.value)}
-                  />
-                  <div className="form-group">
-                    <label>{t('auth_files.disable_cooling_label')}</label>
-                    <ToggleSwitch
-                      checked={editor.disableCooling}
-                      onChange={(value) => onChange('disableCooling', value)}
-                      disabled={disableControls || editor.saving || !editor.json}
-                      ariaLabel={t('auth_files.disable_cooling_label')}
-                    />
-                    <div className="hint">{t('auth_files.disable_cooling_hint')}</div>
-                  </div>
-                  {supportsAuthFileWebsockets(editor.providerKey) && (
-                    <div className="form-group">
-                      <label>{t('auth_files.websockets_label')}</label>
-                      <ToggleSwitch
-                        checked={editor.websockets}
-                        onChange={(value) => onChange('websockets', value)}
-                        disabled={disableControls || editor.saving || !editor.json}
-                        ariaLabel={t('auth_files.websockets_label')}
-                      />
-                      <div className="hint">{t('auth_files.websockets_hint')}</div>
-                    </div>
-                  )}
-                  {supportsAuthFileSiwc(editor.providerKey) && (
-                    <div className="form-group">
-                      <label>{t('auth_files.use_siwc_label')}</label>
-                      <ToggleSwitch
-                        checked={editor.useSiwc}
-                        onChange={(value) => onChange('useSiwc', value)}
-                        disabled={disableControls || editor.saving || !editor.json}
-                        ariaLabel={t('auth_files.use_siwc_label')}
-                      />
-                      <div className="hint">{t('auth_files.use_siwc_hint')}</div>
-                    </div>
-                  )}
-                  {supportsAuthFileUsingApi(editor.providerKey) && (
-                    <div className="form-group">
-                      <label>{t('auth_files.using_api_label')}</label>
-                      <ToggleSwitch
-                        checked={editor.usingApi}
-                        onChange={(value) => onChange('usingApi', value)}
-                        disabled={disableControls || editor.saving || !editor.json}
-                        ariaLabel={t('auth_files.using_api_label')}
-                      />
-                      <div className="hint">{t('auth_files.using_api_hint')}</div>
-                    </div>
-                  )}
-                  <AuthFileExcludedModelsField
-                    fileName={editor.fileName}
-                    value={editor.excludedModelsText}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(value) => onChange('excludedModelsText', value)}
-                  />
-                  <div className="form-group">
-                    <label>{t('auth_files.headers_label')}</label>
-                    <textarea
-                      className={`input ${editor.headersError ? styles.textareaInvalid : ''}`}
-                      value={editor.headersText}
-                      placeholder={t('auth_files.headers_placeholder')}
-                      rows={4}
-                      aria-invalid={Boolean(editor.headersError)}
-                      disabled={disableControls || editor.saving || !editor.json}
-                      onChange={(e) => onChange('headersText', e.target.value)}
-                    />
-                    {editor.headersError && <div className="error-box">{editor.headersError}</div>}
-                    <div className="hint">{t('auth_files.headers_hint')}</div>
-                  </div>
-                  <AuthFilePolicyFields
-                    draft={editor.policy ?? readCredentialPolicy(editor.json)}
-                    disabled={disableControls || editor.saving}
-                    onChange={onChange}
-                  />
-                  <Input
-                    label={t('auth_files.note_label')}
-                    value={editor.note}
-                    placeholder={t('auth_files.note_placeholder')}
-                    hint={t('auth_files.note_hint')}
-                    disabled={disableControls || editor.saving || !editor.json}
-                    onChange={(e) => onChange('note', e.target.value)}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+        </SheetFooter>
+      </SheetContent>
     </Sheet>
   );
 }

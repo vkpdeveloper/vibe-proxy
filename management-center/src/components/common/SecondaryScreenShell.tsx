@@ -1,7 +1,7 @@
 import { forwardRef, type ReactNode } from 'react';
-import { Button } from '@/components/ui/Button';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { IconChevronLeft } from '@/components/ui/icons';
+import { Button } from '@/components/legacy/Button';
+import { LoadingSpinner } from '@/components/legacy/LoadingSpinner';
+import { IconChevronLeft } from '@/components/legacy/icons';
 import styles from './SecondaryScreenShell.module.scss';
 
 export type SecondaryScreenShellProps = {

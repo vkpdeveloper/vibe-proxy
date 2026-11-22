@@ -1,7 +1,24 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouteError } from 'react-router-dom';
-import { IconAlertTriangle, IconCheckCircle2, IconRefreshCw } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Alert02Icon,
+  ChartHistogramIcon,
+  CheckmarkCircle02Icon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item';
 import {
   Table,
   TableBody,
@@ -9,14 +26,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/Table';
+} from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Page, Section } from '@/components/layout/Page';
 import { Meter } from '@/features/dashboard/components/Meter';
-import { fillStyle } from '@/lib/dither';
 import { toneForSuccessRate, type MeterTone } from '@/features/dashboard/utils';
-import { useRevealGroup } from '@/hooks/motion';
+import { cn } from '@/lib/utils';
 import { usageCostsApi, type UsageBreakdown, type UsageCostReport } from '@/services/api';
 import { useAuthStore } from '@/stores';
-import styles from './UsagePage.module.scss';
 
 type Range = '7d' | '30d' | 'month' | 'all';
 type Dimension = 'client' | 'provider' | 'account' | 'model' | 'auth';
@@ -24,22 +42,14 @@ type Dimension = 'client' | 'provider' | 'account' | 'model' | 'auth';
 const RANGES: Range[] = ['7d', '30d', 'month', 'all'];
 const DIMENSIONS: Dimension[] = ['client', 'provider', 'account', 'model', 'auth'];
 /** Keep the date axis legible: at most this many labels regardless of range. */
-const MAX_DATE_LABELS = 10;
+const MAX_DATE_LABELS = 6;
+const DASH = '-';
 
-// Spend bars are dithered, dense at the top. The colour comes from
-// --usage-bar so the stylesheet can still light the peak and hovered bars.
-const SPEND_BAR_FILL = fillStyle('gradient', {
-  color: '--usage-bar',
-  edge: 'top',
-  length: 16,
-  to: 0.25,
-});
-
-const TONE_ACCENTS: Record<MeterTone, string> = {
-  good: 'var(--viz-success)',
-  warning: 'var(--amber-color)',
-  critical: 'var(--viz-failure)',
-  idle: 'var(--border-hover)',
+const TONE_TEXT: Record<MeterTone, string> = {
+  good: 'text-success',
+  warning: 'text-warning',
+  critical: 'text-destructive',
+  idle: 'text-muted-foreground',
 };
 
 const RANGE_META: Record<Range, string> = {
@@ -101,10 +111,34 @@ function coverageTone(coverage: number): MeterTone {
   return 'critical';
 }
 
+function Stat({
+  label,
+  value,
+  hint,
+  valueClassName,
+  children,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  valueClassName?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 bg-card p-4">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className={cn('font-mono text-2xl tracking-tight tabular-nums', valueClassName)}>
+        {value}
+      </span>
+      {children}
+      <span className="text-xs text-faint">{hint}</span>
+    </div>
+  );
+}
+
 export function UsagePage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
-  const revealRef = useRevealGroup<HTMLDivElement>();
   const [range, setRange] = useState<Range>('30d');
   const [dimension, setDimension] = useState<Dimension>('client');
   const [report, setReport] = useState<UsageCostReport | null>(null);
@@ -151,332 +185,360 @@ export function UsagePage() {
     : null;
 
   return (
-    <div className={styles.page} ref={revealRef}>
-      <header className={styles.header}>
-        <div className={styles.copy}>
-          <h1 className={styles.title} data-reveal>
-            {t('usage.title', { defaultValue: 'Usage & spend' })}
-          </h1>
-          <p className={styles.meta} data-reveal>
-            <span>{RANGE_META[range]}</span>
-            <span className={styles.metaDot} aria-hidden="true">
-              ·
-            </span>
-            <span className={report ? styles.metaLive : styles.metaMuted}>
-              {report ? `${report.totals.requests.toLocaleString()} requests` : 'Loading ledger'}
-            </span>
-            {failed > 0 && (
-              <>
-                <span className={styles.metaDot} aria-hidden="true">
-                  ·
-                </span>
-                <span className={styles.metaFailure}>{failed.toLocaleString()} failed</span>
-              </>
-            )}
-          </p>
-        </div>
-        <div className={styles.actions} data-reveal>
-          <button
-            type="button"
-            className={styles.ghostAction}
+    <>
+      <Page
+        title={t('usage.title', { defaultValue: 'Usage & spend' })}
+        actions={
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-9"
             onClick={() => void load()}
             disabled={loading}
           >
-            <IconRefreshCw size={14} className={loading ? styles.spinning : undefined} />
+            <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
             {t('common.refresh', { defaultValue: 'Refresh' })}
-          </button>
-          <div className={styles.segmented} role="group" aria-label="Usage date range">
-            {RANGES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={range === value}
-                className={`${styles.segment} ${range === value ? styles.segmentActive : ''}`}
-                onClick={() => setRange(value)}
-              >
-                {value === 'month'
-                  ? t('usage.month', { defaultValue: 'Month' })
-                  : value.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      {error && (
-        <div className={styles.errorBanner} role="alert">
-          <IconAlertTriangle size={15} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <section className={styles.statsRow} aria-busy={loading} data-reveal>
-        <article
-          className={styles.statTile}
-          style={{ '--tile-accent': 'var(--text-primary)' } as CSSProperties}
-        >
-          <span className={styles.statLabel}>
-            {t('usage.estimated_value', { defaultValue: 'Estimated API value' })}
-          </span>
-          <strong className={styles.statValue}>
-            {report ? formatMoney(report.totals.estimated_usd, report.currency) : '—'}
-          </strong>
-          <span className={styles.statHint}>
-            {t('usage.rates_as_of', { defaultValue: 'Public API rates as of' })}{' '}
-            {report?.pricing_as_of || '—'}
-          </span>
-        </article>
-        <article className={styles.statTile}>
-          <span className={styles.statLabel}>
-            {t('usage.total_tokens', { defaultValue: 'Total tokens' })}
-          </span>
-          <strong className={styles.statValue}>
-            {report ? formatTokens(report.totals.total_tokens) : '—'}
-          </strong>
-          <span className={styles.statHint}>
-            {report
-              ? `${formatTokens(report.totals.input_tokens)} in · ${formatTokens(report.totals.output_tokens)} out`
-              : '—'}
-          </span>
-        </article>
-        <article
-          className={styles.statTile}
-          style={
-            report
-              ? ({
-                  '--tile-accent': TONE_ACCENTS[toneForSuccessRate(successRate)],
-                } as CSSProperties)
-              : undefined
-          }
-        >
-          <span className={styles.statLabel}>
-            {t('usage.requests', { defaultValue: 'Requests' })}
-          </span>
-          <strong className={styles.statValue}>
-            {report?.totals.requests.toLocaleString() ?? '—'}
-          </strong>
-          <span className={styles.statHint}>
-            {report
-              ? `${report.totals.successful.toLocaleString()} successful · ${failed.toLocaleString()} failed`
-              : '—'}
-          </span>
-        </article>
-        <article
-          className={styles.statTile}
-          style={
-            report
-              ? ({
-                  '--tile-accent': TONE_ACCENTS[coverageTone(pricedCoverage)],
-                } as CSSProperties)
-              : undefined
-          }
-        >
-          <span className={styles.statLabel}>
-            {t('usage.pricing_coverage', { defaultValue: 'Pricing coverage' })}
-          </span>
-          <strong className={styles.statValue}>
-            {report ? `${pricedCoverage.toFixed(1)}%` : '—'}
-          </strong>
-          <Meter
-            className={styles.statMeter}
-            value={report ? pricedCoverage : null}
-            tone={report ? coverageTone(pricedCoverage) : 'idle'}
-            ariaLabel="Pricing coverage"
-          />
-          <span className={styles.statHint}>
-            {report?.totals.unpriced_requests ?? 0} unpriced requests
-          </span>
-        </article>
-        <article className={styles.statTile}>
-          <span className={styles.statLabel}>
-            {t('usage.cache_share', { defaultValue: 'Cached input share' })}
-          </span>
-          <strong className={styles.statValue}>{report ? `${cacheShare.toFixed(1)}%` : '—'}</strong>
-          <span className={styles.statHint}>
-            {report ? `${formatTokens(report.totals.cached_tokens)} cached tokens` : '—'}
-          </span>
-        </article>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.eyebrow}>Persistent ledger</span>
-          <h2 className={styles.sectionTitle}>
-            {t('usage.daily_spend', { defaultValue: 'Daily estimated spend' })}
-          </h2>
-          <p className={styles.sectionDescription}>
-            {t('usage.daily_spend_hint', { defaultValue: 'Token-rated usage in UTC.' })}
-          </p>
-        </div>
-        <div className={styles.panel}>
-          {daily.length === 0 ? (
-            <p className={styles.emptyNote}>
-              {loading ? 'Loading usage…' : 'New usage will appear here automatically.'}
-            </p>
-          ) : (
-            <div className={styles.chart}>
-              <div className={styles.plot}>
-                {daily.map((day, index) => {
-                  const label = `${day.date}: ${formatMoney(day.estimated_usd, currency)}`;
-                  return (
-                    <div className={styles.column} key={day.date} title={label}>
-                      {index === peakIndex && maxDailyCost > 0 && (
-                        <span className={styles.peakLabel}>
-                          {formatMoney(day.estimated_usd, currency)}
-                        </span>
-                      )}
-                      <div
-                        className={`${styles.bar} ${index === peakIndex ? styles.barPeak : ''}`}
-                        style={{
-                          height: `${Math.max(2, (day.estimated_usd / Math.max(maxDailyCost, 0.000001)) * 100)}%`,
-                          ...SPEND_BAR_FILL,
-                        }}
-                        role="img"
-                        aria-label={label}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className={styles.axis} aria-hidden="true">
-                {daily.map((day, index) => (
-                  <span key={day.date}>
-                    {index % dateLabelStep === 0 || index === daily.length - 1
-                      ? day.date.slice(5)
-                      : ''}
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              spacing={0}
+              value={range}
+              onValueChange={(value) => value && setRange(value as Range)}
+              aria-label="Usage date range"
+            >
+              {RANGES.map((value) => (
+                <ToggleGroupItem key={value} value={value} className="h-9 px-3">
+                  {value === 'month'
+                    ? t('usage.month', { defaultValue: 'Month' })
+                    : value === 'all'
+                      ? 'All'
+                      : value.toUpperCase()}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-muted-foreground">
+              <span>{RANGE_META[range]}</span>
+              <span className="text-faint" aria-hidden="true">
+                ·
+              </span>
+              <span className="font-mono text-xs text-foreground">
+                {report ? `${report.totals.requests.toLocaleString()} requests` : 'Loading'}
+              </span>
+              {failed > 0 && (
+                <>
+                  <span className="text-faint" aria-hidden="true">
+                    ·
                   </span>
-                ))}
-              </div>
+                  <span className="font-mono text-xs text-destructive">
+                    {failed.toLocaleString()} failed
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+            >
+              <HugeiconsIcon icon={Alert02Icon} className="size-4 shrink-0" strokeWidth={1.75} />
+              {error}
             </div>
           )}
-        </div>
-      </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.eyebrow}>Attribution</span>
-          <h2 className={styles.sectionTitle}>
-            {t('usage.breakdown', { defaultValue: 'Cost breakdown' })}
-          </h2>
-          <p className={styles.sectionDescription}>
-            {t('usage.breakdown_hint', {
-              defaultValue: 'Compare the dimensions that drive token spend.',
-            })}
-          </p>
-        </div>
-        <div className={styles.tabs} role="tablist" aria-label="Breakdown dimension">
-          {DIMENSIONS.map((value) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={dimension === value}
-              className={`${styles.tab} ${dimension === value ? styles.tabActive : ''}`}
-              key={value}
-              onClick={() => setDimension(value)}
+          <section
+            aria-busy={loading}
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4"
+          >
+            <div className="col-span-2 flex min-w-0 flex-col gap-1.5 bg-card p-4 sm:col-span-4">
+              <span className="text-[13px] text-muted-foreground">
+                {t('usage.estimated_value', { defaultValue: 'Estimated API value' })}
+              </span>
+              <span className="font-mono text-4xl tracking-tight tabular-nums">
+                {report ? formatMoney(report.totals.estimated_usd, report.currency) : DASH}
+              </span>
+              <span className="text-xs text-faint">
+                {t('usage.rates_as_of', { defaultValue: 'Public API rates as of' })}{' '}
+                {report?.pricing_as_of || DASH}
+              </span>
+            </div>
+            <Stat
+              label={t('usage.total_tokens', { defaultValue: 'Total tokens' })}
+              value={report ? formatTokens(report.totals.total_tokens) : DASH}
+              hint={
+                report
+                  ? `${formatTokens(report.totals.input_tokens)} in, ${formatTokens(report.totals.output_tokens)} out`
+                  : DASH
+              }
+            />
+            <Stat
+              label={t('usage.requests', { defaultValue: 'Requests' })}
+              value={report?.totals.requests.toLocaleString() ?? DASH}
+              valueClassName={report ? undefined : 'text-muted-foreground'}
+              hint={
+                report
+                  ? `${report.totals.successful.toLocaleString()} successful, ${failed.toLocaleString()} failed`
+                  : DASH
+              }
             >
-              {DIMENSION_LABELS[value]}
-              <span className={styles.tabCount}>{breakdownRows(report, value).length}</span>
-            </button>
-          ))}
+              {report && successRate !== null && (
+                <span
+                  className={cn('font-mono text-xs', TONE_TEXT[toneForSuccessRate(successRate)])}
+                >
+                  {successRate.toFixed(1)}%
+                </span>
+              )}
+            </Stat>
+            <Stat
+              label={t('usage.pricing_coverage', { defaultValue: 'Pricing coverage' })}
+              value={report ? `${pricedCoverage.toFixed(1)}%` : DASH}
+              hint={`${report?.totals.unpriced_requests ?? 0} unpriced requests`}
+            >
+              <Meter
+                value={report ? pricedCoverage : null}
+                tone={report ? coverageTone(pricedCoverage) : 'idle'}
+                ariaLabel="Pricing coverage"
+              />
+            </Stat>
+            <Stat
+              label={t('usage.cache_share', { defaultValue: 'Cached input share' })}
+              value={report ? `${cacheShare.toFixed(1)}%` : DASH}
+              hint={report ? `${formatTokens(report.totals.cached_tokens)} cached tokens` : DASH}
+            />
+          </section>
         </div>
-        <Table className={styles.table}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead alignRight>Requests</TableHead>
-              <TableHead alignRight>Input</TableHead>
-              <TableHead alignRight>Output</TableHead>
-              <TableHead alignRight>Tokens</TableHead>
-              <TableHead alignRight>Est. value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className={styles.emptyRow}>
-                  No usage recorded for this period.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell>
-                    <div className={styles.rowIdentity}>
-                      <span className={styles.rowName}>{row.key}</span>
-                      <Meter
-                        className={styles.rowTrack}
-                        value={maxRowCost ? (row.estimated_usd / maxRowCost) * 100 : 0}
-                        color="ink"
-                        ariaLabel={`${row.key} share of the top spend`}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell alignRight className={styles.numberCell}>
-                    {row.requests.toLocaleString()}
-                  </TableCell>
-                  <TableCell alignRight className={styles.numberCell}>
-                    {formatTokens(row.input_tokens)}
-                  </TableCell>
-                  <TableCell alignRight className={styles.numberCell}>
-                    {formatTokens(row.output_tokens)}
-                  </TableCell>
-                  <TableCell alignRight className={styles.numberCell}>
-                    {formatTokens(row.total_tokens)}
-                  </TableCell>
-                  <TableCell alignRight className={styles.moneyCell}>
-                    {formatMoney(row.estimated_usd, report?.currency)}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </section>
 
-      {unpricedModels.length > 0 && (
-        <section className={styles.panel}>
-          <div className={styles.panelHead}>
-            <h3 className={styles.panelTitle}>Models needing a price</h3>
-            <p className={styles.panelDescription}>
+        <Section
+          title={t('usage.daily_spend', { defaultValue: 'Daily estimated spend' })}
+          actions={<span className="font-mono text-xs text-faint">UTC</span>}
+        >
+          <div className="overflow-hidden rounded-xl border bg-card">
+            {daily.length === 0 ? (
+              <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+                {loading ? 'Loading usage' : 'New usage will appear here automatically.'}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2 px-4 pt-8 pb-3">
+                <div className="relative h-40">
+                  {[0, 0.5, 1].map((ratio) => (
+                    <span
+                      key={ratio}
+                      className="absolute inset-x-0 h-px bg-border/60"
+                      style={{ top: `${ratio * 100}%` }}
+                      aria-hidden="true"
+                    />
+                  ))}
+                  <div className="absolute inset-0 flex items-end gap-[3px]">
+                    {daily.map((day, index) => {
+                      const label = `${day.date}: ${formatMoney(day.estimated_usd, currency)}`;
+                      const height = Math.max(
+                        2,
+                        (day.estimated_usd / Math.max(maxDailyCost, 0.000001)) * 100
+                      );
+                      return (
+                        <Tooltip key={day.date}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
+                              role="img"
+                              aria-label={label}
+                            >
+                              {index === peakIndex && maxDailyCost > 0 && (
+                                <span
+                                  className={cn(
+                                    'absolute pb-1 font-mono text-[11px] whitespace-nowrap text-muted-foreground tabular-nums',
+                                    index > daily.length / 2 ? 'right-0' : 'left-0'
+                                  )}
+                                  style={{ bottom: `${height}%` }}
+                                >
+                                  {formatMoney(day.estimated_usd, currency)}
+                                </span>
+                              )}
+                              <div
+                                className={cn(
+                                  'rounded-[2px] transition-colors duration-150 ease-out',
+                                  index === peakIndex
+                                    ? 'bg-primary'
+                                    : 'bg-primary/50 group-hover:bg-primary/80'
+                                )}
+                                style={{ height: `${height}%` }}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="flex flex-col gap-0.5 font-mono">
+                            <span>{day.date}</span>
+                            <span>{formatMoney(day.estimated_usd, currency)}</span>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div
+                  className="flex justify-between font-mono text-[11px] text-faint"
+                  aria-hidden="true"
+                >
+                  {daily
+                    .filter((_, index) => index % dateLabelStep === 0 || index === daily.length - 1)
+                    .map((day) => (
+                      <span key={day.date}>{day.date.slice(5)}</span>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+
+        <Section title={t('usage.breakdown', { defaultValue: 'Cost breakdown' })}>
+          <div className="-mx-1 overflow-x-auto px-1">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              spacing={0}
+              value={dimension}
+              onValueChange={(value) => value && setDimension(value as Dimension)}
+              aria-label="Breakdown dimension"
+            >
+              {DIMENSIONS.map((value) => (
+                <ToggleGroupItem key={value} value={value} className="h-9 gap-2 px-3">
+                  {DIMENSION_LABELS[value]}
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {breakdownRows(report, value).length}
+                  </span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="px-4 text-xs font-normal text-muted-foreground">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-normal text-muted-foreground max-sm:hidden">
+                    Requests
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-normal text-muted-foreground max-md:hidden">
+                    Input
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-normal text-muted-foreground max-md:hidden">
+                    Output
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-normal text-muted-foreground">
+                    Tokens
+                  </TableHead>
+                  <TableHead className="px-4 text-right text-xs font-normal text-muted-foreground">
+                    Est. value
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      No usage recorded for this period.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((row) => (
+                    <TableRow key={row.key}>
+                      <TableCell className="max-w-0 px-4 whitespace-normal sm:max-w-56">
+                        <div className="flex min-w-0 flex-col gap-1.5 py-0.5">
+                          <span className="truncate text-[13px]" title={row.key}>
+                            {row.key}
+                          </span>
+                          <Meter
+                            className="max-w-40"
+                            value={maxRowCost ? (row.estimated_usd / maxRowCost) * 100 : 0}
+                            tone="neutral"
+                            ariaLabel={`${row.key} share of the top spend`}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums max-sm:hidden">
+                        {row.requests.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums max-md:hidden">
+                        {formatTokens(row.input_tokens)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums max-md:hidden">
+                        {formatTokens(row.output_tokens)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground tabular-nums">
+                        {formatTokens(row.total_tokens)}
+                      </TableCell>
+                      <TableCell className="px-4 text-right font-mono text-xs tabular-nums">
+                        {formatMoney(row.estimated_usd, report?.currency)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Section>
+
+        {unpricedModels.length > 0 && (
+          <Section
+            title="Models needing a price"
+            actions={<Badge variant="secondary">{unpricedModels.length}</Badge>}
+          >
+            <p className="-mt-2 text-[13px] text-muted-foreground">
               These tokens remain in totals but are excluded from the dollar estimate.
             </p>
-          </div>
-          <div className={styles.chipList}>
-            {unpricedModels.map((item) => (
-              <span key={`${item.provider}:${item.model}`} className={styles.chip}>
-                <b>{item.model}</b> · {formatTokens(item.tokens)} tokens
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
+            <ul className="flex flex-wrap gap-1.5">
+              {unpricedModels.map((item) => (
+                <li key={`${item.provider}:${item.model}`}>
+                  <Badge variant="secondary" className="gap-1.5 font-normal">
+                    <span className="font-mono">{item.model}</span>
+                    <span className="text-muted-foreground">
+                      {formatTokens(item.tokens)} tokens
+                    </span>
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
-      <section className={styles.notesGrid}>
-        <article className={styles.panel}>
-          <div className={styles.noteHead}>
-            <IconCheckCircle2 size={16} />
-            <h3 className={styles.panelTitle}>What this amount means</h3>
-          </div>
-          <p className={styles.panelDescription}>
-            It is the public API equivalent of the observed tokens, including cache and long-context
-            rates. OAuth subscriptions and negotiated discounts may make the amount on your invoice
-            different.
-          </p>
-        </article>
-        <article className={styles.panel}>
-          <div className={styles.noteHead}>
-            <IconAlertTriangle size={16} />
-            <h3 className={styles.panelTitle}>Historical recovery</h3>
-          </div>
-          <p className={styles.panelDescription}>
-            {report?.historical.notice || 'Existing logs are scanned when accounting starts.'}{' '}
-            {report
-              ? `${report.historical.imported_usage_records} detailed records imported; ${report.historical.uncostable_legacy_rows.toLocaleString()} legacy requests lacked billing fields.`
-              : ''}
-          </p>
-        </article>
-      </section>
-    </div>
+        <div className="flex flex-col gap-2">
+          <Item variant="outline">
+            <ItemMedia variant="icon">
+              <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={1.75} />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>What this amount means</ItemTitle>
+              <ItemDescription className="line-clamp-none">
+                It is the public API equivalent of the observed tokens, including cache and
+                long-context rates. OAuth subscriptions and negotiated discounts may make the amount
+                on your invoice different.
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+          <Item variant="outline">
+            <ItemMedia variant="icon">
+              <HugeiconsIcon icon={Alert02Icon} strokeWidth={1.75} />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>Historical recovery</ItemTitle>
+              <ItemDescription className="line-clamp-none">
+                {report?.historical.notice || 'Existing logs are scanned when accounting starts.'}{' '}
+                {report
+                  ? `${report.historical.imported_usage_records} detailed records imported; ${report.historical.uncostable_legacy_rows.toLocaleString()} legacy requests lacked billing fields.`
+                  : ''}
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        </div>
+      </Page>
+    </>
   );
 }
 
@@ -484,20 +546,24 @@ export function UsagePageError() {
   useRouteError();
 
   return (
-    <section className={styles.fatalState} role="alert">
-      <span className={styles.eyebrow}>Usage unavailable</span>
-      <h1 className={styles.fatalTitle}>We couldn’t display usage right now.</h1>
-      <p className={styles.sectionDescription}>
-        Your usage ledger is safe. Reload the page to request a fresh report.
-      </p>
-      <button
-        type="button"
-        className={styles.primaryAction}
-        onClick={() => window.location.reload()}
-      >
-        <IconRefreshCw size={14} />
-        Reload usage
-      </button>
-    </section>
+    <Page title="Usage & spend">
+      <Empty className="border border-dashed" role="alert">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <HugeiconsIcon icon={ChartHistogramIcon} strokeWidth={1.75} />
+          </EmptyMedia>
+          <EmptyTitle>We couldn't display usage right now.</EmptyTitle>
+          <EmptyDescription>
+            Your usage ledger is safe. Reload the page to request a fresh report.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button size="lg" className="px-4" onClick={() => window.location.reload()}>
+            <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
+            Reload usage
+          </Button>
+        </EmptyContent>
+      </Empty>
+    </Page>
   );
 }

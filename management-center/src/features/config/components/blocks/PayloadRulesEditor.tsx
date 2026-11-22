@@ -1,7 +1,10 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Settings02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import type {
   PayloadHeaderEntry,
   PayloadModelEntry,
@@ -15,10 +18,20 @@ import {
   VISUAL_CONFIG_PAYLOAD_VALUE_TYPE_OPTIONS,
 } from '@/hooks/useVisualConfig';
 import { FieldShell } from '../fields/FieldPrimitives';
+import { OptionSelect } from '../fields/OptionSelect';
 import { ExpandableInput } from './ExpandableInput';
 import { StringListEditor } from './StringListEditor';
+import { AddButton, BlockLabel, EmptyRules, RemoveButton, RuleCard } from './parts';
 import { buildProtocolOptions, getValidationMessage } from './shared';
-import styles from './Blocks.module.scss';
+
+const jsonInputClass = 'min-h-28 resize-y font-mono text-xs';
+const errorClass = 'text-[13px] text-destructive';
+// Narrow: the path and remove button share the first line, type and value stack below.
+// Wide (container >= lg): path, type, value and remove on one line.
+const paramRowClass =
+  'grid grid-cols-[1fr_auto] items-start gap-2 @lg:grid-cols-[1fr_9rem_1fr_auto]';
+const rawParamRowClass =
+  'grid grid-cols-[1fr_auto] items-start gap-2 @lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]';
 
 function hasPayloadModelAdvancedSettings(model: PayloadModelEntry) {
   return Boolean(
@@ -248,7 +261,7 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
   ) => {
     if (condition.valueType === 'boolean') {
       return (
-        <Select
+        <OptionSelect
           value={
             condition.value.toLowerCase() === 'true' || condition.value.toLowerCase() === 'false'
               ? condition.value.toLowerCase()
@@ -267,8 +280,8 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
 
     if (condition.valueType === 'json') {
       return (
-        <textarea
-          className={`input ${styles.payloadJsonInput}`}
+        <Textarea
+          className={jsonInputClass}
           placeholder={getValuePlaceholder(condition.valueType)}
           aria-label={t('config_management.visual.payload_rules.condition_value')}
           value={condition.value}
@@ -302,8 +315,8 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
   ) => {
     if (rawJsonValues) {
       return (
-        <textarea
-          className={`input ${styles.payloadJsonInput}`}
+        <Textarea
+          className={jsonInputClass}
           placeholder={t('config_management.visual.payload_rules.value_raw_json')}
           aria-label={t('config_management.visual.payload_rules.param_value')}
           value={param.value}
@@ -317,7 +330,7 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
 
     if (param.valueType === 'boolean') {
       return (
-        <Select
+        <OptionSelect
           value={
             param.value.toLowerCase() === 'true' || param.value.toLowerCase() === 'false'
               ? param.value.toLowerCase()
@@ -334,8 +347,8 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
 
     if (param.valueType === 'json') {
       return (
-        <textarea
-          className={`input ${styles.payloadJsonInput}`}
+        <Textarea
+          className={jsonInputClass}
           placeholder={getValuePlaceholder(param.valueType)}
           aria-label={t('config_management.visual.payload_rules.param_value')}
           value={param.value}
@@ -356,118 +369,95 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
     );
   };
 
-  return (
-    <div className={styles.blockStack}>
-      {rules.map((rule, ruleIndex) => (
-        <div key={rule.id} className={styles.ruleCard}>
-          <div className={styles.ruleCardHeader}>
-            <div className={styles.ruleCardTitle}>
-              {t('config_management.visual.payload_rules.rule')} {ruleIndex + 1}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => removeRule(ruleIndex)}
-              disabled={disabled}
-            >
-              {t('config_management.visual.common.delete')}
-            </Button>
-          </div>
+  const deleteLabel = t('config_management.visual.common.delete');
 
-          <div className={styles.blockStack}>
-            <div className={styles.blockLabel}>
-              {t('config_management.visual.payload_rules.models')}
-            </div>
-            {(rule.models.length ? rule.models : []).map((model, modelIndex) => {
+  return (
+    <div className="flex flex-col gap-3">
+      {rules.map((rule, ruleIndex) => (
+        <RuleCard
+          key={rule.id}
+          title={`${t('config_management.visual.payload_rules.rule')} ${ruleIndex + 1}`}
+          removeLabel={deleteLabel}
+          onRemove={() => removeRule(ruleIndex)}
+          disabled={disabled}
+        >
+          <div className="flex flex-col gap-2">
+            <BlockLabel>{t('config_management.visual.payload_rules.models')}</BlockLabel>
+            {rule.models.map((model, modelIndex) => {
               const hasAdvancedSettings = hasPayloadModelAdvancedSettings(model);
               const advancedExpanded = modelAdvancedOverrides[model.id] ?? hasAdvancedSettings;
+              const nameInput = (
+                <ExpandableInput
+                  placeholder={t('config_management.visual.payload_rules.model_name')}
+                  ariaLabel={t('config_management.visual.payload_rules.model_name')}
+                  value={model.name}
+                  onChange={(nextValue) => updateModel(ruleIndex, modelIndex, { name: nextValue })}
+                  disabled={disabled}
+                />
+              );
+              const protocolSelect = (
+                <OptionSelect
+                  value={model.protocol ?? ''}
+                  options={protocolOptions}
+                  disabled={disabled}
+                  ariaLabel={t('config_management.visual.payload_rules.provider_type')}
+                  onChange={(nextValue) =>
+                    updateModel(ruleIndex, modelIndex, {
+                      protocol: (nextValue || undefined) as PayloadModelEntry['protocol'],
+                    })
+                  }
+                />
+              );
 
               return (
-                <div key={model.id} className={styles.payloadModelGroup}>
+                <div key={model.id} className="flex flex-col gap-3">
+                  {/* Narrow: inputs stack, actions share the line below them. */}
                   <div
-                    className={[
-                      styles.payloadRuleModelRow,
-                      protocolFirst ? styles.payloadRuleModelRowProtocolFirst : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    {protocolFirst ? (
-                      <>
-                        <Select
-                          value={model.protocol ?? ''}
-                          options={protocolOptions}
-                          disabled={disabled}
-                          ariaLabel={t('config_management.visual.payload_rules.provider_type')}
-                          onChange={(nextValue) =>
-                            updateModel(ruleIndex, modelIndex, {
-                              protocol: (nextValue || undefined) as PayloadModelEntry['protocol'],
-                            })
-                          }
-                        />
-                        <ExpandableInput
-                          placeholder={t('config_management.visual.payload_rules.model_name')}
-                          ariaLabel={t('config_management.visual.payload_rules.model_name')}
-                          value={model.name}
-                          onChange={(nextValue) =>
-                            updateModel(ruleIndex, modelIndex, { name: nextValue })
-                          }
-                          disabled={disabled}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <ExpandableInput
-                          placeholder={t('config_management.visual.payload_rules.model_name')}
-                          ariaLabel={t('config_management.visual.payload_rules.model_name')}
-                          value={model.name}
-                          onChange={(nextValue) =>
-                            updateModel(ruleIndex, modelIndex, { name: nextValue })
-                          }
-                          disabled={disabled}
-                        />
-                        <Select
-                          value={model.protocol ?? ''}
-                          options={protocolOptions}
-                          disabled={disabled}
-                          ariaLabel={t('config_management.visual.payload_rules.provider_type')}
-                          onChange={(nextValue) =>
-                            updateModel(ruleIndex, modelIndex, {
-                              protocol: (nextValue || undefined) as PayloadModelEntry['protocol'],
-                            })
-                          }
-                        />
-                      </>
+                    className={cn(
+                      'grid grid-cols-[1fr_auto] items-start gap-2',
+                      protocolFirst
+                        ? '@lg:grid-cols-[10rem_1fr_auto_auto]'
+                        : '@lg:grid-cols-[1fr_10rem_auto_auto]'
                     )}
+                  >
+                    <div className="col-span-2 flex min-w-0 @lg:col-span-1">
+                      {protocolFirst ? protocolSelect : nameInput}
+                    </div>
+                    <div className="col-span-2 flex min-w-0 @lg:col-span-1">
+                      {protocolFirst ? nameInput : protocolSelect}
+                    </div>
                     <Button
-                      variant="secondary"
-                      size="sm"
-                      className={styles.payloadRowActionButton}
+                      type="button"
+                      variant={advancedExpanded ? 'secondary' : 'outline'}
+                      size="lg"
+                      className="justify-self-start"
+                      aria-expanded={advancedExpanded}
                       onClick={() => toggleModelAdvanced(model.id, hasAdvancedSettings)}
                       disabled={disabled}
                     >
+                      <HugeiconsIcon
+                        icon={Settings02Icon}
+                        data-icon="inline-start"
+                        strokeWidth={1.75}
+                      />
                       {advancedExpanded
                         ? t('config_management.visual.payload_rules.hide_advanced')
                         : t('config_management.visual.payload_rules.advanced')}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={styles.payloadRowActionButton}
+                    <RemoveButton
+                      label={deleteLabel}
                       onClick={() => removeModel(ruleIndex, modelIndex)}
                       disabled={disabled}
-                    >
-                      {t('config_management.visual.common.delete')}
-                    </Button>
+                    />
                   </div>
 
                   {advancedExpanded ? (
-                    <div className={styles.payloadModelAdvanced}>
-                      <div className={styles.payloadAdvancedGrid}>
+                    <div className="ml-2.5 flex flex-col gap-4 border-l-2 pl-3">
+                      <div className="grid gap-4 @lg:grid-cols-2">
                         <FieldShell
                           label={t('config_management.visual.payload_rules.from_protocol')}
                         >
-                          <Select
+                          <OptionSelect
                             value={model.fromProtocol ?? ''}
                             options={fromProtocolOptions}
                             disabled={disabled}
@@ -482,12 +472,15 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                         </FieldShell>
                       </div>
 
-                      <div className={styles.blockStack}>
-                        <div className={styles.blockLabel}>
+                      <div className="flex flex-col gap-2">
+                        <BlockLabel>
                           {t('config_management.visual.payload_rules.headers')}
-                        </div>
+                        </BlockLabel>
                         {(model.headers ?? []).map((header, headerIndex) => (
-                          <div key={header.id} className={styles.payloadHeaderRow}>
+                          <div
+                            key={header.id}
+                            className="grid grid-cols-[1fr_auto] items-start gap-2 @lg:grid-cols-[1fr_1fr_auto]"
+                          >
                             <ExpandableInput
                               placeholder={t('config_management.visual.payload_rules.header_name')}
                               ariaLabel={t('config_management.visual.payload_rules.header_name')}
@@ -499,45 +492,42 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                               }
                               disabled={disabled}
                             />
-                            <ExpandableInput
-                              placeholder={t('config_management.visual.payload_rules.header_value')}
-                              ariaLabel={t('config_management.visual.payload_rules.header_value')}
-                              value={header.value}
-                              onChange={(nextValue) =>
-                                updateHeader(ruleIndex, modelIndex, headerIndex, {
-                                  value: nextValue,
-                                })
-                              }
-                              disabled={disabled}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={styles.payloadRowActionButton}
+                            <RemoveButton
+                              label={deleteLabel}
+                              className="@lg:col-start-3"
                               onClick={() => removeHeader(ruleIndex, modelIndex, headerIndex)}
                               disabled={disabled}
-                            >
-                              {t('config_management.visual.common.delete')}
-                            </Button>
+                            />
+                            <div className="flex min-w-0 @lg:col-start-2 @lg:row-start-1">
+                              <ExpandableInput
+                                placeholder={t(
+                                  'config_management.visual.payload_rules.header_value'
+                                )}
+                                ariaLabel={t('config_management.visual.payload_rules.header_value')}
+                                value={header.value}
+                                onChange={(nextValue) =>
+                                  updateHeader(ruleIndex, modelIndex, headerIndex, {
+                                    value: nextValue,
+                                  })
+                                }
+                                disabled={disabled}
+                              />
+                            </div>
                           </div>
                         ))}
-                        <div className={styles.actionRow}>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => addHeader(ruleIndex, modelIndex)}
-                            disabled={disabled}
-                          >
-                            {t('config_management.visual.payload_rules.add_header')}
-                          </Button>
-                        </div>
+                        <AddButton
+                          onClick={() => addHeader(ruleIndex, modelIndex)}
+                          disabled={disabled}
+                        >
+                          {t('config_management.visual.payload_rules.add_header')}
+                        </AddButton>
                       </div>
 
                       {(['match', 'notMatch'] as const).map((conditionKey) => (
-                        <div key={conditionKey} className={styles.blockStack}>
-                          <div className={styles.blockLabel}>
+                        <div key={conditionKey} className="flex flex-col gap-2">
+                          <BlockLabel>
                             {t(`config_management.visual.payload_rules.${conditionKey}`)}
-                          </div>
+                          </BlockLabel>
                           {(model[conditionKey] ?? []).map((condition, conditionIndex) => {
                             const conditionError = getValidationMessage(
                               t,
@@ -545,8 +535,8 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                             );
 
                             return (
-                              <div key={condition.id} className={styles.payloadRuleParamGroup}>
-                                <div className={styles.payloadRuleParamRow}>
+                              <div key={condition.id} className="flex flex-col gap-1.5">
+                                <div className={paramRowClass}>
                                   <ExpandableInput
                                     placeholder={t(
                                       'config_management.visual.payload_rules.condition_path'
@@ -566,43 +556,9 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                                     }
                                     disabled={disabled}
                                   />
-                                  <Select
-                                    value={condition.valueType}
-                                    options={payloadValueTypeOptions}
-                                    disabled={disabled}
-                                    ariaLabel={t(
-                                      'config_management.visual.payload_rules.param_type'
-                                    )}
-                                    onChange={(nextValue) =>
-                                      updateCondition(
-                                        ruleIndex,
-                                        modelIndex,
-                                        conditionKey,
-                                        conditionIndex,
-                                        {
-                                          valueType: nextValue as PayloadParamValueType,
-                                          value:
-                                            nextValue === 'boolean'
-                                              ? 'true'
-                                              : nextValue === 'json' &&
-                                                  condition.value.trim() === ''
-                                                ? '{}'
-                                                : condition.value,
-                                        }
-                                      )
-                                    }
-                                  />
-                                  {renderConditionValueEditor(
-                                    ruleIndex,
-                                    modelIndex,
-                                    conditionKey,
-                                    conditionIndex,
-                                    condition
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={styles.payloadRowActionButton}
+                                  <RemoveButton
+                                    label={deleteLabel}
+                                    className="@lg:col-start-4"
                                     onClick={() =>
                                       removeCondition(
                                         ruleIndex,
@@ -612,36 +568,65 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                                       )
                                     }
                                     disabled={disabled}
-                                  >
-                                    {t('config_management.visual.common.delete')}
-                                  </Button>
+                                  />
+                                  <div className="col-start-1 min-w-0 @lg:col-start-2 @lg:row-start-1">
+                                    <OptionSelect
+                                      value={condition.valueType}
+                                      options={payloadValueTypeOptions}
+                                      disabled={disabled}
+                                      ariaLabel={t(
+                                        'config_management.visual.payload_rules.param_type'
+                                      )}
+                                      onChange={(nextValue) =>
+                                        updateCondition(
+                                          ruleIndex,
+                                          modelIndex,
+                                          conditionKey,
+                                          conditionIndex,
+                                          {
+                                            valueType: nextValue as PayloadParamValueType,
+                                            value:
+                                              nextValue === 'boolean'
+                                                ? 'true'
+                                                : nextValue === 'json' &&
+                                                    condition.value.trim() === ''
+                                                  ? '{}'
+                                                  : condition.value,
+                                          }
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <div className="col-start-1 flex min-w-0 @lg:col-start-3 @lg:row-start-1">
+                                    {renderConditionValueEditor(
+                                      ruleIndex,
+                                      modelIndex,
+                                      conditionKey,
+                                      conditionIndex,
+                                      condition
+                                    )}
+                                  </div>
                                 </div>
                                 {conditionError ? (
-                                  <div className={`error-box ${styles.payloadParamError}`}>
-                                    {conditionError}
-                                  </div>
+                                  <div className={errorClass}>{conditionError}</div>
                                 ) : null}
                               </div>
                             );
                           })}
-                          <div className={styles.actionRow}>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => addCondition(ruleIndex, modelIndex, conditionKey)}
-                              disabled={disabled}
-                            >
-                              {t('config_management.visual.payload_rules.add_condition')}
-                            </Button>
-                          </div>
+                          <AddButton
+                            onClick={() => addCondition(ruleIndex, modelIndex, conditionKey)}
+                            disabled={disabled}
+                          >
+                            {t('config_management.visual.payload_rules.add_condition')}
+                          </AddButton>
                         </div>
                       ))}
 
-                      <div className={styles.payloadAdvancedGrid}>
-                        <div className={styles.blockStack}>
-                          <div className={styles.blockLabel}>
+                      <div className="grid gap-4 @lg:grid-cols-2">
+                        <div className="flex flex-col gap-2">
+                          <BlockLabel>
                             {t('config_management.visual.payload_rules.exist')}
-                          </div>
+                          </BlockLabel>
                           <StringListEditor
                             value={model.exist ?? []}
                             disabled={disabled}
@@ -652,10 +637,10 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                             onChange={(exist) => updateModel(ruleIndex, modelIndex, { exist })}
                           />
                         </div>
-                        <div className={styles.blockStack}>
-                          <div className={styles.blockLabel}>
+                        <div className="flex flex-col gap-2">
+                          <BlockLabel>
                             {t('config_management.visual.payload_rules.notExist')}
-                          </div>
+                          </BlockLabel>
                           <StringListEditor
                             value={model.notExist ?? []}
                             disabled={disabled}
@@ -674,35 +659,19 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                 </div>
               );
             })}
-            <div className={styles.actionRow}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => addModel(ruleIndex)}
-                disabled={disabled}
-              >
-                {t('config_management.visual.payload_rules.add_model')}
-              </Button>
-            </div>
+            <AddButton onClick={() => addModel(ruleIndex)} disabled={disabled}>
+              {t('config_management.visual.payload_rules.add_model')}
+            </AddButton>
           </div>
 
-          <div className={styles.blockStack}>
-            <div className={styles.blockLabel}>
-              {t('config_management.visual.payload_rules.params')}
-            </div>
-            {(rule.params.length ? rule.params : []).map((param, paramIndex) => {
+          <div className="flex flex-col gap-2">
+            <BlockLabel>{t('config_management.visual.payload_rules.params')}</BlockLabel>
+            {rule.params.map((param, paramIndex) => {
               const paramError = getParamErrorMessage(param);
 
               return (
-                <div key={param.id} className={styles.payloadRuleParamGroup}>
-                  <div
-                    className={[
-                      styles.payloadRuleParamRow,
-                      rawJsonValues ? styles.payloadRuleRawParamRow : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
+                <div key={param.id} className="flex flex-col gap-1.5">
+                  <div className={rawJsonValues ? rawParamRowClass : paramRowClass}>
                     <ExpandableInput
                       placeholder={t('config_management.visual.payload_rules.json_path')}
                       ariaLabel={t('config_management.visual.payload_rules.json_path')}
@@ -712,67 +681,60 @@ export const PayloadRulesEditor = memo(function PayloadRulesEditor({
                       }
                       disabled={disabled}
                     />
-                    {rawJsonValues ? null : (
-                      <Select
-                        value={param.valueType}
-                        options={payloadValueTypeOptions}
-                        disabled={disabled}
-                        ariaLabel={t('config_management.visual.payload_rules.param_type')}
-                        onChange={(nextValue) =>
-                          updateParam(ruleIndex, paramIndex, {
-                            valueType: nextValue as PayloadParamValueType,
-                            value:
-                              nextValue === 'boolean'
-                                ? 'true'
-                                : nextValue === 'json' && param.value.trim() === ''
-                                  ? '{}'
-                                  : param.value,
-                          })
-                        }
-                      />
-                    )}
-                    {renderParamValueEditor(ruleIndex, paramIndex, param)}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={styles.payloadRowActionButton}
+                    <RemoveButton
+                      label={deleteLabel}
+                      className={rawJsonValues ? '@lg:col-start-3' : '@lg:col-start-4'}
                       onClick={() => removeParam(ruleIndex, paramIndex)}
                       disabled={disabled}
+                    />
+                    {rawJsonValues ? null : (
+                      <div className="col-start-1 min-w-0 @lg:col-start-2 @lg:row-start-1">
+                        <OptionSelect
+                          value={param.valueType}
+                          options={payloadValueTypeOptions}
+                          disabled={disabled}
+                          ariaLabel={t('config_management.visual.payload_rules.param_type')}
+                          onChange={(nextValue) =>
+                            updateParam(ruleIndex, paramIndex, {
+                              valueType: nextValue as PayloadParamValueType,
+                              value:
+                                nextValue === 'boolean'
+                                  ? 'true'
+                                  : nextValue === 'json' && param.value.trim() === ''
+                                    ? '{}'
+                                    : param.value,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                    <div
+                      className={cn(
+                        'col-start-1 flex min-w-0 @lg:row-start-1',
+                        rawJsonValues ? '@lg:col-start-2' : '@lg:col-start-3'
+                      )}
                     >
-                      {t('config_management.visual.common.delete')}
-                    </Button>
+                      {renderParamValueEditor(ruleIndex, paramIndex, param)}
+                    </div>
                   </div>
-                  {paramError && (
-                    <div className={`error-box ${styles.payloadParamError}`}>{paramError}</div>
-                  )}
+                  {paramError ? <div className={errorClass}>{paramError}</div> : null}
                 </div>
               );
             })}
-            <div className={styles.actionRow}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => addParam(ruleIndex)}
-                disabled={disabled}
-              >
-                {t('config_management.visual.payload_rules.add_param')}
-              </Button>
-            </div>
+            <AddButton onClick={() => addParam(ruleIndex)} disabled={disabled}>
+              {t('config_management.visual.payload_rules.add_param')}
+            </AddButton>
           </div>
-        </div>
+        </RuleCard>
       ))}
 
       {rules.length === 0 && (
-        <div className={styles.emptyState}>
-          {t('config_management.visual.payload_rules.no_rules')}
-        </div>
+        <EmptyRules>{t('config_management.visual.payload_rules.no_rules')}</EmptyRules>
       )}
 
-      <div className={styles.actionRow}>
-        <Button variant="secondary" size="sm" onClick={addRule} disabled={disabled}>
-          {t('config_management.visual.payload_rules.add_rule')}
-        </Button>
-      </div>
+      <AddButton onClick={addRule} disabled={disabled}>
+        {t('config_management.visual.payload_rules.add_rule')}
+      </AddButton>
     </div>
   );
 });

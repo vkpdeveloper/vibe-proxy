@@ -30,6 +30,8 @@ export interface BuiltInOAuthProviderCard {
   /** 对话框标题，沿用 `auth_login.<id>_oauth_title`。 */
   titleKey: string;
   icon: ThemedIcon;
+  /** The artwork carries its own rounded tile, so it fills the logo tile instead of being inset. */
+  flush?: boolean;
   flow: OAuthFlowKind;
   /** 区分同品牌的不同站点，磁贴副行展示。 */
   domain?: string;
@@ -62,6 +64,7 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     label: { key: 'auth_login.kimi_oauth_name' },
     titleKey: 'auth_login.kimi_oauth_title',
     icon: { light: iconKimiTileBlack, dark: iconKimiTileWhite },
+    flush: true,
     flow: 'device',
     domain: 'kimi.com',
     sponsor: { signUpUrl: KIMI_CHINESE_AFFILIATE_URL, siteKey: 'auth_login.sponsor_site_china' },
@@ -72,6 +75,7 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     label: { key: 'auth_login.kimi_ai_oauth_name' },
     titleKey: 'auth_login.kimi_ai_oauth_title',
     icon: { light: iconKimiTileBlack, dark: iconKimiTileWhite },
+    flush: true,
     flow: 'device',
     domain: 'kimi.ai',
     sponsor: {
@@ -93,6 +97,7 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     label: 'Codex',
     titleKey: 'auth_login.codex_oauth_title',
     icon: iconCodex,
+    flush: true,
     flow: 'browser',
   },
   {

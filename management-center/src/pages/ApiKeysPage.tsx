@@ -1,21 +1,73 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  IconAlertTriangle,
-  IconPencil,
-  IconPlus,
-  IconRefreshCw,
-  IconTrash2,
-} from '@/components/ui/icons';
+  Add01Icon,
+  Alert02Icon,
+  ArrowReloadHorizontalIcon,
+  Delete02Icon,
+  Key01Icon,
+  MoreHorizontalIcon,
+  PencilEdit02Icon,
+  RefreshIcon,
+  Search01Icon,
+} from '@hugeicons/core-free-icons';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CopyButton } from '@/components/ui/copy-button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item';
+import { Private } from '@/components/ui/private';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Page } from '@/components/layout/Page';
 import { Meter } from '@/features/dashboard/components/Meter';
-import { useRevealGroup } from '@/hooks/motion';
+import { useAction } from '@/hooks/use-action';
 import {
   clientApiKeysApi,
   type ClientApiKey,
@@ -29,7 +81,6 @@ import {
   normalizeProviderKey,
 } from '@/features/authFiles/constants';
 import { namedModels } from '@/utils/modelNames';
-import styles from './ApiKeysPage.module.scss';
 
 const emptyOptions: ClientApiKeyOptions = { providers: [], models: [] };
 const money = new Intl.NumberFormat(undefined, {
@@ -39,6 +90,16 @@ const money = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+
+type NumberField =
+  'daily_limit_usd' | 'daily_request_limit' | 'daily_token_limit' | 'requests_per_minute';
+
+const LIMIT_FIELDS: Array<{ field: NumberField; label: string; step: string }> = [
+  { field: 'daily_limit_usd', label: 'USD per day', step: '0.01' },
+  { field: 'daily_request_limit', label: 'Requests per day', step: '1' },
+  { field: 'daily_token_limit', label: 'Tokens per day', step: '1' },
+  { field: 'requests_per_minute', label: 'Requests per minute', step: '1' },
+];
 
 function newKeyInput(provider = ''): ClientApiKeyInput {
   return {
@@ -66,12 +127,14 @@ function inputFromKey(key: ClientApiKey, options: ClientApiKeyOptions): ClientAp
   };
 }
 
+/** Rotate and delete both ask first; this holds which one and for which key. */
+type PendingConfirm = { kind: 'rotate' | 'delete'; key: ClientApiKey };
+
 export function ApiKeysPage() {
   const { t } = useTranslation();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const connected = useAuthStore((state) => state.connectionStatus === 'connected');
-  const revealRef = useRevealGroup<HTMLDivElement>();
-  const { showNotification, showConfirmation } = useNotificationStore();
+  const { showNotification } = useNotificationStore();
   const [keys, setKeys] = useState<ClientApiKey[]>([]);
   const [options, setOptions] = useState<ClientApiKeyOptions>(emptyOptions);
   const [loading, setLoading] = useState(true);
@@ -81,6 +144,8 @@ export function ApiKeysPage() {
   const [form, setForm] = useState<ClientApiKeyInput>(newKeyInput());
   const [modelSearch, setModelSearch] = useState('');
   const [revealedSecret, setRevealedSecret] = useState('');
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+  const confirmAction = useAction();
 
   const load = useCallback(async () => {
     if (!connected) return;
@@ -130,10 +195,8 @@ export function ApiKeysPage() {
     setModelSearch('');
   };
 
-  const toggleProvider = (provider: string, selected: boolean) => {
-    const providers = selected
-      ? [...form.allowed_providers, provider]
-      : form.allowed_providers.filter((item) => item !== provider);
+  // Dropping a provider also drops the selected models only it could serve.
+  const setProviders = (providers: string[]) => {
     const validModels = new Set(
       options.models
         .filter((model) => model.providers.some((item) => providers.includes(item)))
@@ -186,405 +249,458 @@ export function ApiKeysPage() {
     }
   };
 
-  const copySecret = async () => {
-    try {
-      await navigator.clipboard.writeText(revealedSecret);
-      showNotification('API key copied.', 'success');
-    } catch {
-      showNotification('Copy failed. Select the key and copy it manually.', 'warning');
-    }
-  };
-
-  const rotate = (key: ClientApiKey) => {
-    showConfirmation({
-      title: `Rotate ${key.name}?`,
-      message:
-        'The current secret will stop working immediately. The policy and usage history stay intact.',
-      confirmText: 'Rotate key',
-      variant: 'danger',
-      onConfirm: async () => {
+  const runConfirm = async ({ kind, key }: PendingConfirm) => {
+    const ok = await confirmAction.run(async () => {
+      if (kind === 'rotate') {
         const response = await clientApiKeysApi.rotate(key.id);
         setRevealedSecret(response.api_key);
         showNotification('API key rotated.', 'success');
-        await load();
-      },
-    });
-  };
-
-  const remove = (key: ClientApiKey) => {
-    showConfirmation({
-      title: `Delete ${key.name}?`,
-      message:
-        'Requests using this secret will fail immediately. Existing spending history remains in the ledger.',
-      confirmText: 'Delete key',
-      variant: 'danger',
-      onConfirm: async () => {
+      } else {
         await clientApiKeysApi.remove(key.id);
         showNotification('API key deleted.', 'success');
-        await load();
-      },
+      }
+      await load();
     });
+    if (ok) setConfirm(null);
   };
 
   const providerLabel = (provider: string) => getTypeLabel(t, normalizeProviderKey(provider));
   const providerIcon = (provider: string) =>
     getAuthFileIcon(normalizeProviderKey(provider), resolvedTheme);
 
+  const stats = [
+    { label: 'Keys', value: keys.length.toLocaleString() },
+    { label: 'Enabled', value: activeKeys.toLocaleString(), dot: activeKeys > 0 && 'bg-success' },
+    {
+      label: 'Blocked',
+      value: blockedKeys.toLocaleString(),
+      dot: blockedKeys > 0 && 'bg-destructive',
+    },
+    { label: 'Spend today', value: money.format(totalToday) },
+  ];
+
   return (
-    <div className={styles.page} ref={revealRef}>
-      <header className={styles.header}>
-        <div className={styles.copy}>
-          <h1 className={styles.title} data-reveal>
-            Client API keys
-          </h1>
-          <p className={styles.meta} data-reveal>
-            <span>
-              {keys.length} {keys.length === 1 ? 'key' : 'keys'}
-            </span>
-            <span className={styles.metaDot} aria-hidden="true">
-              ·
-            </span>
-            <span className={activeKeys > 0 ? styles.metaActive : styles.metaMuted}>
-              {activeKeys} enabled
-            </span>
-            {blockedKeys > 0 && (
-              <>
-                <span className={styles.metaDot} aria-hidden="true">
-                  ·
-                </span>
-                <span className={styles.metaProblem}>{blockedKeys} blocked</span>
-              </>
-            )}
-            <span className={styles.metaDot} aria-hidden="true">
-              ·
-            </span>
-            <span>{money.format(totalToday)} today</span>
-          </p>
-        </div>
-        <div className={styles.actions} data-reveal>
-          <button
-            className={styles.ghostAction}
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-          >
-            <IconRefreshCw size={14} className={loading ? styles.spinning : undefined} />
-            Refresh
-          </button>
-          <button className={styles.primaryAction} type="button" onClick={openCreate}>
-            <IconPlus size={15} />
-            Generate key
-          </button>
-        </div>
-      </header>
-
-      {error && (
-        <div className={styles.errorBanner} role="alert">
-          <IconAlertTriangle size={15} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <section aria-busy={loading}>
-        {loading && keys.length === 0 ? (
-          <div className={styles.list} aria-hidden="true">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Skeleton key={index} height={44} className={styles.skeletonRow} />
-            ))}
+    <>
+      <Page
+        title={t('nav.client_api_keys')}
+        actions={
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon-lg"
+              aria-label="Refresh"
+              disabled={loading}
+              onClick={() => void load()}
+            >
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+            </Button>
+            <Button size="lg" className="h-9 px-3" onClick={openCreate}>
+              <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
+              Generate key
+            </Button>
           </div>
-        ) : !loading && keys.length === 0 ? (
-          <EmptyState
-            title="No client keys yet"
-            action={
-              <Button size="sm" onClick={openCreate}>
-                <IconPlus size={14} /> Generate key
-              </Button>
-            }
-          />
-        ) : (
-          <div className={styles.list}>
-            <div className={styles.listHead} aria-hidden="true">
-              <span>Key</span>
-              <span>Access</span>
-              <span>Spend today</span>
-              <span className={styles.alignRight}>Requests · Tokens</span>
-              <span />
-            </div>
-            {keys.map((key) => {
-              const budgetUsed =
-                key.daily_limit_usd > 0 ? (key.today_usd / key.daily_limit_usd) * 100 : null;
-              const limits = [
-                key.daily_request_limit > 0 &&
-                  `${compact.format(key.daily_request_limit)} req/day`,
-                key.daily_token_limit > 0 && `${compact.format(key.daily_token_limit)} tok/day`,
-                key.requests_per_minute > 0 && `${compact.format(key.requests_per_minute)} rpm`,
-              ].filter(Boolean);
-              return (
-                <article
-                  className={`${styles.row} ${key.disabled ? styles.rowDisabled : ''}`}
-                  key={key.id}
-                >
-                  <div className={styles.who}>
-                    <span className={styles.name}>{key.name}</span>
-                    <span className={styles.rowMeta}>
-                      {key.managed && <code>{key.masked_key}</code>}
-                      {key.disabled ? (
-                        <span className={styles.stateOff}>Disabled</span>
-                      ) : key.blocked ? (
-                        <span className={styles.stateBlocked} title={key.block_reason}>
-                          Blocked
-                        </span>
-                      ) : null}
-                    </span>
-                  </div>
-
-                  <div className={styles.access}>
-                    {key.managed ? (
-                      <span className={styles.providers}>
-                        {key.allowed_providers.map((provider) => {
-                          const icon = providerIcon(provider);
-                          return (
-                            <span className={styles.provider} key={provider} title={providerLabel(provider)}>
-                              {icon ? <img src={icon} alt="" /> : null}
-                              {providerLabel(provider)}
-                            </span>
-                          );
-                        })}
-                      </span>
-                    ) : (
-                      <span className={styles.unrestricted}>Unrestricted</span>
-                    )}
-                    <span className={styles.accessHint}>
-                      {key.allowed_models.length
-                        ? `${key.allowed_models.length} model${key.allowed_models.length === 1 ? '' : 's'}`
-                        : 'All models'}
-                      {limits.length > 0 && ` · ${limits.join(' · ')}`}
-                    </span>
-                  </div>
-
-                  <div className={styles.spend}>
-                    <span className={styles.spendHead}>
-                      <strong>{money.format(key.today_usd)}</strong>
-                      {key.daily_limit_usd > 0 && (
-                        <span>of {money.format(key.daily_limit_usd)}</span>
-                      )}
-                    </span>
-                    {budgetUsed !== null && (
-                      <Meter
-                        value={budgetUsed}
-                        tone={budgetUsed >= 100 ? 'critical' : budgetUsed >= 80 ? 'warning' : 'good'}
-                        ariaLabel={`${key.name} daily budget used`}
-                      />
-                    )}
-                  </div>
-
-                  <div className={styles.counts}>
-                    {compact.format(key.today_requests)}
-                    <span className={styles.countDivider}>·</span>
-                    {compact.format(key.today_tokens)}
-                  </div>
-
-                  <div className={styles.rowActions}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => openEdit(key)}
-                      aria-label={`Edit ${key.name}`}
-                      title="Edit"
-                    >
-                      <IconPencil size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => rotate(key)}
-                      aria-label={`Rotate ${key.name}`}
-                      title="Rotate secret"
-                    >
-                      <IconRefreshCw size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                      onClick={() => remove(key)}
-                      aria-label={`Delete ${key.name}`}
-                      title="Delete"
-                    >
-                      <IconTrash2 size={15} />
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+        }
+      >
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+          >
+            <HugeiconsIcon icon={Alert02Icon} className="size-4 shrink-0" strokeWidth={1.75} />
+            {error}
           </div>
         )}
-      </section>
 
-      <Modal
-        open={editing !== undefined}
-        onClose={() => !saving && setEditing(undefined)}
-        closeDisabled={saving}
-        width={640}
-        title={editing ? `Edit ${editing.name}` : 'New API key'}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button variant="ghost" onClick={() => setEditing(undefined)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={() => void save()} loading={saving}>
-              {editing ? 'Save' : 'Generate key'}
-            </Button>
+        <section aria-busy={loading} className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="flex min-w-0 flex-col gap-1.5 bg-card p-4">
+                <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                  {stat.dot && <span className={`size-2 rounded-full ${stat.dot}`} />}
+                  {stat.label}
+                </span>
+                <span className="truncate font-mono text-2xl tracking-tight tabular-nums">
+                  {stat.value}
+                </span>
+              </div>
+            ))}
           </div>
-        }
-      >
-        <div className={styles.form}>
-          <Input
-            label="Name"
-            value={form.name}
-            placeholder="Production app"
-            onChange={(event) => setForm({ ...form, name: event.target.value })}
-          />
 
-          <fieldset className={styles.fieldset}>
-            <legend>Providers</legend>
-            <div className={styles.providerChoices}>
-              {options.providers.map((provider) => {
-                const selected = form.allowed_providers.includes(provider);
-                const icon = providerIcon(provider);
+          {loading && keys.length === 0 ? (
+            <div className="flex flex-col gap-2" aria-hidden="true">
+              {Array.from({ length: 3 }, (_, index) => (
+                <Skeleton key={index} className="h-[74px] rounded-lg" />
+              ))}
+            </div>
+          ) : !loading && keys.length === 0 ? (
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <HugeiconsIcon icon={Key01Icon} strokeWidth={1.75} />
+                </EmptyMedia>
+                <EmptyTitle>No client keys yet</EmptyTitle>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button size="lg" className="px-4" onClick={openCreate}>
+                  <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
+                  Generate key
+                </Button>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <ItemGroup className="gap-2">
+              {keys.map((key) => {
+                const budgetUsed =
+                  key.daily_limit_usd > 0 ? (key.today_usd / key.daily_limit_usd) * 100 : null;
+                const limits = [
+                  key.daily_request_limit > 0 &&
+                    `${compact.format(key.daily_request_limit)} req/day`,
+                  key.daily_token_limit > 0 && `${compact.format(key.daily_token_limit)} tok/day`,
+                  key.requests_per_minute > 0 && `${compact.format(key.requests_per_minute)} rpm`,
+                ].filter(Boolean);
                 return (
-                  <button
-                    key={provider}
-                    type="button"
-                    className={`${styles.providerChoice} ${selected ? styles.providerChoiceOn : ''}`}
-                    aria-pressed={selected}
-                    onClick={() => toggleProvider(provider, !selected)}
+                  <Item
+                    key={key.id}
+                    variant="outline"
+                    className={key.disabled ? 'relative opacity-60' : 'relative'}
                   >
-                    {icon ? <img src={icon} alt="" /> : null}
-                    {providerLabel(provider)}
-                  </button>
+                    <ItemMedia variant="icon">
+                      <HugeiconsIcon icon={Key01Icon} strokeWidth={1.75} />
+                    </ItemMedia>
+                    <ItemContent className="min-w-0 max-sm:pr-8">
+                      <ItemTitle className="max-w-full">
+                        <span className="truncate">{key.name}</span>
+                        {key.disabled ? (
+                          <Badge variant="secondary" className="gap-1.5">
+                            <span className="size-1.5 rounded-full bg-faint" />
+                            Disabled
+                          </Badge>
+                        ) : key.blocked ? (
+                          <Badge variant="destructive" title={key.block_reason}>
+                            Blocked
+                          </Badge>
+                        ) : null}
+                      </ItemTitle>
+                      {key.managed && (
+                        <ItemDescription className="truncate font-mono text-xs">
+                          {key.masked_key}
+                        </ItemDescription>
+                      )}
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        {key.managed ? (
+                          key.allowed_providers.map((provider) => {
+                            const icon = providerIcon(provider);
+                            return (
+                              <span key={provider} className="flex items-center gap-1">
+                                {icon && <img src={icon} alt="" className="size-3.5 rounded-sm" />}
+                                {providerLabel(provider)}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span>Unrestricted</span>
+                        )}
+                        <span className="text-faint">
+                          {key.allowed_models.length
+                            ? `${key.allowed_models.length} model${key.allowed_models.length === 1 ? '' : 's'}`
+                            : 'All models'}
+                          {limits.length > 0 && `, ${limits.join(', ')}`}
+                        </span>
+                      </div>
+                    </ItemContent>
+                    <div className="flex w-full flex-col gap-1.5 pl-6.5 sm:w-36 sm:items-end sm:pl-0">
+                      <span className="font-mono text-sm tabular-nums">
+                        {money.format(key.today_usd)}
+                        {key.daily_limit_usd > 0 && (
+                          <span className="text-xs text-faint">
+                            {' '}
+                            / {money.format(key.daily_limit_usd)}
+                          </span>
+                        )}
+                      </span>
+                      {budgetUsed !== null && (
+                        <Meter
+                          className="w-full"
+                          value={budgetUsed}
+                          tone={
+                            budgetUsed >= 100 ? 'critical' : budgetUsed >= 80 ? 'warning' : 'good'
+                          }
+                          ariaLabel={`${key.name} daily budget used`}
+                        />
+                      )}
+                      <span className="font-mono text-xs text-faint tabular-nums">
+                        {compact.format(key.today_requests)} req, {compact.format(key.today_tokens)}{' '}
+                        tok
+                      </span>
+                    </div>
+                    <ItemActions className="max-sm:absolute max-sm:top-2 max-sm:right-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Actions for ${key.name}`}
+                          >
+                            <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => openEdit(key)}>
+                            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              confirmAction.setError(null);
+                              setConfirm({ kind: 'rotate', key });
+                            }}
+                          >
+                            <HugeiconsIcon icon={ArrowReloadHorizontalIcon} strokeWidth={1.75} />
+                            Rotate secret
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={() => {
+                              confirmAction.setError(null);
+                              setConfirm({ kind: 'delete', key });
+                            }}
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </ItemActions>
+                  </Item>
                 );
               })}
+            </ItemGroup>
+          )}
+        </section>
+
+        <Dialog
+          open={editing !== undefined}
+          onOpenChange={(open) => {
+            if (!open && !saving) setEditing(undefined);
+          }}
+        >
+          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{editing ? `Edit ${editing.name}` : 'New API key'}</DialogTitle>
+            </DialogHeader>
+            <form
+              className="flex flex-col gap-6"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save();
+              }}
+            >
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="api-key-name">Name</FieldLabel>
+                  <Input
+                    id="api-key-name"
+                    className="h-9"
+                    value={form.name}
+                    placeholder="Production app"
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  />
+                </Field>
+
+                <FieldSet className="gap-2">
+                  <FieldLegend variant="label">Providers</FieldLegend>
+                  <ToggleGroup
+                    type="multiple"
+                    variant="outline"
+                    className="flex-wrap"
+                    value={form.allowed_providers}
+                    onValueChange={setProviders}
+                  >
+                    {options.providers.map((provider) => {
+                      const icon = providerIcon(provider);
+                      return (
+                        <ToggleGroupItem
+                          key={provider}
+                          value={provider}
+                          className="h-8 gap-1.5 px-2.5 data-[state=on]:border-primary/60 data-[state=on]:bg-primary/10"
+                        >
+                          {icon && <img src={icon} alt="" className="size-4 rounded-sm" />}
+                          {providerLabel(provider)}
+                        </ToggleGroupItem>
+                      );
+                    })}
+                  </ToggleGroup>
+                </FieldSet>
+
+                <FieldSet className="gap-2">
+                  <FieldLegend
+                    variant="label"
+                    className="flex w-full items-center justify-between gap-3"
+                  >
+                    Models
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {form.allowed_models.length
+                        ? `${form.allowed_models.length} selected`
+                        : 'None selected allows all'}
+                    </span>
+                  </FieldLegend>
+                  <InputGroup className="h-9">
+                    <InputGroupAddon>
+                      <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      aria-label="Search models"
+                      placeholder="Search models"
+                      value={modelSearch}
+                      onChange={(event) => setModelSearch(event.target.value)}
+                    />
+                  </InputGroup>
+                  <div className="max-h-56 divide-y overflow-y-auto rounded-lg border">
+                    {visibleModels.map((model) => (
+                      <label
+                        key={model.id}
+                        className="flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors duration-150 hover:bg-muted/50"
+                      >
+                        <Checkbox
+                          checked={form.allowed_models.includes(model.id)}
+                          onCheckedChange={(value) => toggleModel(model.id, value === true)}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-[13px]">{model.name}</span>
+                        {model.name !== model.id && (
+                          <code className="max-w-[45%] truncate font-mono text-xs text-faint">
+                            {model.id}
+                          </code>
+                        )}
+                      </label>
+                    ))}
+                    {visibleModels.length === 0 && (
+                      <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">
+                        No models match.
+                      </p>
+                    )}
+                  </div>
+                </FieldSet>
+
+                <FieldSet className="gap-2">
+                  <FieldLegend
+                    variant="label"
+                    className="flex w-full items-center justify-between gap-3"
+                  >
+                    Limits
+                    <span className="text-xs font-normal text-muted-foreground">
+                      0 means no limit
+                    </span>
+                  </FieldLegend>
+                  <div className="grid grid-cols-2 gap-3">
+                    {LIMIT_FIELDS.map(({ field, label, step }) => (
+                      <Field key={field} className="gap-1.5">
+                        <FieldLabel
+                          htmlFor={`api-key-${field}`}
+                          className="text-xs font-normal text-muted-foreground"
+                        >
+                          {label}
+                        </FieldLabel>
+                        <Input
+                          id={`api-key-${field}`}
+                          className="h-9 font-mono"
+                          type="number"
+                          min="0"
+                          step={step}
+                          value={form[field]}
+                          onChange={(event) =>
+                            setForm({ ...form, [field]: Number(event.target.value) })
+                          }
+                        />
+                      </Field>
+                    ))}
+                  </div>
+                </FieldSet>
+
+                <Field orientation="horizontal" className="justify-between">
+                  <FieldLabel htmlFor="api-key-enabled">Enabled</FieldLabel>
+                  <Switch
+                    id="api-key-enabled"
+                    checked={!form.disabled}
+                    onCheckedChange={(enabled) => setForm({ ...form, disabled: !enabled })}
+                  />
+                </Field>
+              </FieldGroup>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditing(undefined)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {editing ? 'Save' : 'Generate key'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(revealedSecret)}
+          onOpenChange={(open) => {
+            if (!open) setRevealedSecret('');
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Copy your API key</DialogTitle>
+              <DialogDescription>It won't be shown again.</DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center gap-2 rounded-lg border bg-card py-1 pr-1 pl-3">
+              <code className="min-w-0 flex-1 font-mono text-xs break-all">
+                <Private>{revealedSecret}</Private>
+              </code>
+              <CopyButton value={revealedSecret} label="Copy key" />
             </div>
-          </fieldset>
+            <DialogFooter>
+              <Button onClick={() => setRevealedSecret('')}>Done</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <fieldset className={styles.fieldset}>
-            <legend>
-              Models
-              <span className={styles.legendHint}>
-                {form.allowed_models.length
-                  ? `${form.allowed_models.length} selected`
-                  : 'None selected allows all'}
-              </span>
-            </legend>
-            <Input
-              aria-label="Search models"
-              placeholder="Search models"
-              value={modelSearch}
-              onChange={(event) => setModelSearch(event.target.value)}
-            />
-            <div className={styles.modelList}>
-              {visibleModels.map((model) => (
-                <SelectionCheckbox
-                  key={model.id}
-                  className={styles.modelRow}
-                  labelClassName={styles.modelLabel}
-                  checked={form.allowed_models.includes(model.id)}
-                  onChange={(value) => toggleModel(model.id, value)}
-                  label={
-                    <>
-                      <span className={styles.modelName}>{model.name}</span>
-                      {model.name !== model.id && (
-                        <code className={styles.modelId}>{model.id}</code>
-                      )}
-                    </>
-                  }
-                />
-              ))}
-              {visibleModels.length === 0 && (
-                <p className={styles.modelEmpty}>No models match.</p>
-              )}
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.fieldset}>
-            <legend>
-              Limits
-              <span className={styles.legendHint}>0 means no limit</span>
-            </legend>
-            <div className={styles.limitGrid}>
-              <Input
-                label="USD per day"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.daily_limit_usd}
-                onChange={(event) =>
-                  setForm({ ...form, daily_limit_usd: Number(event.target.value) })
-                }
-              />
-              <Input
-                label="Requests per day"
-                type="number"
-                min="0"
-                step="1"
-                value={form.daily_request_limit}
-                onChange={(event) =>
-                  setForm({ ...form, daily_request_limit: Number(event.target.value) })
-                }
-              />
-              <Input
-                label="Tokens per day"
-                type="number"
-                min="0"
-                step="1"
-                value={form.daily_token_limit}
-                onChange={(event) =>
-                  setForm({ ...form, daily_token_limit: Number(event.target.value) })
-                }
-              />
-              <Input
-                label="Requests per minute"
-                type="number"
-                min="0"
-                step="1"
-                value={form.requests_per_minute}
-                onChange={(event) =>
-                  setForm({ ...form, requests_per_minute: Number(event.target.value) })
-                }
-              />
-            </div>
-          </fieldset>
-
-          <div className={styles.enableRow}>
-            <span>Enabled</span>
-            <ToggleSwitch
-              checked={!form.disabled}
-              onChange={(enabled) => setForm({ ...form, disabled: !enabled })}
-              ariaLabel="Enable this API key"
-            />
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(revealedSecret)}
-        onClose={() => setRevealedSecret('')}
-        width={520}
-        title="Copy your API key"
-        footer={
-          <div className={styles.modalFooter}>
-            <Button variant="ghost" onClick={() => setRevealedSecret('')}>
-              Done
-            </Button>
-            <Button onClick={() => void copySecret()}>Copy key</Button>
-          </div>
-        }
-      >
-        <div className={styles.secretPanel}>
-          <code>{revealedSecret}</code>
-          <p>It won't be shown again.</p>
-        </div>
-      </Modal>
-    </div>
+        <AlertDialog
+          open={confirm !== null}
+          onOpenChange={(open) => {
+            if (!open && !confirmAction.busy) setConfirm(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {confirm?.kind === 'rotate' ? 'Rotate' : 'Delete'} {confirm?.key.name}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirm?.kind === 'rotate'
+                  ? 'The current secret will stop working immediately. The policy and usage history stay intact.'
+                  : 'Requests using this secret will fail immediately. Existing spending history remains in the ledger.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {confirmAction.error && <FieldError>{confirmAction.error}</FieldError>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={confirmAction.busy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={confirmAction.busy}
+                onClick={(event) => {
+                  // Keep the dialog open until the request finishes, so a failure can show here.
+                  event.preventDefault();
+                  if (confirm) void runConfirm(confirm);
+                }}
+              >
+                {confirm?.kind === 'rotate' ? 'Rotate key' : 'Delete key'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </Page>
+    </>
   );
 }

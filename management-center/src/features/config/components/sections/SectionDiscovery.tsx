@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { SettingGroup } from '../fields/SettingGroup';
 import type { ConfigSectionProps } from '../../types';
 import { BlockSetting, SettingList, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
 import { StringListEditor } from '../blocks/StringListEditor';
@@ -15,15 +15,13 @@ export function SectionDiscovery({
   const { t } = useTranslation();
 
   return (
-    <Collapsible
+    <SettingGroup
       label={t('config_management.visual.serverExtras.discoveryTitle')}
       hint={t('config_management.visual.serverExtras.discoveryHint')}
-      defaultOpen={false}
     >
       <SettingList>
         <ToggleSetting
           fieldId="discoveryEnabled"
-          wide
           label={t('config_management.visual.serverExtras.discoveryEnabled.label')}
           description={t('config_management.visual.serverExtras.discoveryEnabled.hint')}
           checked={values.discoveryEnabled}
@@ -108,6 +106,6 @@ export function SectionDiscovery({
           onChange={(discoveryAdvertiseManagement) => onChange({ discoveryAdvertiseManagement })}
         />
       </SettingList>
-    </Collapsible>
+    </SettingGroup>
   );
 }

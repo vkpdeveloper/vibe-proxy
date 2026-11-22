@@ -1,10 +1,54 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  AiBrain01Icon,
+  ArrowUpRight01Icon,
+  BookOpen01Icon,
+  GithubIcon,
+  InformationCircleIcon,
+  LinkSquare02Icon,
+  RefreshIcon,
+  SourceCodeIcon,
+  UserLock01Icon,
+} from '@hugeicons/core-free-icons';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item';
+import { Private } from '@/components/ui/private';
+import { Switch } from '@/components/ui/switch';
+import { Page, Section, type Tab } from '@/components/layout/Page';
+import { Logo } from '@/components/brand';
+import { cn } from '@/lib/utils';
 import {
   useAuthStore,
   useConfigStore,
@@ -17,7 +61,6 @@ import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import { formatDateTimeValue } from '@/utils/format';
 import { classifyModels } from '@/utils/models';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
-import vibeProxyLogo from '@/assets/vibe-proxy-logo.svg';
 import iconGemini from '@/assets/icons/gemini.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconMeta from '@/assets/icons/meta.svg';
@@ -33,7 +76,6 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconDeepseek from '@/assets/icons/deepseek.svg';
 import iconMinimax from '@/assets/icons/minimax.svg';
-import styles from './SystemPage.module.scss';
 
 const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: string }> = {
   devin: { light: iconDevinLight, dark: iconDevinDark },
@@ -48,6 +90,37 @@ const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: strin
   deepseek: iconDeepseek,
   minimax: iconMinimax,
 };
+
+const LINKS = [
+  {
+    href: 'https://github.com/router-for-me/CLIProxyAPI',
+    icon: GithubIcon,
+    title: 'system_info.link_main_repo',
+    description: 'system_info.link_main_repo_desc',
+  },
+  {
+    href: 'https://github.com/router-for-me/Cli-Proxy-API-Management-Center',
+    icon: SourceCodeIcon,
+    title: 'system_info.link_webui_repo',
+    description: 'system_info.link_webui_repo_desc',
+  },
+  {
+    href: 'https://help.router-for.me/',
+    icon: BookOpen01Icon,
+    title: 'system_info.link_docs',
+    description: 'system_info.link_docs_desc',
+  },
+] as const;
+
+type SystemTab = 'about' | 'models' | 'links' | 'storage';
+const TAB_IDS: SystemTab[] = ['about', 'models', 'links', 'storage'];
+
+const STATUS_DOT = {
+  success: 'bg-success',
+  warning: 'bg-warning',
+  error: 'bg-destructive',
+  muted: 'bg-faint',
+} as const;
 
 const parseVersionSegments = (version?: string | null) => {
   if (!version) return null;
@@ -77,7 +150,7 @@ const compareVersions = (latest?: string | null, current?: string | null) => {
 
 export function SystemPage() {
   const { t, i18n } = useTranslation();
-  const { showNotification, showConfirmation } = useNotificationStore();
+  const { showNotification } = useNotificationStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const auth = useAuthStore();
   const config = useConfigStore((state) => state.config);
@@ -89,6 +162,10 @@ export function SystemPage() {
   const modelsLoading = useModelsStore((state) => state.loading);
   const modelsError = useModelsStore((state) => state.error);
   const fetchModelsFromStore = useModelsStore((state) => state.fetchModels);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab: SystemTab = TAB_IDS.find((id) => id === tabParam) ?? 'about';
 
   const [modelStatus, setModelStatus] = useState<{
     type: 'success' | 'warning' | 'error' | 'muted';
@@ -116,6 +193,13 @@ export function SystemPage() {
   const apiVersion = auth.serverVersion || t('system_info.version_unknown');
   const buildTime =
     formatDateTimeValue(auth.serverBuildDate, i18n.language) || t('system_info.version_unknown');
+
+  const tabs: Tab<SystemTab>[] = [
+    { id: 'about', label: t('system_info.tab_about'), icon: InformationCircleIcon },
+    { id: 'models', label: t('system_info.models_title'), icon: AiBrain01Icon },
+    { id: 'links', label: t('system_info.quick_links_title'), icon: LinkSquare02Icon },
+    { id: 'storage', label: t('system_info.clear_login_title'), icon: UserLock01Icon },
+  ];
 
   const getIconForCategory = (categoryId: string): string | null => {
     const iconEntry = MODEL_CATEGORY_ICONS[categoryId];
@@ -160,20 +244,12 @@ export function SystemPage() {
     }
   };
 
-  const handleClearLoginStorage = () => {
-    showConfirmation({
-      title: t('system_info.clear_login_title', { defaultValue: 'Clear Login Storage' }),
-      message: t('system_info.clear_login_confirm'),
-      variant: 'danger',
-      confirmText: t('common.confirm'),
-      onConfirm: () => {
-        auth.logout();
-        if (typeof localStorage === 'undefined') return;
-        const keysToRemove = [STORAGE_KEY_AUTH, 'isLoggedIn', 'apiBase', 'apiUrl', 'managementKey'];
-        keysToRemove.forEach((key) => localStorage.removeItem(key));
-        showNotification(t('notification.login_storage_cleared'), 'success');
-      },
-    });
+  const clearLoginStorage = () => {
+    auth.logout();
+    if (typeof localStorage === 'undefined') return;
+    const keysToRemove = [STORAGE_KEY_AUTH, 'isLoggedIn', 'apiBase', 'apiUrl', 'managementKey'];
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    showNotification(t('notification.login_storage_cleared'), 'success');
   };
 
   const openRequestLogModal = useCallback(() => {
@@ -182,6 +258,7 @@ export function SystemPage() {
     setRequestLogModalOpen(true);
   }, [requestLogEnabled]);
 
+  // Seven quick taps on the version row open the hidden request-log switch.
   const handleInfoVersionTap = useCallback(() => {
     versionTapCount.current += 1;
     if (versionTapTimer.current) {
@@ -293,166 +370,143 @@ export function SystemPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.connectionStatus, auth.apiBase]);
 
-  return (
-    <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('system_info.title')}</h1>
-      <div className={styles.content}>
-        <Card className={styles.aboutCard}>
-          <div className={styles.aboutHeader}>
-            <img src={vibeProxyLogo} alt="Vibe Proxy" className={styles.aboutLogo} />
-            <div className={styles.aboutTitle}>{t('system_info.about_title')}</div>
-          </div>
+  const connectionDot =
+    auth.connectionStatus === 'connected'
+      ? 'bg-success'
+      : auth.connectionStatus === 'connecting'
+        ? 'bg-warning'
+        : 'bg-faint';
 
-          <div className={styles.aboutInfoGrid}>
+  return (
+    <Page
+      title={t('system_info.title')}
+      tabs={tabs}
+      tab={tab}
+      onTab={(next) => setSearchParams(next === 'about' ? {} : { tab: next }, { replace: true })}
+    >
+      {tab === 'about' && (
+        <Section title={t('system_info.about_title')} icon={<Logo className="size-6" />}>
+          <div className="divide-y overflow-hidden rounded-xl border bg-card text-sm">
+            {/* A plain row to the eye; also the seven-tap target for the request log switch. */}
             <button
               type="button"
-              className={`${styles.infoTile} ${styles.tapTile}`}
+              className="flex w-full cursor-default items-center justify-between gap-6 px-4 py-3 text-left outline-none focus-visible:bg-muted/50"
               onClick={handleInfoVersionTap}
             >
-              <div className={styles.tileHeader}>
-                <div className={styles.tileLabel}>{t('footer.version')}</div>
-              </div>
-              <div className={styles.tileValue}>{appVersion}</div>
+              <span className="text-muted-foreground">{t('footer.version')}</span>
+              <span className="truncate font-mono text-xs">{appVersion}</span>
             </button>
-
-            <div className={styles.infoTile}>
-              <div className={styles.tileHeader}>
-                <div className={styles.tileLabel}>{t('footer.api_version')}</div>
+            <div className="flex items-center justify-between gap-6 px-4 py-2">
+              <span className="text-muted-foreground">{t('footer.api_version')}</span>
+              <span className="flex min-w-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <span className="max-w-full truncate font-mono text-xs">{apiVersion}</span>
                 <Button
-                  type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className={styles.tileAction}
+                  disabled={checkingVersion}
                   onClick={() => void handleVersionCheck()}
-                  loading={checkingVersion}
-                  title={t('system_info.version_check_button')}
-                  aria-label={t('system_info.version_check_button')}
                 >
                   {t('system_info.version_check_button')}
                 </Button>
-              </div>
-              <div className={styles.tileValue}>{apiVersion}</div>
+              </span>
             </div>
-
-            <div className={styles.infoTile}>
-              <div className={styles.tileLabel}>{t('footer.build_date')}</div>
-              <div className={styles.tileValue}>{buildTime}</div>
+            <div className="flex items-center justify-between gap-6 px-4 py-3">
+              <span className="text-muted-foreground">{t('footer.build_date')}</span>
+              <span className="truncate font-mono text-xs">{buildTime}</span>
             </div>
-
-            <div className={styles.infoTile}>
-              <div className={styles.tileLabel}>{t('connection.status')}</div>
-              <div className={styles.tileValue}>{t(`common.${auth.connectionStatus}_status`)}</div>
-              <div className={styles.tileSub}>{auth.apiBase || '-'}</div>
+            <div className="flex items-center justify-between gap-6 px-4 py-3">
+              <span className="shrink-0 text-muted-foreground">
+                {t('connection.status').replace(/[:：]\s*$/, '')}
+              </span>
+              <span className="flex min-w-0 flex-col items-end gap-1">
+                <span className="flex items-center gap-2">
+                  <span className={cn('size-2 rounded-full', connectionDot)} />
+                  {t(`common.${auth.connectionStatus}_status`)}
+                </span>
+                {auth.apiBase && (
+                  <span className="max-w-full truncate font-mono text-xs text-muted-foreground">
+                    <Private>{auth.apiBase}</Private>
+                  </span>
+                )}
+              </span>
             </div>
           </div>
-        </Card>
+        </Section>
+      )}
 
-        <Card title={t('system_info.quick_links_title')}>
-          <p className={styles.sectionDescription}>{t('system_info.quick_links_desc')}</p>
-          <div className={styles.quickLinks}>
-            <a
-              href="https://github.com/router-for-me/CLIProxyAPI"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.linkCard}
-            >
-              <div className={`${styles.linkIcon} ${styles.github}`}>
-                <IconGithub size={22} />
-              </div>
-              <div className={styles.linkContent}>
-                <div className={styles.linkTitle}>
-                  {t('system_info.link_main_repo')}
-                  <IconExternalLink size={14} />
-                </div>
-                <div className={styles.linkDesc}>{t('system_info.link_main_repo_desc')}</div>
-              </div>
-            </a>
-
-            <a
-              href="https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.linkCard}
-            >
-              <div className={`${styles.linkIcon} ${styles.github}`}>
-                <IconCode size={22} />
-              </div>
-              <div className={styles.linkContent}>
-                <div className={styles.linkTitle}>
-                  {t('system_info.link_webui_repo')}
-                  <IconExternalLink size={14} />
-                </div>
-                <div className={styles.linkDesc}>{t('system_info.link_webui_repo_desc')}</div>
-              </div>
-            </a>
-
-            <a
-              href="https://help.router-for.me/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.linkCard}
-            >
-              <div className={`${styles.linkIcon} ${styles.docs}`}>
-                <IconBookOpen size={22} />
-              </div>
-              <div className={styles.linkContent}>
-                <div className={styles.linkTitle}>
-                  {t('system_info.link_docs')}
-                  <IconExternalLink size={14} />
-                </div>
-                <div className={styles.linkDesc}>{t('system_info.link_docs_desc')}</div>
-              </div>
-            </a>
-          </div>
-        </Card>
-
-        <Card
+      {tab === 'models' && (
+        <Section
           title={t('system_info.models_title')}
-          extra={
+          actions={
             <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => fetchModels({ forceRefresh: true })}
-              loading={modelsLoading}
+              variant="outline"
+              size="lg"
+              className="h-9"
+              disabled={modelsLoading}
+              onClick={() => void fetchModels({ forceRefresh: true })}
             >
+              <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
               {t('common.refresh')}
             </Button>
           }
         >
-          <p className={styles.sectionDescription}>{t('system_info.models_desc')}</p>
-          {modelStatus && (
-            <div className={`status-badge ${modelStatus.type}`}>{modelStatus.message}</div>
-          )}
-          {modelsError && <div className="error-box">{modelsError}</div>}
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-muted-foreground">{t('system_info.models_desc')}</p>
+            {modelStatus && (
+              <span className="flex items-center gap-2 text-[13px]">
+                <span className={cn('size-2 rounded-full', STATUS_DOT[modelStatus.type])} />
+                <span className={modelStatus.type === 'error' ? 'text-destructive' : undefined}>
+                  {modelStatus.message}
+                </span>
+              </span>
+            )}
+            {modelsError && <p className="text-[13px] text-destructive">{modelsError}</p>}
+          </div>
           {modelsLoading ? (
-            <div className="hint">{t('common.loading')}</div>
+            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
           ) : models.length === 0 ? (
-            <div className="hint">{t('system_info.models_empty')}</div>
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <HugeiconsIcon icon={AiBrain01Icon} strokeWidth={1.75} />
+                </EmptyMedia>
+                <EmptyTitle>{t('system_info.models_empty')}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <div className="item-list">
+            <div className="divide-y overflow-hidden rounded-xl border bg-card">
               {groupedModels.map((group) => {
                 const iconSrc = getIconForCategory(group.id);
                 return (
-                  <div key={group.id} className="item-row">
-                    <div className="item-meta">
-                      <div className={styles.groupTitle}>
-                        {iconSrc && <img src={iconSrc} alt="" className={styles.groupIcon} />}
-                        <span className="item-title">{group.label}</span>
-                      </div>
-                      <div className="item-subtitle">
-                        {t('system_info.models_count', { count: group.items.length })}
-                      </div>
+                  <div key={group.id} className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2.5 text-sm font-medium">
+                        {iconSrc ? (
+                          <img src={iconSrc} alt="" className="size-5 rounded" />
+                        ) : (
+                          <HugeiconsIcon
+                            icon={AiBrain01Icon}
+                            className="size-5 text-muted-foreground"
+                            strokeWidth={1.75}
+                          />
+                        )}
+                        {group.label}
+                      </span>
+                      <span className="font-mono text-xs text-faint">{group.items.length}</span>
                     </div>
-                    <div className={styles.modelTags}>
+                    <div className="flex flex-wrap gap-1.5">
                       {group.items.map((model) => (
-                        <span
+                        <Badge
                           key={`${model.name}-${model.alias ?? 'default'}`}
-                          className={styles.modelTag}
+                          variant="secondary"
+                          className="h-auto max-w-full gap-1.5 font-mono font-normal"
                           title={model.description || ''}
                         >
-                          <span className={styles.modelName}>{model.name}</span>
-                          {model.alias && <span className={styles.modelAlias}>{model.alias}</span>}
-                        </span>
+                          <span className="truncate">{model.name}</span>
+                          {model.alias && (
+                            <span className="truncate text-muted-foreground">{model.alias}</span>
+                          )}
+                        </Badge>
                       ))}
                     </div>
                   </div>
@@ -460,51 +514,107 @@ export function SystemPage() {
               })}
             </div>
           )}
-        </Card>
+        </Section>
+      )}
 
-        <Card title={t('system_info.clear_login_title')}>
-          <p className={styles.sectionDescription}>{t('system_info.clear_login_desc')}</p>
-          <div className={styles.clearLoginActions}>
-            <Button variant="danger" onClick={handleClearLoginStorage}>
-              {t('system_info.clear_login_button')}
-            </Button>
-          </div>
-        </Card>
-      </div>
+      {tab === 'links' && (
+        <Section title={t('system_info.quick_links_title')}>
+          <ItemGroup className="gap-2">
+            {LINKS.map((link) => (
+              <Item key={link.href} variant="outline" asChild>
+                <a href={link.href} target="_blank" rel="noopener noreferrer">
+                  <ItemMedia variant="icon">
+                    <HugeiconsIcon icon={link.icon} strokeWidth={1.75} />
+                  </ItemMedia>
+                  <ItemContent className="min-w-0">
+                    <ItemTitle>{t(link.title)}</ItemTitle>
+                    <ItemDescription>{t(link.description)}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <HugeiconsIcon
+                      icon={ArrowUpRight01Icon}
+                      className="size-4 text-muted-foreground"
+                      strokeWidth={2}
+                    />
+                  </ItemActions>
+                </a>
+              </Item>
+            ))}
+          </ItemGroup>
+        </Section>
+      )}
 
-      <Modal
+      {tab === 'storage' && (
+        <Section title={t('system_info.clear_login_title')}>
+          <Item variant="outline">
+            <ItemContent>
+              <ItemDescription>{t('system_info.clear_login_desc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">{t('system_info.clear_login_button')}</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('system_info.clear_login_title')}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('system_info.clear_login_confirm')}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                    <AlertDialogAction variant="destructive" onClick={clearLoginStorage}>
+                      {t('common.confirm')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </ItemActions>
+          </Item>
+        </Section>
+      )}
+
+      <Dialog
         open={requestLogModalOpen}
-        onClose={handleRequestLogClose}
-        title={t('basic_settings.request_log_title')}
-        footer={
-          <>
-            <Button variant="secondary" onClick={handleRequestLogClose} disabled={requestLogSaving}>
+        onOpenChange={(open) => {
+          if (!open && !requestLogSaving) handleRequestLogClose();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('basic_settings.request_log_title')}</DialogTitle>
+          </DialogHeader>
+          <p className="rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-[13px] text-warning">
+            {t('basic_settings.request_log_warning')}
+          </p>
+          <Field orientation="horizontal" className="justify-between">
+            <FieldLabel htmlFor="request-log-enabled">
+              {t('basic_settings.request_log_enable')}
+            </FieldLabel>
+            <Switch
+              id="request-log-enabled"
+              checked={requestLogDraft}
+              disabled={!canEditRequestLog || requestLogSaving}
+              onCheckedChange={(value) => {
+                setRequestLogDraft(value);
+                setRequestLogTouched(true);
+              }}
+            />
+          </Field>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleRequestLogClose} disabled={requestLogSaving}>
               {t('common.cancel')}
             </Button>
             <Button
-              onClick={handleRequestLogSave}
-              loading={requestLogSaving}
-              disabled={!canEditRequestLog || !requestLogDirty}
+              onClick={() => void handleRequestLogSave()}
+              disabled={!canEditRequestLog || !requestLogDirty || requestLogSaving}
             >
               {t('common.save')}
             </Button>
-          </>
-        }
-      >
-        <div className="request-log-modal">
-          <div className="status-badge warning">{t('basic_settings.request_log_warning')}</div>
-          <ToggleSwitch
-            label={t('basic_settings.request_log_enable')}
-            labelPosition="left"
-            checked={requestLogDraft}
-            disabled={!canEditRequestLog || requestLogSaving}
-            onChange={(value) => {
-              setRequestLogDraft(value);
-              setRequestLogTouched(true);
-            }}
-          />
-        </div>
-      </Modal>
-    </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Page>
   );
 }

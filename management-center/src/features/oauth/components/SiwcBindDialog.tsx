@@ -1,28 +1,38 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui/Modal';
-import { IconExternalLink, IconLoader2 } from '@/components/ui/icons';
+import { Button } from '@/components/ui/button';
+import { FieldLegend, FieldSet } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import iconCodex from '@/assets/icons/codex.svg';
 import { authFilesApi } from '@/services/api/authFiles';
 import { captureSiwcBindingApi, oauthApi, type SiwcBindResponse } from '@/services/api/oauth';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { AuthFileItem } from '@/types';
 import { formatDateTimeValue } from '@/utils/format';
+import { cn } from '@/lib/utils';
 import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
 import { deriveAuthFileIdentity, stripJsonExtension } from '@/features/authFiles/identity';
 import { createOAuthAttempts, type OAuthAttempt } from '../oauthAttempts';
-import { splitAuthUrl } from '../flowView';
 import {
   createSiwcStart,
   getSiwcBindingStatus,
   isSiwcCallbackValid,
   listSiwcTargets,
 } from '../siwcBinding';
-import { CopyButton } from './CopyButton';
-import { DialogTitle } from './OAuthFlowDialog';
+import {
+  AuthUrlField,
+  CallbackFeedback,
+  CallbackForm,
+  FlowAlert,
+  FlowDialog,
+  FlowFooter,
+  FlowView,
+  OpenLinkButton,
+  ResultView,
+  Step,
+  Steps,
+} from './FlowDialogParts';
 import { SiwcStatusBadge } from './SiwcStatusBadge';
-import dialogStyles from './OAuthFlowDialog.module.scss';
-import styles from './SiwcBindDialog.module.scss';
 
 type Phase = 'idle' | 'starting' | 'wait' | 'ok' | 'error' | 'unsupported' | 'expired';
 type Feedback = 'submitted' | 'invalid_callback' | 'callback_failed';
@@ -36,9 +46,10 @@ export interface SiwcBindDialogProps {
 }
 
 /**
- * SIWC 绑定：与 OAuth 授权对话框同一套语汇（品牌头 / 步骤 / 底部状态条 / 成功视图）。
- * 先在对话框内选择 Codex 凭证，再开始授权；授权开始后凭证锁定，失败可原地重来。
- * 每次打开由父级以新 key 重新挂载，关闭时取消仍在进行的服务端会话。
+ * SIWC binding, in the same dialog frame as the OAuth sign-in (brand header, steps, status
+ * footer, result). Pick a Codex credential first, then authorize; the credential is locked once
+ * authorization starts and a failure can start over in place. The parent remounts it with a new
+ * key per open; closing cancels a server session that is still running.
  */
 export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialogProps) {
   const { t, i18n } = useTranslation();
@@ -209,33 +220,32 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
           : 'failed';
 
   return (
-    <Modal
+    <FlowDialog
       open={open}
       onClose={close}
-      width={500}
-      className={dialogStyles.dialog}
-      title={
-        <DialogTitle
-          title={t('siwc.title')}
-          caption={`Codex · ${t('auth_login.method_browser')}`}
-          icon={iconCodex}
-        />
-      }
+      heading={{
+        title: t('siwc.title'),
+        caption: `Codex · ${t('auth_login.method_browser')}`,
+        icon: iconCodex,
+        flush: true,
+      }}
       footer={
         view === 'flow' ? (
-          <FlowStatusBar
-            generating={phase === 'starting'}
-            onCancel={close}
+          <FlowFooter
+            tone={phase === 'starting' ? 'pending' : 'waiting'}
             label={t(phase === 'starting' ? 'siwc.starting' : 'siwc.wait')}
-            cancelLabel={t('siwc.cancel')}
-          />
+          >
+            <Button variant="outline" onClick={close}>
+              {t('siwc.cancel')}
+            </Button>
+          </FlowFooter>
         ) : undefined
       }
     >
-      <div className={dialogStyles.view} key={view}>
+      <FlowView key={view}>
         {view === 'pick' && (
-          <div className={dialogStyles.stack}>
-            <p className={dialogStyles.hint}>{t('siwc.intro')}</p>
+          <>
+            <p className="text-sm text-muted-foreground">{t('siwc.intro')}</p>
             <TargetPicker
               targets={targets}
               loadFailed={loadFailed}
@@ -243,24 +253,29 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
               onChange={setName}
               expiresOf={expiresOf}
             />
-            <div>
-              <button
-                type="button"
-                className={dialogStyles.primary}
-                disabled={!name}
-                onClick={() => void startRef.current?.start()}
-              >
-                {t('siwc.start')}
-              </button>
-            </div>
-          </div>
+            <Button
+              size="lg"
+              className="h-9 w-fit px-4"
+              disabled={!name}
+              onClick={() => void startRef.current?.start()}
+            >
+              {t('siwc.start')}
+            </Button>
+          </>
         )}
 
         {view === 'flow' && (
-          <div className={dialogStyles.stack}>
+          <>
             {selected && <TargetSummary file={selected} />}
-            <ol className={dialogStyles.steps}>
-              <OpenStep url={session?.url} />
+            <Steps>
+              <Step title={t('siwc.step_open')}>
+                <AuthUrlField
+                  url={session?.url}
+                  copyLabel={t('siwc.copy')}
+                  pendingLabel={t('siwc.starting')}
+                />
+                <OpenLinkButton url={session?.url} label={t('siwc.open')} />
+              </Step>
               <CallbackStep
                 disabled={!session || phase !== 'wait'}
                 value={callback}
@@ -272,54 +287,49 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
                 }}
                 onSubmit={() => void submit()}
               />
-            </ol>
-          </div>
+            </Steps>
+          </>
         )}
 
         {view === 'failed' && (
-          <div className={dialogStyles.stack}>
+          <>
             {selected && <TargetSummary file={selected} />}
-            <div className={dialogStyles.alert} role="alert">
-              {t(`siwc.${phase}`)}
-            </div>
+            <FlowAlert>{t(`siwc.${phase}`)}</FlowAlert>
             {phase !== 'unsupported' && (
-              <div>
-                <button type="button" className={dialogStyles.primary} onClick={restart}>
-                  {t('siwc.retry')}
-                </button>
-              </div>
+              <Button size="lg" className="h-9 w-fit px-4" onClick={restart}>
+                {t('siwc.retry')}
+              </Button>
             )}
-          </div>
+          </>
         )}
 
         {view === 'success' && (
-          <div className={dialogStyles.result} role="status">
-            <svg className={dialogStyles.successMark} viewBox="0 0 52 52" aria-hidden="true">
-              <circle className={dialogStyles.successRing} cx="26" cy="26" r="24" />
-              <path className={dialogStyles.successCheck} d="M16 27l7 7 14-15" />
-            </svg>
-            <div className={dialogStyles.resultTitle}>{t('siwc.ok')}</div>
+          <ResultView
+            title={t('siwc.ok')}
+            actions={
+              <>
+                <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+                  {t('auth_login.view_auth_files')}
+                </Button>
+                <Button size="lg" className="h-9 px-4" onClick={close}>
+                  {t('siwc.done')}
+                </Button>
+              </>
+            }
+          >
             {selected && (
-              <p className={dialogStyles.resultHint}>
+              <p className="text-sm text-muted-foreground">
                 {t('siwc.ok_hint', { name: deriveAuthFileIdentity(selected).primary })}
               </p>
             )}
-            <div className={dialogStyles.resultActions}>
-              <button type="button" className={dialogStyles.secondary} onClick={onViewAuthFiles}>
-                {t('auth_login.view_auth_files')}
-              </button>
-              <button type="button" className={dialogStyles.primary} onClick={close}>
-                {t('siwc.done')}
-              </button>
-            </div>
-          </div>
+          </ResultView>
         )}
-      </div>
-    </Modal>
+      </FlowView>
+    </FlowDialog>
   );
 }
 
-/* ---------- 凭证选择：原生 radio（键盘/读屏零成本），视觉为可点行 ---------- */
+/* ---------- Credential picker: native radios (keyboard and screen readers for free), shown as tiles ---------- */
 
 function TargetPicker({
   targets,
@@ -339,23 +349,23 @@ function TargetPicker({
 
   let content: ReactNode;
   if (loadFailed) {
-    content = (
-      <div className={dialogStyles.alert} role="alert">
-        {t('siwc.load_failed')}
-      </div>
-    );
+    content = <FlowAlert>{t('siwc.load_failed')}</FlowAlert>;
   } else if (!targets) {
     content = (
-      <div className={styles.options} aria-busy="true" aria-label={t('siwc.loading')}>
-        <span className={styles.skeletonRow} />
-        <span className={styles.skeletonRow} />
+      <div className="grid gap-2" aria-busy="true" aria-label={t('siwc.loading')}>
+        <span className="h-15 rounded-xl bg-muted/50" />
+        <span className="h-15 rounded-xl bg-muted/50" />
       </div>
     );
   } else if (targets.length === 0) {
-    content = <p className={styles.empty}>{t('siwc.no_targets')}</p>;
+    content = (
+      <p className="rounded-xl border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+        {t('siwc.no_targets')}
+      </p>
+    );
   } else {
     content = (
-      <div className={styles.options}>
+      <div className="grid gap-2">
         {targets.map((file) => {
           const identity = deriveAuthFileIdentity(file);
           const expires = expiresOf(file);
@@ -365,28 +375,27 @@ function TargetPicker({
           return (
             <label
               key={file.name}
-              className={styles.option}
-              data-checked={value === file.name || undefined}
+              className="flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors duration-150 ease-out hover:bg-muted/50 has-checked:border-primary/20 has-checked:bg-primary/10 has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
             >
               <input
                 type="radio"
-                className={styles.radioInput}
+                className="grid size-4 shrink-0 appearance-none place-items-center rounded-full border border-input outline-none before:size-2 before:rounded-full before:bg-primary-foreground before:opacity-0 checked:border-primary checked:bg-primary checked:before:opacity-100 dark:bg-input/30 dark:checked:bg-primary"
                 name={groupName}
                 value={file.name}
                 checked={value === file.name}
                 onChange={() => onChange(file.name)}
               />
-              <span className={styles.radio} aria-hidden="true" />
-              <span className={styles.optionText}>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span
-                  className={`${styles.optionName} ${
-                    identity.kind === 'fileName' ? styles.optionNameMono : ''
-                  }`}
+                  className={cn(
+                    'truncate text-sm font-medium',
+                    identity.kind === 'fileName' && 'font-mono text-xs leading-5'
+                  )}
                   title={identity.fullName}
                 >
                   {identity.primary || stripJsonExtension(file.name)}
                 </span>
-                {meta && <span className={styles.optionMeta}>{meta}</span>}
+                {meta && <span className="truncate text-sm text-muted-foreground">{meta}</span>}
               </span>
               <SiwcStatusBadge status={getSiwcBindingStatus(file)} withLabel={false} />
             </label>
@@ -397,89 +406,33 @@ function TargetPicker({
   }
 
   return (
-    <fieldset className={styles.picker}>
-      <legend className={styles.legend}>{t('siwc.target')}</legend>
+    <FieldSet className="min-w-0 gap-3">
+      <FieldLegend variant="label" className="mb-0">
+        {t('siwc.target')}
+      </FieldLegend>
       {content}
-    </fieldset>
+    </FieldSet>
   );
 }
 
-/** 授权开始后的锁定目标：单行摘要，不再可改。 */
+/** The locked target once authorization started: a one-line summary. */
 function TargetSummary({ file }: { file: AuthFileItem }) {
   const { t } = useTranslation();
   const identity = deriveAuthFileIdentity(file);
   return (
-    <div className={styles.summary}>
-      <span className={styles.summaryLabel}>{t('siwc.target')}</span>
+    <div className="flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5">
+      <span className="shrink-0 text-sm text-muted-foreground">{t('siwc.target')}</span>
       <span
-        className={`${styles.summaryName} ${identity.kind === 'fileName' ? styles.optionNameMono : ''}`}
+        className={cn(
+          'min-w-0 flex-1 truncate text-sm font-medium',
+          identity.kind === 'fileName' && 'font-mono text-xs'
+        )}
         title={identity.fullName}
       >
         {identity.primary || stripJsonExtension(file.name)}
       </span>
       <SiwcStatusBadge status={getSiwcBindingStatus(file)} withLabel={false} />
     </div>
-  );
-}
-
-/* ---------- 步骤：与 OAuthFlowDialog 同构 ---------- */
-
-function Step({
-  title,
-  titleFor,
-  children,
-}: {
-  title: string;
-  titleFor?: string;
-  children: ReactNode;
-}) {
-  return (
-    <li className={dialogStyles.step}>
-      <span className={dialogStyles.stepIndex} aria-hidden="true" />
-      <div className={dialogStyles.stepBody}>
-        <div className={dialogStyles.stepHead}>
-          {titleFor ? (
-            <label className={dialogStyles.stepTitle} htmlFor={titleFor}>
-              {title}
-            </label>
-          ) : (
-            <span className={dialogStyles.stepTitle}>{title}</span>
-          )}
-        </div>
-        {children}
-      </div>
-    </li>
-  );
-}
-
-function OpenStep({ url }: { url?: string }) {
-  const { t } = useTranslation();
-  const parts = url ? splitAuthUrl(url) : null;
-  return (
-    <Step title={t('siwc.step_open')}>
-      <div className={dialogStyles.urlField} aria-busy={!url}>
-        {parts ? (
-          <span className={dialogStyles.urlText} title={url}>
-            <span className={dialogStyles.urlHost}>{parts.host}</span>
-            <span className={dialogStyles.urlRest}>{parts.rest}</span>
-          </span>
-        ) : (
-          <span className={dialogStyles.urlSkeleton} aria-label={t('siwc.starting')} />
-        )}
-        {url && <CopyButton value={url} label={t('siwc.copy')} />}
-      </div>
-      <div>
-        <button
-          type="button"
-          className={dialogStyles.primary}
-          disabled={!url}
-          onClick={() => url && window.open(url, '_blank', 'noopener,noreferrer')}
-        >
-          {t('siwc.open')}
-          <IconExternalLink size={14} aria-hidden="true" />
-        </button>
-      </div>
-    </Step>
   );
 }
 
@@ -506,19 +459,13 @@ function CallbackStep({
 
   return (
     <Step title={t('siwc.callback')} titleFor={inputId}>
-      <p className={dialogStyles.stepHint} id={hintId}>
+      <p className="text-sm text-muted-foreground" id={hintId}>
         {t('siwc.hint')}
       </p>
-      <form
-        className={dialogStyles.callbackRow}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <input
+      <CallbackForm onSubmit={onSubmit}>
+        <Input
           id={inputId}
-          className={`input ${dialogStyles.callbackInput}`}
+          className="h-9 flex-1 font-mono text-xs md:text-xs"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={CALLBACK_PLACEHOLDER}
@@ -528,54 +475,21 @@ function CallbackStep({
           aria-invalid={isError}
           aria-describedby={feedback ? `${feedbackId} ${hintId}` : hintId}
         />
-        <button
+        <Button
           type="submit"
-          className={dialogStyles.secondary}
+          variant="outline"
+          size="lg"
+          className="h-9 px-4"
           disabled={disabled || submitting || !value.trim()}
         >
-          {submitting && (
-            <IconLoader2 size={14} className={dialogStyles.spinning} aria-hidden="true" />
-          )}
           {t('siwc.submit')}
-        </button>
-      </form>
+        </Button>
+      </CallbackForm>
       {feedback && (
-        <p
-          id={feedbackId}
-          className={isError ? dialogStyles.feedbackError : dialogStyles.feedbackSuccess}
-          role={isError ? 'alert' : 'status'}
-        >
+        <CallbackFeedback id={feedbackId} tone={isError ? 'error' : 'success'}>
           {t(`siwc.${feedback}`)}
-        </p>
+        </CallbackFeedback>
       )}
     </Step>
-  );
-}
-
-function FlowStatusBar({
-  generating,
-  label,
-  cancelLabel,
-  onCancel,
-}: {
-  generating: boolean;
-  label: string;
-  cancelLabel: string;
-  onCancel: () => void;
-}) {
-  return (
-    <div className={dialogStyles.statusBar} data-tone="waiting">
-      <p className={dialogStyles.statusText} role="status" aria-live="polite">
-        {generating ? (
-          <IconLoader2 size={13} className={dialogStyles.spinning} aria-hidden="true" />
-        ) : (
-          <span className={dialogStyles.statusDot} aria-hidden="true" />
-        )}
-        <span className={dialogStyles.statusLabel}>{label}</span>
-      </p>
-      <button type="button" className={dialogStyles.ghost} onClick={onCancel}>
-        {cancelLabel}
-      </button>
-    </div>
   );
 }

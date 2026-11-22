@@ -1,42 +1,40 @@
-import { useId, type ReactNode } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui/Modal';
-import { IconExternalLink, IconLoader2 } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { LinkSquare02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import type { ProviderFlowState } from '../hooks/useOAuthFlows';
-import { resolveFlowView, splitAuthUrl, type FlowView } from '../flowView';
-import { BrandGlyph } from './BrandGlyph';
-import { CopyButton } from './CopyButton';
-import styles from './OAuthFlowDialog.module.scss';
+import { resolveFlowView, type FlowView as FlowViewKind } from '../flowView';
+import {
+  AuthUrlField,
+  CallbackFeedback,
+  CallbackForm,
+  FlowAlert,
+  FlowDialog,
+  FlowFooter,
+  FlowView,
+  OpenLinkButton,
+  OptionalTag,
+  ResultView,
+  Step,
+  Steps,
+  type DialogHeading,
+} from './FlowDialogParts';
 
-export interface DialogHeading {
-  title: string;
-  caption: string;
-  icon: string;
-}
-
-export function DialogTitle({ title, caption, icon }: DialogHeading) {
-  return (
-    <span className={styles.heading}>
-      <span className={styles.headingGlyph}>
-        <BrandGlyph src={icon} size={22} className={styles.headingImage} />
-      </span>
-      <span className={styles.headingText}>
-        <span className={styles.headingTitle}>{title}</span>
-        <span className={styles.headingCaption}>{caption}</span>
-      </span>
-    </span>
-  );
-}
+export type { DialogHeading };
 
 export interface OAuthFlowDialogProps {
   open: boolean;
   providerId: string;
   heading: DialogHeading;
   state: ProviderFlowState;
-  /** 提供商专属文案：`auth_login.<id>_<suffix>` 或插件模板。 */
+  /** Provider copy: `auth_login.<id>_<suffix>` or the plugin template. */
   text: (suffix: string) => string;
   supportsCallback: boolean;
-  /** 赞助商：品牌蓝主按钮 + 提示行里的注册链接。 */
+  /** Sponsor: adds the sign-up link to the hint. */
   sponsor?: { url: string; label: string };
   onStart: () => void;
   onCancel: () => void;
@@ -49,22 +47,24 @@ export interface OAuthFlowDialogProps {
 }
 
 export function OAuthFlowDialog(props: OAuthFlowDialogProps) {
-  const { open, heading, state, onClose } = props;
-  const view = resolveFlowView(state);
-
+  const { open, heading, onClose } = props;
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      width={500}
-      className={props.sponsor ? `${styles.dialog} ${styles.sponsorDialog}` : styles.dialog}
-      title={<DialogTitle {...heading} />}
-      footer={view === 'flow' ? <FlowStatusBar {...props} /> : undefined}
-    >
-      <div className={styles.view} key={view}>
+    <FlowDialog open={open} heading={heading} onClose={onClose}>
+      <OAuthFlowContent {...props} />
+    </FlowDialog>
+  );
+}
+
+/** Everything below the dialog header. Exported so it can render without the dialog portal. */
+export function OAuthFlowContent(props: OAuthFlowDialogProps) {
+  const view = resolveFlowView(props.state);
+  return (
+    <>
+      <FlowView key={view}>
         {view === 'success' ? <SuccessView {...props} /> : <FlowBody {...props} view={view} />}
-      </div>
-    </Modal>
+      </FlowView>
+      {view === 'flow' && <FlowStatusBar {...props} />}
+    </>
   );
 }
 
@@ -75,22 +75,27 @@ function ProviderHint({
 }: Pick<OAuthFlowDialogProps, 'text' | 'sponsor' | 'state'>) {
   const { t } = useTranslation();
   return (
-    <p className={styles.hint}>
+    <p className="text-sm text-muted-foreground">
       {state.reconnect
         ? t('auth_login.anthropic_reconnect_hint', { name: state.reconnect.label })
         : text('oauth_hint')}
       {sponsor && (
         <>
           {' '}
-          <span className={styles.signUpPrompt}>{t('auth_login.sign_up_prompt')}</span>
+          {t('auth_login.sign_up_prompt')}{' '}
           <a
-            className={styles.inlineLink}
+            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
             href={sponsor.url}
             target="_blank"
             rel="noopener noreferrer"
           >
             {sponsor.label}
-            <IconExternalLink size={11} aria-hidden="true" />
+            <HugeiconsIcon
+              icon={LinkSquare02Icon}
+              strokeWidth={1.75}
+              className="size-3.5"
+              aria-hidden="true"
+            />
           </a>
         </>
       )}
@@ -98,14 +103,14 @@ function ProviderHint({
   );
 }
 
-function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'success'> }) {
+function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowViewKind, 'success'> }) {
   const { t } = useTranslation();
   const { view, providerId, state, text, onStart } = props;
   const isDevin = providerId === 'devin';
 
   if (view !== 'flow') {
     return (
-      <div className={styles.stack}>
+      <>
         <ProviderHint text={text} sponsor={props.sponsor} state={state} />
         {props.onAccountNameChange && !state.reconnect && (
           <AccountNameField
@@ -115,82 +120,59 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowView, 'succe
           />
         )}
         {view === 'failed' && (
-          <div className={styles.alert} role="alert">
+          <FlowAlert>
             {text('oauth_status_error')} {state.error || ''}
-          </div>
+          </FlowAlert>
         )}
-        <div>
-          <button type="button" className={styles.primary} onClick={onStart}>
-            {view === 'failed' ? t('auth_login.restart_login') : text('oauth_button')}
-          </button>
-        </div>
-      </div>
+        <Button size="lg" className="h-9 w-fit px-4" onClick={onStart}>
+          {view === 'failed' ? t('auth_login.restart_login') : text('oauth_button')}
+        </Button>
+      </>
     );
   }
 
   return (
-    <div className={styles.stack}>
+    <>
       <ProviderHint text={text} sponsor={props.sponsor} state={state} />
       {isDevin && state.state && state.status === 'error' && (
-        <div className={styles.alert} role="alert">
-          {t('auth_login.devin_oauth_retry_hint')}
-        </div>
+        <FlowAlert>{t('auth_login.devin_oauth_retry_hint')}</FlowAlert>
       )}
       {state.cancelError && (
-        <div className={styles.alert} role="alert">
+        <FlowAlert>
           {t('auth_login.devin_oauth_cancel_error')} {state.cancelError}
-        </div>
+        </FlowAlert>
       )}
-      <ol className={styles.steps}>
-        <OpenStep {...props} />
+      <Steps>
+        <Step
+          title={
+            state.secondStep
+              ? t('auth_login.anthropic_second_step')
+              : t('auth_login.step_open_auth_page')
+          }
+        >
+          <AuthUrlField
+            url={state.url}
+            copyLabel={text('copy_link')}
+            pendingLabel={t('auth_login.generating_link')}
+          />
+          <OpenLinkButton url={state.url} label={text('open_link')} />
+        </Step>
         {state.userCode && (
           <Step title={t('auth_login.step_enter_device_code')}>
-            <div className={styles.codeRow}>
-              <output className={styles.code} aria-label={t('auth_login.device_code_label')}>
+            <div className="flex items-center gap-1">
+              <output
+                className="font-mono text-2xl font-semibold tracking-widest"
+                aria-label={t('auth_login.device_code_label')}
+              >
                 {state.userCode}
               </output>
-              <CopyButton
-                value={state.userCode}
-                label={t('auth_login.device_code_copy')}
-                showLabel
-              />
+              <CopyButton value={state.userCode} label={t('auth_login.device_code_copy')} />
             </div>
           </Step>
         )}
         {props.supportsCallback && <CallbackStep {...props} />}
-      </ol>
-    </div>
-  );
-}
-
-function Step({
-  title,
-  titleFor,
-  aside,
-  children,
-}: {
-  title: string;
-  titleFor?: string;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <li className={styles.step}>
-      <span className={styles.stepIndex} aria-hidden="true" />
-      <div className={styles.stepBody}>
-        <div className={styles.stepHead}>
-          {titleFor ? (
-            <label className={styles.stepTitle} htmlFor={titleFor}>
-              {title}
-            </label>
-          ) : (
-            <span className={styles.stepTitle}>{title}</span>
-          )}
-          {aside}
-        </div>
-        {children}
-      </div>
-    </li>
+      </Steps>
+    </>
   );
 }
 
@@ -207,66 +189,28 @@ function AccountNameField({
   const inputId = useId();
   return (
     <form
-      className={styles.nameField}
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <label className={styles.stepTitle} htmlFor={inputId}>
-        {t('auth_login.account_name_label')}
-        <span className={styles.optional}>{t('auth_login.optional_step')}</span>
-      </label>
-      <input
-        id={inputId}
-        className="input"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={t('auth_login.account_name_placeholder')}
-        maxLength={64}
-        autoComplete="off"
-        spellCheck={false}
-      />
+      <Field>
+        <FieldLabel htmlFor={inputId}>
+          {t('auth_login.account_name_label')}
+          <OptionalTag />
+        </FieldLabel>
+        <Input
+          id={inputId}
+          className="h-9"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={t('auth_login.account_name_placeholder')}
+          maxLength={64}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Field>
     </form>
-  );
-}
-
-function OpenStep({ state, text }: OAuthFlowDialogProps) {
-  const { t } = useTranslation();
-  const url = state.url;
-  const parts = url ? splitAuthUrl(url) : null;
-
-  return (
-    <Step
-      title={
-        state.secondStep
-          ? t('auth_login.anthropic_second_step')
-          : t('auth_login.step_open_auth_page')
-      }
-    >
-      <div className={styles.urlField} aria-busy={!url}>
-        {parts ? (
-          <span className={styles.urlText} title={url}>
-            <span className={styles.urlHost}>{parts.host}</span>
-            <span className={styles.urlRest}>{parts.rest}</span>
-          </span>
-        ) : (
-          <span className={styles.urlSkeleton} aria-label={t('auth_login.generating_link')} />
-        )}
-        {url && <CopyButton value={url} label={text('copy_link')} />}
-      </div>
-      <div>
-        <button
-          type="button"
-          className={styles.primary}
-          disabled={!url}
-          onClick={() => url && window.open(url, '_blank', 'noopener,noreferrer')}
-        >
-          {text('open_link')}
-          <IconExternalLink size={14} aria-hidden="true" />
-        </button>
-      </div>
-    </Step>
   );
 }
 
@@ -309,21 +253,15 @@ function CallbackStep({
     <Step
       title={t(isXai ? 'auth_login.xai_callback_label' : 'auth_login.oauth_callback_label')}
       titleFor={inputId}
-      aside={<span className={styles.optional}>{t('auth_login.optional_step')}</span>}
+      aside={<OptionalTag />}
     >
-      <p className={styles.stepHint} id={hintId}>
+      <p className="text-sm text-muted-foreground" id={hintId}>
         {t(hintKey)}
       </p>
-      <form
-        className={styles.callbackRow}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onCallbackSubmit();
-        }}
-      >
-        <input
+      <CallbackForm onSubmit={onCallbackSubmit}>
+        <Input
           id={inputId}
-          className={`input ${styles.callbackInput}`}
+          className="h-9 flex-1 font-mono text-xs md:text-xs"
           value={state.callbackUrl || ''}
           onChange={(event) => onCallbackChange(event.target.value)}
           placeholder={t(placeholderKey)}
@@ -333,25 +271,20 @@ function CallbackStep({
           aria-invalid={feedback?.tone === 'error'}
           aria-describedby={feedback ? `${feedbackId} ${hintId}` : hintId}
         />
-        <button
+        <Button
           type="submit"
-          className={styles.secondary}
+          variant="outline"
+          size="lg"
+          className="h-9 px-4"
           disabled={disabled || state.callbackSubmitting}
         >
-          {state.callbackSubmitting && (
-            <IconLoader2 size={14} className={styles.spinning} aria-hidden="true" />
-          )}
           {t('auth_login.oauth_callback_button')}
-        </button>
-      </form>
+        </Button>
+      </CallbackForm>
       {feedback && (
-        <p
-          id={feedbackId}
-          className={feedback.tone === 'error' ? styles.feedbackError : styles.feedbackSuccess}
-          role={feedback.tone === 'error' ? 'alert' : 'status'}
-        >
+        <CallbackFeedback id={feedbackId} tone={feedback.tone}>
           {feedback.message}
-        </p>
+        </CallbackFeedback>
       )}
     </Step>
   );
@@ -362,66 +295,52 @@ function FlowStatusBar({ providerId, state, text, onStart, onCancel }: OAuthFlow
   const isDevin = providerId === 'devin';
   const failed = state.status === 'error';
   const generating = !failed && !state.url;
-  // Devin 会话在服务端可能仍挂着：必须先取消才能重开
+  // A Devin session may still be open on the server: it has to be cancelled before a restart.
   const canCancel = isDevin && Boolean(state.state);
 
   return (
-    <div className={styles.statusBar} data-tone={failed ? 'error' : 'waiting'}>
-      <p className={styles.statusText} role="status" aria-live="polite">
-        {generating ? (
-          <IconLoader2 size={13} className={styles.spinning} aria-hidden="true" />
-        ) : (
-          <span className={styles.statusDot} aria-hidden="true" />
-        )}
-        <span className={styles.statusLabel}>
-          {generating
-            ? t('auth_login.generating_link')
-            : failed
-              ? `${text('oauth_status_error')} ${state.error || ''}`
-              : text('oauth_status_waiting')}
-        </span>
-      </p>
+    <FlowFooter
+      tone={generating ? 'pending' : failed ? 'error' : 'waiting'}
+      label={
+        generating
+          ? t('auth_login.generating_link')
+          : failed
+            ? `${text('oauth_status_error')} ${state.error || ''}`
+            : text('oauth_status_waiting')
+      }
+    >
       {canCancel ? (
-        <button
-          type="button"
-          className={styles.ghost}
-          onClick={onCancel}
-          disabled={state.cancelling}
-        >
-          {state.cancelling && (
-            <IconLoader2 size={13} className={styles.spinning} aria-hidden="true" />
-          )}
+        <Button variant="outline" onClick={onCancel} disabled={state.cancelling}>
           {t('auth_login.devin_oauth_cancel')}
-        </button>
+        </Button>
       ) : failed ? (
-        <button type="button" className={styles.ghost} onClick={onStart}>
+        <Button variant="outline" onClick={onStart}>
           {t('auth_login.restart_login')}
-        </button>
+        </Button>
       ) : (
-        <span className={styles.statusAside}>{t('auth_login.waiting_background_hint')}</span>
+        <span className="text-xs text-faint">{t('auth_login.waiting_background_hint')}</span>
       )}
-    </div>
+    </FlowFooter>
   );
 }
 
 function SuccessView({ text, onStart, onViewAuthFiles }: OAuthFlowDialogProps) {
   const { t } = useTranslation();
   return (
-    <div className={styles.result} role="status">
-      <svg className={styles.successMark} viewBox="0 0 52 52" aria-hidden="true">
-        <circle className={styles.successRing} cx="26" cy="26" r="24" />
-        <path className={styles.successCheck} d="M16 27l7 7 14-15" />
-      </svg>
-      <div className={styles.resultTitle}>{text('oauth_status_success')}</div>
-      <p className={styles.resultHint}>{t('auth_login.success_saved_hint')}</p>
-      <div className={styles.resultActions}>
-        <button type="button" className={styles.secondary} onClick={onViewAuthFiles}>
-          {t('auth_login.view_auth_files')}
-        </button>
-        <button type="button" className={styles.primary} onClick={onStart}>
-          {t('auth_login.login_another_account')}
-        </button>
-      </div>
-    </div>
+    <ResultView
+      title={text('oauth_status_success')}
+      actions={
+        <>
+          <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+            {t('auth_login.view_auth_files')}
+          </Button>
+          <Button size="lg" className="h-9 px-4" onClick={onStart}>
+            {t('auth_login.login_another_account')}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-muted-foreground">{t('auth_login.success_saved_hint')}</p>
+    </ResultView>
   );
 }

@@ -1,13 +1,14 @@
 import { useId, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { IconFileText, IconLoader2, IconUpload } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { File01Icon, Upload04Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
+import { cn } from '@/lib/utils';
 import type { VertexImportState } from '../hooks/useVertexImport';
-import { DialogTitle, type DialogHeading } from './OAuthFlowDialog';
-import dialogStyles from './OAuthFlowDialog.module.scss';
-import styles from './VertexImportDialog.module.scss';
+import { FlowAlert, FlowDialog, FlowView, ResultView, type DialogHeading } from './FlowDialogParts';
 
 export interface VertexImportDialogProps {
   open: boolean;
@@ -36,6 +37,8 @@ export function VertexImportDialog({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fileHintId = useId();
   const fileTitleId = useId();
+  const fileLabelId = useId();
+  const locationId = useId();
   const [dragging, setDragging] = useState(false);
   const result = vertex.result;
 
@@ -55,131 +58,126 @@ export function VertexImportDialog({
     : [];
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      width={500}
-      className={dialogStyles.dialog}
-      title={<DialogTitle {...heading} />}
-    >
-      <div className={dialogStyles.view} key={result ? 'result' : 'form'}>
+    <FlowDialog open={open} heading={heading} onClose={onClose}>
+      <FlowView key={result ? 'result' : 'form'}>
         {result ? (
-          <div className={dialogStyles.result} role="status">
-            <svg className={dialogStyles.successMark} viewBox="0 0 52 52" aria-hidden="true">
-              <circle className={dialogStyles.successRing} cx="26" cy="26" r="24" />
-              <path className={dialogStyles.successCheck} d="M16 27l7 7 14-15" />
-            </svg>
-            <div className={dialogStyles.resultTitle}>{t('vertex_import.result_title')}</div>
+          <ResultView
+            title={t('vertex_import.result_title')}
+            actions={
+              <>
+                <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+                  {t('auth_login.view_auth_files')}
+                </Button>
+                <Button size="lg" className="h-9 px-4" onClick={onImportAnother}>
+                  {t('vertex_import.import_another')}
+                </Button>
+              </>
+            }
+          >
             {resultRows.length > 0 && (
-              <dl className={styles.facts}>
+              <dl className="mt-1 grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2 rounded-lg border p-3 text-left text-sm">
                 {resultRows.map((row) => (
-                  <div className={styles.fact} key={row.key}>
-                    <dt>{t(`vertex_import.${row.key}`)}</dt>
-                    <dd>
+                  <div className="contents" key={row.key}>
+                    <dt className="text-muted-foreground">{t(`vertex_import.${row.key}`)}</dt>
+                    <dd className="min-w-0 truncate font-mono text-xs leading-5">
                       <EmailPrivacyText text={row.value} />
                     </dd>
                   </div>
                 ))}
               </dl>
             )}
-            <div className={dialogStyles.resultActions}>
-              <button type="button" className={dialogStyles.secondary} onClick={onViewAuthFiles}>
-                {t('auth_login.view_auth_files')}
-              </button>
-              <button type="button" className={dialogStyles.primary} onClick={onImportAnother}>
-                {t('vertex_import.import_another')}
-              </button>
-            </div>
-          </div>
+          </ResultView>
         ) : (
-          <div className={dialogStyles.stack}>
-            <p className={dialogStyles.hint}>{t('vertex_import.description')}</p>
+          <>
+            <p className="text-sm text-muted-foreground">{t('vertex_import.description')}</p>
 
-            <div className={styles.field}>
-              <span className={styles.label}>{t('vertex_import.file_label')}</span>
-              {/* Stretched button keeps the email-reveal button out of the click target */}
-              <div
-                className={styles.dropZone}
-                data-dragging={dragging}
-                data-filled={Boolean(vertex.file)}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-              >
-                <button
-                  type="button"
-                  className={styles.dropButton}
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-labelledby={fileTitleId}
-                  aria-describedby={fileHintId}
+            <FieldGroup>
+              <Field>
+                <FieldTitle id={fileLabelId}>{t('vertex_import.file_label')}</FieldTitle>
+                {/* Stretched button keeps the email reveal button out of the click target */}
+                <div
+                  className={cn(
+                    'relative flex min-w-0 items-center gap-3 rounded-lg border border-dashed border-input p-3 transition-colors duration-150 ease-out hover:bg-muted/50 has-[button:focus-visible]:border-ring has-[button:focus-visible]:ring-3 has-[button:focus-visible]:ring-ring/50',
+                    dragging && 'border-primary bg-primary/10 hover:bg-primary/10',
+                    vertex.file && !dragging && 'border-solid'
+                  )}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
                 >
-                  <span className={styles.dropGlyph} aria-hidden="true">
-                    {vertex.file ? <IconFileText size={18} /> : <IconUpload size={18} />}
-                  </span>
-                </button>
-                <span className={styles.dropText}>
-                  <span
-                    className={vertex.file ? styles.fileName : styles.dropTitle}
-                    id={fileTitleId}
+                  <button
+                    type="button"
+                    className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground outline-none after:absolute after:inset-0 after:rounded-lg"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-labelledby={`${fileLabelId} ${fileTitleId}`}
+                    aria-describedby={fileHintId}
                   >
-                    <EmailPrivacyText
-                      text={vertex.file?.name ?? ''}
-                      fallback={t('vertex_import.drop_hint')}
+                    <HugeiconsIcon
+                      icon={vertex.file ? File01Icon : Upload04Icon}
+                      strokeWidth={1.75}
+                      className="size-4"
                     />
+                  </button>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span
+                      className={cn(
+                        'truncate text-sm',
+                        vertex.file ? 'font-mono text-xs leading-5' : 'font-medium'
+                      )}
+                      id={fileTitleId}
+                    >
+                      <EmailPrivacyText
+                        text={vertex.file?.name ?? ''}
+                        fallback={t('vertex_import.drop_hint')}
+                      />
+                    </span>
+                    <span className="text-sm text-muted-foreground" id={fileHintId}>
+                      {vertex.file ? t('vertex_import.choose_file') : t('vertex_import.file_hint')}
+                    </span>
                   </span>
-                  <span className={styles.dropHint} id={fileHintId}>
-                    {vertex.file ? t('vertex_import.choose_file') : t('vertex_import.file_hint')}
-                  </span>
-                </span>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                hidden
-                onChange={(event) => {
-                  onPickFile(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
-            </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  hidden
+                  onChange={(event) => {
+                    onPickFile(event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                />
+              </Field>
 
-            <div className={styles.locationField}>
-              <Input
-                label={t('vertex_import.location_label')}
-                hint={t('vertex_import.location_hint')}
-                value={vertex.location}
-                onChange={(event) => onLocationChange(event.target.value)}
-                placeholder={t('vertex_import.location_placeholder')}
-                spellCheck={false}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor={locationId}>{t('vertex_import.location_label')}</FieldLabel>
+                <Input
+                  id={locationId}
+                  className="h-9"
+                  value={vertex.location}
+                  onChange={(event) => onLocationChange(event.target.value)}
+                  placeholder={t('vertex_import.location_placeholder')}
+                  spellCheck={false}
+                />
+                <FieldDescription>{t('vertex_import.location_hint')}</FieldDescription>
+              </Field>
+            </FieldGroup>
 
-            {vertex.error && (
-              <div className={dialogStyles.alert} role="alert">
-                {vertex.error}
-              </div>
-            )}
+            {vertex.error && <FlowAlert>{vertex.error}</FlowAlert>}
 
-            <div>
-              <button
-                type="button"
-                className={dialogStyles.primary}
-                onClick={onImport}
-                disabled={!vertex.file || vertex.loading}
-              >
-                {vertex.loading && (
-                  <IconLoader2 size={14} className={dialogStyles.spinning} aria-hidden="true" />
-                )}
-                {t('vertex_import.import_button')}
-              </button>
-            </div>
-          </div>
+            <Button
+              size="lg"
+              className="h-9 w-fit px-4"
+              onClick={onImport}
+              disabled={!vertex.file || vertex.loading}
+            >
+              {t('vertex_import.import_button')}
+            </Button>
+          </>
         )}
-      </div>
-    </Modal>
+      </FlowView>
+    </FlowDialog>
   );
 }

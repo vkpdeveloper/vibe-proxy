@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider } from 'react-i18next';
 import { createInstance } from 'i18next';
 import en from '@/i18n/locales/en.json';
-import { OAuthFlowDialog } from '@/features/oauth/components/OAuthFlowDialog';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { OAuthFlowContent } from '@/features/oauth/components/OAuthFlowDialog';
 import {
   CALLBACK_SUPPORTED,
   OAUTH_PROVIDERS,
@@ -90,20 +91,24 @@ describe('Muse (Meta) provider and device OAuth', () => {
       createElement(
         I18nextProvider,
         { i18n },
-        createElement(OAuthFlowDialog, {
-          open: true,
-          providerId: 'meta',
-          heading: { title: en.auth_login.meta_oauth_title, caption: 'Device code', icon: '' },
-          state: { status: 'waiting', url: 'https://meta.example/device', userCode: 'WDJB-MJHT' },
-          text: (suffix: string) => i18n.t(`auth_login.meta_${suffix}`),
-          supportsCallback: false,
-          onStart: () => {},
-          onCancel: () => {},
-          onCallbackChange: () => {},
-          onCallbackSubmit: () => {},
-          onViewAuthFiles: () => {},
-          onClose: () => {},
-        })
+        createElement(
+          TooltipProvider,
+          null,
+          createElement(OAuthFlowContent, {
+            open: true,
+            providerId: 'meta',
+            heading: { title: en.auth_login.meta_oauth_title, caption: 'Device code', icon: '' },
+            state: { status: 'waiting', url: 'https://meta.example/device', userCode: 'WDJB-MJHT' },
+            text: (suffix: string) => i18n.t(`auth_login.meta_${suffix}`),
+            supportsCallback: false,
+            onStart: () => {},
+            onCancel: () => {},
+            onCallbackChange: () => {},
+            onCallbackSubmit: () => {},
+            onViewAuthFiles: () => {},
+            onClose: () => {},
+          })
+        )
       )
     );
     expect(markup).toContain('WDJB-MJHT');

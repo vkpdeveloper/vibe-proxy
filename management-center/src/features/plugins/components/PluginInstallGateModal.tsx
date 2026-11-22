@@ -1,9 +1,18 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
-import { IconAlertTriangle, IconExternalLink, IconPlug } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert02Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores';
 import type { PluginStoreEntry } from '@/types';
 import {
@@ -13,7 +22,7 @@ import {
   isDefaultPluginStoreSource,
   resolvePluginAssetURL,
 } from '../pluginResources';
-import styles from './PluginInstallGateModal.module.scss';
+import { PluginLogo } from './PluginParts';
 
 interface PluginInstallGateModalProps {
   open: boolean;
@@ -22,15 +31,6 @@ interface PluginInstallGateModalProps {
   installing: boolean;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
-}
-
-function GateLogo({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  return src && !failed ? (
-    <img src={src} alt="" onError={() => setFailed(true)} />
-  ) : (
-    <IconPlug size={26} />
-  );
 }
 
 export function PluginInstallGateModal({
@@ -85,29 +85,31 @@ export function PluginInstallGateModal({
   };
 
   const identity = (
-    <div className={styles.identity}>
-      <div className={styles.logoBox} aria-hidden="true">
-        <GateLogo src={logo} />
+    <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
+      <PluginLogo src={logo} className="size-11" />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate font-medium">{title}</span>
+        {repositoryURL ? (
+          <a
+            className="inline-flex min-w-0 items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            href={repositoryURL}
+            target="_blank"
+            rel="noreferrer"
+            title={t('plugin_store.open_repository')}
+            aria-label={t('plugin_store.open_repository')}
+          >
+            <span className="truncate">{repoLabel}</span>
+            <HugeiconsIcon icon={LinkSquare02Icon} className="size-3 shrink-0" strokeWidth={1.75} />
+          </a>
+        ) : (
+          <span className="truncate font-mono text-xs text-muted-foreground">{repoLabel}</span>
+        )}
+        {sourceText ? (
+          <span className="truncate text-xs text-faint">
+            {t('plugin_store.source_name', { source: sourceText })}
+          </span>
+        ) : null}
       </div>
-      <h3 className={styles.name}>{title}</h3>
-      {repositoryURL ? (
-        <a
-          className={styles.repoLink}
-          href={repositoryURL}
-          target="_blank"
-          rel="noreferrer"
-          title={t('plugin_store.open_repository')}
-          aria-label={t('plugin_store.open_repository')}
-        >
-          <span>{repoLabel}</span>
-          <IconExternalLink size={12} />
-        </a>
-      ) : (
-        <p className={styles.slug}>{repoLabel}</p>
-      )}
-      {sourceText ? (
-        <p className={styles.source}>{t('plugin_store.source_name', { source: sourceText })}</p>
-      ) : null}
     </div>
   );
 
@@ -117,7 +119,7 @@ export function PluginInstallGateModal({
   if (step === 1) {
     body = identity;
     footer = (
-      <Button variant="secondary" fullWidth onClick={() => setStep(2)}>
+      <Button variant="outline" size="lg" className="w-full" onClick={() => setStep(2)}>
         {t('plugin_store.gate_step1_action')}
       </Button>
     );
@@ -125,28 +127,28 @@ export function PluginInstallGateModal({
     body = (
       <>
         {identity}
-        <div className={styles.warningBanner}>
-          <IconAlertTriangle size={18} />
+        <div className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-[13px] text-warning">
+          <HugeiconsIcon icon={Alert02Icon} className="mt-px size-4 shrink-0" strokeWidth={1.75} />
           <span>{t('plugin_store.gate_warning')}</span>
         </div>
-        <ul className={styles.effects}>
+        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[13px] text-muted-foreground marker:text-faint">
           <li>{t('plugin_store.gate_effect_runs_code')}</li>
           <li>{t('plugin_store.gate_effect_no_review')}</li>
           <li>{t('plugin_store.gate_effect_restart')}</li>
         </ul>
-        <div className={styles.untrustedAlert}>
-          <p className={styles.untrustedText}>{t('plugin_store.gate_untrusted_alert')}</p>
-          <dl className={styles.originGrid}>
-            <dt>{t('plugin_store.gate_repository_label')}</dt>
-            <dd>{repoSlug || entry.repository || '—'}</dd>
-            <dt>{t('plugin_store.gate_source_label')}</dt>
-            <dd>{sourceText || '—'}</dd>
+        <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+          <p className="text-[13px] text-destructive">{t('plugin_store.gate_untrusted_alert')}</p>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
+            <dt className="text-muted-foreground">{t('plugin_store.gate_repository_label')}</dt>
+            <dd className="truncate font-mono">{repoSlug || entry.repository || '-'}</dd>
+            <dt className="text-muted-foreground">{t('plugin_store.gate_source_label')}</dt>
+            <dd className="truncate">{sourceText || '-'}</dd>
           </dl>
         </div>
       </>
     );
     footer = (
-      <Button variant="secondary" fullWidth onClick={() => setStep(3)}>
+      <Button variant="outline" size="lg" className="w-full" onClick={() => setStep(3)}>
         {t('plugin_store.gate_step2_action')}
       </Button>
     );
@@ -154,12 +156,13 @@ export function PluginInstallGateModal({
     body = (
       <>
         {identity}
-        <div className={styles.confirmBlock}>
-          <label className={styles.confirmPrompt} htmlFor="plugin-gate-confirm">
+        <Field>
+          <FieldLabel htmlFor="plugin-gate-confirm" className="font-normal">
             {t('plugin_store.gate_step3_prompt', { token })}
-          </label>
+          </FieldLabel>
           <Input
             id="plugin-gate-confirm"
+            className="h-9 font-mono"
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             autoComplete="off"
@@ -167,17 +170,17 @@ export function PluginInstallGateModal({
             disabled={installing}
             aria-label={t('plugin_store.gate_step3_prompt', { token })}
           />
-          <p className={styles.confirmHint}>{t('plugin_store.gate_step3_hint')}</p>
-        </div>
+          <FieldDescription>{t('plugin_store.gate_step3_hint')}</FieldDescription>
+        </Field>
       </>
     );
     footer = (
       <Button
-        variant="danger"
-        fullWidth
+        variant="destructive"
+        size="lg"
+        className="w-full"
         onClick={handleFinalConfirm}
         disabled={!tokenMatches || installing}
-        loading={installing}
       >
         {t('plugin_store.gate_step3_action')}
       </Button>
@@ -185,18 +188,31 @@ export function PluginInstallGateModal({
   }
 
   return (
-    <Modal
+    <Dialog
       open={open}
-      onClose={handleClose}
-      title={t(isUpdate ? 'plugin_store.gate_title_update' : 'plugin_store.gate_title', {
-        name: title,
-      })}
-      closeDisabled={installing}
-      footer={footer}
-      width={520}
-      className={styles.gateModal}
+      onOpenChange={(next) => {
+        if (!next) handleClose();
+      }}
     >
-      {body}
-    </Modal>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-md"
+        showCloseButton={!installing}
+        onEscapeKeyDown={(event) => installing && event.preventDefault()}
+        onInteractOutside={(event) => installing && event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {t(isUpdate ? 'plugin_store.gate_title_update' : 'plugin_store.gate_title', {
+              name: title,
+            })}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            {t('plugin_store.gate_untrusted_alert')}
+          </DialogDescription>
+        </DialogHeader>
+        {body}
+        <DialogFooter>{footer}</DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,26 +1,36 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { SignalField } from '@/components/dither/SignalField';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
-import { IconEye, IconEyeOff } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowDown01Icon, GlobeIcon, ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons';
+import { Logo } from '@/components/brand';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { cn } from '@/lib/utils';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
-import { isSupportedLanguage } from '@/utils/language';
-import vibeProxyLogo from '@/assets/vibe-proxy-logo.svg';
 import type { ApiError } from '@/types';
 import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
-import styles from './LoginPage.module.scss';
 
-/**
- * 将 API 错误转换为本地化的用户友好消息
- */
 type RedirectState = { from?: { pathname?: string } };
 
+/** Turns a login failure into a localized message, keeping the HTTP status and backend detail. */
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
   if (error instanceof LegacyBackendError) return t('login.error_legacy_backend');
   const apiError = error as Partial<ApiError>;
@@ -36,51 +46,29 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
           : '';
 
   const withHttpStatus = (summary: string) => {
-    if (!status) {
-      return summary;
-    }
-
+    if (!status) return summary;
     const genericAxiosMessage = `Request failed with status code ${status}`;
     const detail = message.trim();
     const backendDetail =
       detail && detail !== genericAxiosMessage
         ? ` (${t('login.error_backend_detail')}: ${detail})`
         : '';
-
     return `HTTP ${status}: ${summary}${backendDetail}`;
   };
 
-  // 根据 HTTP 状态码判断
-  if (status === 401) {
-    return withHttpStatus(t('login.error_unauthorized'));
-  }
-  if (status === 403) {
-    return withHttpStatus(t('login.error_forbidden'));
-  }
-  if (status === 404) {
-    return withHttpStatus(t('login.error_not_found'));
-  }
-  if (status && status >= 500) {
-    return withHttpStatus(t('login.error_server'));
-  }
+  if (status === 401) return withHttpStatus(t('login.error_unauthorized'));
+  if (status === 403) return withHttpStatus(t('login.error_forbidden'));
+  if (status === 404) return withHttpStatus(t('login.error_not_found'));
+  if (status && status >= 500) return withHttpStatus(t('login.error_server'));
 
-  // 根据 axios 错误码判断
-  if (code === 'ECONNABORTED' || message.toLowerCase().includes('timeout')) {
-    return t('login.error_timeout');
-  }
-  if (code === 'ERR_NETWORK' || message.toLowerCase().includes('network error')) {
-    return t('login.error_network');
-  }
-  if (code === 'ERR_CERT_AUTHORITY_INVALID' || message.toLowerCase().includes('certificate')) {
+  const lower = message.toLowerCase();
+  if (code === 'ECONNABORTED' || lower.includes('timeout')) return t('login.error_timeout');
+  if (code === 'ERR_NETWORK' || lower.includes('network error')) return t('login.error_network');
+  if (code === 'ERR_CERT_AUTHORITY_INVALID' || lower.includes('certificate')) {
     return t('login.error_ssl');
   }
+  if (lower.includes('cors') || lower.includes('cross-origin')) return t('login.error_cors');
 
-  // 检查 CORS 错误
-  if (message.toLowerCase().includes('cors') || message.toLowerCase().includes('cross-origin')) {
-    return t('login.error_cors');
-  }
-
-  // 默认错误消息
   return withHttpStatus(t('login.error_invalid'));
 }
 
@@ -88,7 +76,7 @@ export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { showNotification } = useNotificationStore();
+  const showNotification = useNotificationStore((state) => state.showNotification);
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -100,241 +88,184 @@ export function LoginPage() {
 
   const [apiBase, setApiBase] = useState('');
   const [managementKey, setManagementKey] = useState('');
-  const [showCustomBase, setShowCustomBase] = useState(false);
+  const [showServer, setShowServer] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [autoLoading, setAutoLoading] = useState(true);
-  const [autoLoginSuccess, setAutoLoginSuccess] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState('');
 
   const detectedBase = useMemo(() => detectApiBaseFromLocation(), []);
-  const languageOptions = useMemo(
-    () =>
-      LANGUAGE_ORDER.map((lang) => ({
-        value: lang,
-        label: t(LANGUAGE_LABEL_KEYS[lang]),
-      })),
-    [t]
-  );
-  const handleLanguageChange = useCallback(
-    (selectedLanguage: string) => {
-      if (!isSupportedLanguage(selectedLanguage)) {
-        return;
-      }
-      setLanguage(selectedLanguage);
-    },
-    [setLanguage]
-  );
+  const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
 
+  // Auto-login with a remembered session; otherwise prefill what was saved.
   useEffect(() => {
     const init = async () => {
       try {
-        const autoLoggedIn = await restoreSession();
-        if (autoLoggedIn) {
-          setAutoLoginSuccess(true);
-          // 延迟跳转，让用户看到成功动画
-          setTimeout(() => {
-            const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
-            navigate(redirect, { replace: true });
-          }, 1500);
-        } else {
-          setApiBase(storedBase || detectedBase);
-          setManagementKey(storedKey || '');
-          setRememberPassword(storedRememberPassword || Boolean(storedKey));
+        if (await restoreSession()) {
+          navigate(redirect, { replace: true });
+          return;
         }
+        setApiBase(storedBase || detectedBase);
+        setManagementKey(storedKey || '');
+        setRememberPassword(storedRememberPassword || Boolean(storedKey));
       } finally {
-        // 自动登录成功时 showSplash 仍由 autoLoginSuccess 维持，可无条件结束 loading
-        setAutoLoading(false);
+        setRestoring(false);
       }
     };
-
-    init();
+    void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (loading) return;
     if (!managementKey.trim()) {
       setError(t('login.error_required'));
       return;
     }
-
-    const baseToUse = apiBase ? normalizeApiBase(apiBase) : detectedBase;
     setLoading(true);
     setError('');
     try {
       await login({
-        apiBase: baseToUse,
+        apiBase: apiBase ? normalizeApiBase(apiBase) : detectedBase,
         managementKey: managementKey.trim(),
         rememberPassword,
       });
       showNotification(t('common.connected_status'), 'success');
       navigate('/', { replace: true });
     } catch (err: unknown) {
-      const message = getLocalizedErrorMessage(err, t);
-      setError(message);
-      showNotification(`${t('notification.login_failed')}: ${message}`, 'error');
+      setError(getLocalizedErrorMessage(err, t));
     } finally {
       setLoading(false);
     }
-  }, [
-    apiBase,
-    detectedBase,
-    login,
-    managementKey,
-    navigate,
-    rememberPassword,
-    showNotification,
-    t,
-  ]);
+  };
 
-  const handleSubmitKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      if (event.key === 'Enter' && !loading) {
-        event.preventDefault();
-        handleSubmit();
-      }
-    },
-    [loading, handleSubmit]
-  );
+  if (isAuthenticated && !restoring) return <Navigate to={redirect} replace />;
+  // Like VM Bridge, nothing shows while a remembered session is checked.
+  if (restoring) return null;
 
-  if (isAuthenticated && !autoLoading && !autoLoginSuccess) {
-    const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
-    return <Navigate to={redirect} replace />;
-  }
-
-  // 显示启动动画（自动登录中或自动登录成功）
-  const showSplash = autoLoading || autoLoginSuccess;
+  const serverAddress = apiBase || detectedBase;
+  const keyLabel = showKey ? t('login.hide_key') : t('login.show_key');
 
   return (
-    <div className={styles.container}>
-      {/* 左侧品牌展示区 */}
-      <div className={styles.brandPanel}>
-        {/* The brand panel is black in every theme, so the lanes use a fixed blue. */}
-        <SignalField
-          className="absolute inset-0"
-          palette={['transparent', 'oklch(0.72 0.14 240)']}
-          clear={0}
-          gap={11}
-          intensity={0.75}
-        />
-        <div className={styles.brandContent}>
-          <span className={styles.brandWord}>VIBE</span>
-          <span className={styles.brandWord}>PROXY</span>
+    <main className="grid min-h-full grid-cols-1 place-items-center px-4 py-10">
+      <form
+        className="flex w-full max-w-sm min-w-0 flex-col gap-8"
+        onSubmit={handleSubmit}
+        noValidate
+      >
+        <div className="flex flex-col items-center gap-4">
+          <Logo className="size-12" />
+          <h1 className="text-xl font-semibold tracking-tight">{t('title.login')}</h1>
         </div>
-      </div>
 
-      {/* 右侧功能交互区 */}
-      <div className={styles.formPanel}>
-        {showSplash ? (
-          /* 启动动画 */
-          <div className={styles.splashContent}>
-            <img src={vibeProxyLogo} alt="Vibe Proxy" className={styles.splashLogo} />
-            <h1 className={styles.splashTitle}>{t('splash.title')}</h1>
-            <p className={styles.splashSubtitle}>{t('splash.subtitle')}</p>
-            <div className={styles.splashLoader}>
-              <div className={styles.splashLoaderBar} />
-            </div>
-          </div>
-        ) : (
-          /* 登录表单 */
-          <div className={styles.formContent}>
-            {/* Logo */}
-            <img src={vibeProxyLogo} alt="Vibe Proxy" className={styles.logo} />
-
-            {/* 登录表单卡片 */}
-            <div className={styles.loginCard}>
-              <div className={styles.loginHeader}>
-                <div className={styles.titleRow}>
-                  <div className={styles.title}>{t('title.login')}</div>
-                  <Select
-                    className={styles.languageSelect}
-                    value={language}
-                    options={languageOptions}
-                    onChange={handleLanguageChange}
-                    fullWidth={false}
-                    ariaLabel={t('language.switch')}
-                  />
-                </div>
-                <div className={styles.subtitle}>{t('login.subtitle')}</div>
-              </div>
-
-              <div className={styles.connectionBox}>
-                <div className={styles.label}>{t('login.connection_current')}</div>
-                <div className={styles.value}>{apiBase || detectedBase}</div>
-                <div className={styles.hint}>{t('login.connection_auto_hint')}</div>
-              </div>
-
-              <div className={styles.toggleAdvanced}>
-                <SelectionCheckbox
-                  checked={showCustomBase}
-                  onChange={setShowCustomBase}
-                  ariaLabel={t('login.custom_connection_label')}
-                  label={t('login.custom_connection_label')}
-                  labelClassName={styles.toggleLabel}
-                />
-              </div>
-
-              {showCustomBase && (
-                <Input
-                  label={t('login.custom_connection_label')}
-                  placeholder={t('login.custom_connection_placeholder')}
-                  value={apiBase}
-                  onChange={(e) => setApiBase(e.target.value)}
-                  hint={t('login.custom_connection_hint')}
-                />
-              )}
-
-              <Input
-                autoFocus
-                label={t('login.management_key_label')}
-                placeholder={t('login.management_key_placeholder')}
-                type={showKey ? 'text' : 'password'}
+        <FieldGroup>
+          <Field data-invalid={Boolean(error)}>
+            <FieldLabel htmlFor="management-key">{t('login.management_key_label')}</FieldLabel>
+            <InputGroup className="h-10">
+              <InputGroupInput
+                id="management-key"
                 name="cpa-management-key"
+                type={showKey ? 'text' : 'password'}
+                autoFocus
                 autoComplete="current-password"
+                placeholder={t('login.management_key_placeholder')}
+                aria-invalid={Boolean(error)}
                 value={managementKey}
-                onChange={(e) => setManagementKey(e.target.value)}
-                onKeyDown={handleSubmitKeyDown}
-                rightElement={
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setShowKey((prev) => !prev)}
-                    aria-label={
-                      showKey
-                        ? t('login.hide_key', { defaultValue: '隐藏密钥' })
-                        : t('login.show_key', { defaultValue: '显示密钥' })
-                    }
-                    title={
-                      showKey
-                        ? t('login.hide_key', { defaultValue: '隐藏密钥' })
-                        : t('login.show_key', { defaultValue: '显示密钥' })
-                    }
-                  >
-                    {showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                  </button>
-                }
+                onChange={(event) => setManagementKey(event.target.value)}
               />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={keyLabel}
+                  title={keyLabel}
+                  onClick={() => setShowKey((shown) => !shown)}
+                >
+                  <HugeiconsIcon icon={showKey ? ViewOffSlashIcon : ViewIcon} strokeWidth={1.75} />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            {error && <FieldError>{error}</FieldError>}
+          </Field>
 
-              <div className={styles.toggleAdvanced}>
-                <SelectionCheckbox
-                  checked={rememberPassword}
-                  onChange={setRememberPassword}
-                  ariaLabel={t('login.remember_password_label')}
-                  label={t('login.remember_password_label')}
-                  labelClassName={styles.toggleLabel}
-                />
-              </div>
+          <Field orientation="horizontal">
+            <Checkbox
+              id="remember-password"
+              checked={rememberPassword}
+              onCheckedChange={(checked) => setRememberPassword(checked === true)}
+            />
+            <FieldLabel htmlFor="remember-password" className="font-normal">
+              {t('login.remember_password_label')}
+            </FieldLabel>
+          </Field>
 
-              <Button fullWidth onClick={handleSubmit} loading={loading}>
-                {loading ? t('login.submitting') : t('login.submit_button')}
+          {showServer && (
+            <Field>
+              <FieldLabel htmlFor="server-address">{t('login.custom_connection_label')}</FieldLabel>
+              <Input
+                id="server-address"
+                className="h-10 font-mono"
+                inputMode="url"
+                autoComplete="url"
+                placeholder={t('login.custom_connection_placeholder')}
+                value={apiBase}
+                onChange={(event) => setApiBase(event.target.value)}
+              />
+              <FieldDescription>{t('login.custom_connection_hint')}</FieldDescription>
+            </Field>
+          )}
+
+          <Button type="submit" size="lg" className="h-10" disabled={loading}>
+            {loading ? t('login.submitting') : t('login.submit_button')}
+          </Button>
+        </FieldGroup>
+
+        <div className="-mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <button
+            type="button"
+            aria-expanded={showServer}
+            onClick={() => setShowServer((shown) => !shown)}
+            className="flex min-w-0 items-center gap-1.5 rounded-md outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="truncate">
+              {t('login.custom_connection_label')}
+              {!showServer && <span className="ml-1.5 font-mono text-faint">{serverAddress}</span>}
+            </span>
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              strokeWidth={1.75}
+              className={cn(
+                'size-3.5 shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
+                showServer && 'rotate-180'
+              )}
+            />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="shrink-0 text-muted-foreground"
+                aria-label={t('language.switch')}
+              >
+                <HugeiconsIcon icon={GlobeIcon} strokeWidth={1.75} />
+                {t(LANGUAGE_LABEL_KEYS[language])}
               </Button>
-
-              {error && <div className={styles.errorBox}>{error}</div>}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
+                {LANGUAGE_ORDER.map((lang) => (
+                  <DropdownMenuRadioItem key={lang} value={lang}>
+                    {t(LANGUAGE_LABEL_KEYS[lang])}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </form>
+    </main>
   );
 }

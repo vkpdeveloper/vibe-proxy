@@ -1,5 +1,6 @@
 {
   "common": {
+    "more": "더보기",
     "login": "로그인",
     "logout": "로그아웃",
     "back": "뒤로",
@@ -66,14 +67,16 @@
     "subtitle": "관리 센터"
   },
   "login": {
+    "show_key": "키 표시",
+    "hide_key": "키 숨기기",
     "subtitle": "CLI Proxy API v8 이상 버전에 연결",
     "connection_current": "현재 URL",
     "connection_auto_hint": "시스템이 자동으로 현재 URL을 사용하여 연결합니다",
-    "custom_connection_label": "사용자 지정 연결 URL:",
+    "custom_connection_label": "서버 주소",
     "custom_connection_placeholder": "예: https://example.com:8317",
     "custom_connection_hint": "기본적으로 현재 URL이 사용됩니다. 필요한 경우 여기서 재정의하세요.",
     "remember_password_label": "비밀번호 저장",
-    "management_key_label": "관리 키:",
+    "management_key_label": "관리 키",
     "management_key_placeholder": "관리 키를 입력하세요",
     "submit_button": "로그인",
     "submitting": "연결 중...",
@@ -206,7 +209,11 @@
     "cta_system_desc": "버전 세부 정보 및 관리 센터 정보입니다.",
     "window_m": "{{minutes}}분",
     "window_h": "{{hours}}시간",
-    "window_hm": "{{hours}}시간 {{minutes}}분"
+    "window_hm": "{{hours}}시간 {{minutes}}분",
+    "providers_title": "공급자",
+    "shortcuts_title": "바로가기",
+    "col_requests": "요청",
+    "col_volume": "추이"
   },
   "basic_settings": {
     "debug_enable": "디버그 모드 활성화",
@@ -1028,6 +1035,10 @@
     "history_evicted": "읽던 위치가 더 이상 캐시되지 않습니다. 새 위치를 선택하세요.",
     "resume_following": "최신 위치로 이동 · 새 줄: {{count}}",
     "level_filter": "로그 레벨",
+    "column_time": "시간",
+    "column_level": "레벨",
+    "column_request": "요청",
+    "column_duration": "소요 시간",
     "all_levels": "모든 레벨",
     "view_request": "요청 {{id}} 로그 보기",
     "copy_line": "이 줄 복사",
@@ -1115,6 +1126,15 @@
       "save": "변경 사항 저장"
     },
     "discard_confirm_message": "저장되지 않은 모든 변경 사항을 취소하고 마지막 서버 버전으로 복원하시겠습니까?",
+    "tabs": {
+      "common": "일반",
+      "connectivity": "접속",
+      "network": "네트워크",
+      "logging": "로깅",
+      "streaming": "스트리밍",
+      "advanced": "고급",
+      "payload": "페이로드"
+    },
     "mode": {
       "label": "편집기 모드",
       "visual": "시각",
@@ -1842,6 +1862,7 @@
   "system_info": {
     "title": "관리 센터 정보",
     "about_title": "VProxy",
+    "tab_about": "정보",
     "models_title": "사용 가능한 모델",
     "models_desc": "/models 응답을 표시하며 저장된 API 키를 사용하여 자동으로 인증합니다.",
     "models_loading": "사용 가능한 모델을 불러오는 중...",

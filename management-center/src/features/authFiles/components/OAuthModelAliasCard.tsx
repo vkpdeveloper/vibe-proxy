@@ -1,12 +1,29 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Add01Icon,
+  ArrowShrink02Icon,
+  Delete02Icon,
+  PencilEdit02Icon,
+} from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Section } from '@/components/layout/Page';
 import { ModelMappingDiagram, type ModelMappingDiagramRef } from '@/components/modelAlias';
-import { IconChevronUp } from '@/components/ui/icons';
 import type { OAuthModelAliasEntry } from '@/types';
 import type { AuthFileModelItem, OAuthConfigLoadError } from '@/features/authFiles/constants';
-import styles from './OAuthConfigPanels.module.scss';
+import { OAuthConfigEmpty } from './OAuthConfigEmpty';
+import { ProviderLogo } from './ProviderLogo';
 
 type ViewMode = 'diagram' | 'list';
 
@@ -53,114 +70,129 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
     onRenameAlias,
     onDeleteAlias,
   } = props;
+  const entries = Object.entries(modelAlias);
+  const unavailable = disableControls || modelAliasError !== null;
 
   return (
-    <section className={styles.panel}>
-      <header className={styles.panelHead}>
-        <h3 className={styles.panelTitle}>{t('oauth_model_alias.title')}</h3>
-        <div className={styles.panelExtra}>
-          <div className={styles.viewModeSwitch}>
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('list')}
-              disabled={disableControls || modelAliasError !== null}
-              aria-pressed={viewMode === 'list'}
-            >
-              {t('oauth_model_alias.view_mode_list')}
-            </Button>
-            <Button
-              variant={viewMode === 'diagram' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('diagram')}
-              disabled={disableControls || modelAliasError !== null}
-              aria-pressed={viewMode === 'diagram'}
-            >
+    <Section
+      title={t('oauth_model_alias.title')}
+      actions={
+        <div className="flex items-center gap-2">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            spacing={0}
+            value={viewMode}
+            onValueChange={(value) => {
+              if (value === 'list' || value === 'diagram') onViewModeChange(value);
+            }}
+            disabled={unavailable}
+          >
+            <ToggleGroupItem value="list">{t('oauth_model_alias.view_mode_list')}</ToggleGroupItem>
+            <ToggleGroupItem value="diagram">
               {t('oauth_model_alias.view_mode_diagram')}
-            </Button>
-          </div>
-          <Button size="sm" onClick={onAdd} disabled={disableControls || modelAliasError !== null}>
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <Button
+            variant="outline"
+            size="icon"
+            className="sm:hidden"
+            onClick={onAdd}
+            disabled={unavailable}
+            aria-label={t('oauth_model_alias.add')}
+          >
+            <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
+          </Button>
+          <Button
+            variant="outline"
+            className="max-sm:hidden"
+            onClick={onAdd}
+            disabled={unavailable}
+          >
+            <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
             {t('oauth_model_alias.add')}
           </Button>
         </div>
-      </header>
-      <div className={styles.panelBody}>
-        {modelAliasError === 'unsupported' ? (
-          <EmptyState
-            title={t('oauth_model_alias.upgrade_required_title')}
-            description={t('oauth_model_alias.upgrade_required_desc')}
+      }
+    >
+      {modelAliasError !== null || entries.length === 0 ? (
+        <OAuthConfigEmpty
+          error={modelAliasError}
+          upgradeTitle={t('oauth_model_alias.upgrade_required_title')}
+          upgradeDescription={t('oauth_model_alias.upgrade_required_desc')}
+          emptyTitle={t('oauth_model_alias.list_empty_all')}
+          onRetry={onRetry}
+        />
+      ) : viewMode === 'diagram' ? (
+        <div className="flex flex-col gap-3 rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-medium">{t('oauth_model_alias.chart_title')}</h3>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => diagramRef.current?.collapseAll()}
+              disabled={unavailable}
+              title={t('oauth_model_alias.diagram_collapse')}
+              aria-label={t('oauth_model_alias.diagram_collapse')}
+            >
+              <HugeiconsIcon icon={ArrowShrink02Icon} strokeWidth={1.75} />
+            </Button>
+          </div>
+          <ModelMappingDiagram
+            ref={diagramRef}
+            modelAlias={modelAlias}
+            allProviderModels={allProviderModels}
+            onUpdate={onUpdate}
+            onDeleteLink={onDeleteLink}
+            onToggleFork={onToggleFork}
+            onRenameAlias={onRenameAlias}
+            onDeleteAlias={onDeleteAlias}
+            onEditProvider={onEditProvider}
+            onDeleteProvider={onDeleteProvider}
+            className="min-h-80 overflow-x-auto"
           />
-        ) : modelAliasError === 'load' ? (
-          <EmptyState
-            title={t('notification.refresh_failed')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void onRetry()}>
-                {t('common.refresh')}
-              </Button>
-            }
-          />
-        ) : modelAliasError === 'loading' ? (
-          <EmptyState title={t('common.loading')} />
-        ) : viewMode === 'diagram' ? (
-          Object.keys(modelAlias).length === 0 ? (
-            <EmptyState title={t('oauth_model_alias.list_empty_all')} />
-          ) : (
-            <div className={styles.aliasChartSection}>
-              <div className={styles.aliasChartHeader}>
-                <h4 className={styles.aliasChartTitle}>{t('oauth_model_alias.chart_title')}</h4>
+        </div>
+      ) : (
+        <ItemGroup className="gap-0 overflow-hidden rounded-xl border">
+          {entries.map(([provider, mappings]) => (
+            <Item key={provider} className="rounded-none border-0 not-last:border-b">
+              <ItemMedia>
+                <ProviderLogo type={provider} className="size-8 rounded-lg" />
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle className="font-mono">{provider}</ItemTitle>
+                <ItemDescription>
+                  {mappings?.length
+                    ? t('oauth_model_alias.model_count', { count: mappings.length })
+                    : t('oauth_model_alias.no_models')}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions className="gap-0">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  onClick={() => diagramRef.current?.collapseAll()}
-                  disabled={disableControls || modelAliasError !== null}
-                  title={t('oauth_model_alias.diagram_collapse')}
-                  aria-label={t('oauth_model_alias.diagram_collapse')}
+                  size="icon-sm"
+                  aria-label={t('common.edit')}
+                  title={t('common.edit')}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onEditProvider(provider)}
                 >
-                  <IconChevronUp size={16} />
+                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
                 </Button>
-              </div>
-              <ModelMappingDiagram
-                ref={diagramRef}
-                modelAlias={modelAlias}
-                allProviderModels={allProviderModels}
-                onUpdate={onUpdate}
-                onDeleteLink={onDeleteLink}
-                onToggleFork={onToggleFork}
-                onRenameAlias={onRenameAlias}
-                onDeleteAlias={onDeleteAlias}
-                onEditProvider={onEditProvider}
-                onDeleteProvider={onDeleteProvider}
-                className={styles.aliasChart}
-              />
-            </div>
-          )
-        ) : Object.keys(modelAlias).length === 0 ? (
-          <EmptyState title={t('oauth_model_alias.list_empty_all')} />
-        ) : (
-          <div className={styles.list}>
-            {Object.entries(modelAlias).map(([provider, mappings]) => (
-              <div key={provider} className={styles.item}>
-                <div className={styles.itemInfo}>
-                  <div className={styles.itemProvider}>{provider}</div>
-                  <div className={styles.itemCount}>
-                    {mappings?.length
-                      ? t('oauth_model_alias.model_count', { count: mappings.length })
-                      : t('oauth_model_alias.no_models')}
-                  </div>
-                </div>
-                <div className={styles.itemActions}>
-                  <Button variant="secondary" size="sm" onClick={() => onEditProvider(provider)}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => onDeleteProvider(provider)}>
-                    {t('oauth_model_alias.delete')}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('oauth_model_alias.delete')}
+                  title={t('oauth_model_alias.delete')}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => onDeleteProvider(provider)}
+                >
+                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                </Button>
+              </ItemActions>
+            </Item>
+          ))}
+        </ItemGroup>
+      )}
+    </Section>
   );
 }

@@ -1,3 +1,5 @@
+import '@fontsource-variable/mona-sans';
+import '@fontsource/fragment-mono';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/styles/tailwind.css';

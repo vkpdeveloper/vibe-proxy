@@ -1,11 +1,18 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { IconEye, IconEyeOff, IconLoader2 } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 import type { ApiKeyImportState } from '../apiKeyImport';
-import { DialogTitle, type DialogHeading } from './OAuthFlowDialog';
-import dialogStyles from './OAuthFlowDialog.module.scss';
-import styles from './ApiKeyImportDialog.module.scss';
+import { FlowAlert, FlowDialog, FlowView, ResultView, type DialogHeading } from './FlowDialogParts';
 
 /** Optional plain field; label/hint/placeholder come from `<namespace>.<id>_*`. */
 export interface ApiKeyImportField {
@@ -32,7 +39,7 @@ export interface ApiKeyImportDialogProps {
   onClose: () => void;
 }
 
-/** API-key credential import (OpenCode Go / Devin CLI): secret + optional fields → upload. */
+/** API key credential import (OpenCode Go / Devin CLI): secret + optional fields, then upload. */
 export function ApiKeyImportDialog({
   open,
   heading,
@@ -48,103 +55,98 @@ export function ApiKeyImportDialog({
   onClose,
 }: ApiKeyImportDialogProps) {
   const { t } = useTranslation();
+  const idPrefix = useId();
+  const keyId = `${idPrefix}-key`;
   const toggleLabel = state.showKey
     ? t('login.hide_key', { defaultValue: 'Hide key' })
     : t('login.show_key', { defaultValue: 'Show key' });
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      width={500}
-      className={dialogStyles.dialog}
-      title={<DialogTitle {...heading} />}
-    >
-      <div className={dialogStyles.view} key={state.success ? 'result' : 'form'}>
+    <FlowDialog open={open} heading={heading} onClose={onClose}>
+      <FlowView key={state.success ? 'result' : 'form'}>
         {state.success ? (
-          <div className={dialogStyles.result} role="status">
-            <svg className={dialogStyles.successMark} viewBox="0 0 52 52" aria-hidden="true">
-              <circle className={dialogStyles.successRing} cx="26" cy="26" r="24" />
-              <path className={dialogStyles.successCheck} d="M16 27l7 7 14-15" />
-            </svg>
-            <div className={dialogStyles.resultTitle}>{t(`${namespace}.success`)}</div>
-            <div className={dialogStyles.resultActions}>
-              <button type="button" className={dialogStyles.secondary} onClick={onViewAuthFiles}>
-                {t('auth_login.view_auth_files')}
-              </button>
-              <button type="button" className={dialogStyles.primary} onClick={onViewQuota}>
-                {t(`${namespace}.view_quota`)}
-              </button>
-            </div>
-          </div>
+          <ResultView
+            title={t(`${namespace}.success`)}
+            actions={
+              <>
+                <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+                  {t('auth_login.view_auth_files')}
+                </Button>
+                <Button size="lg" className="h-9 px-4" onClick={onViewQuota}>
+                  {t(`${namespace}.view_quota`)}
+                </Button>
+              </>
+            }
+          />
         ) : (
-          <div className={dialogStyles.stack}>
-            <p className={dialogStyles.hint}>{t(`${namespace}.description`)}</p>
+          <form
+            className="flex flex-col gap-5"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmit();
+            }}
+          >
+            <p className="text-sm text-muted-foreground">{t(`${namespace}.description`)}</p>
 
-            <div className={styles.fields}>
-              <Input
-                label={t(`${namespace}.api_key_label`)}
-                hint={t(`${namespace}.api_key_hint`)}
-                placeholder={t(`${namespace}.api_key_placeholder`)}
-                type={state.showKey ? 'text' : 'password'}
-                name={secretName}
-                autoComplete="off"
-                spellCheck={false}
-                className={styles.secretInput}
-                value={state.apiKey}
-                onChange={(event) => onApiKeyChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') onSubmit();
-                }}
-                rightElement={
-                  <button
-                    type="button"
-                    className={styles.secretToggle}
-                    onClick={onToggleShowKey}
-                    aria-label={toggleLabel}
-                    title={toggleLabel}
-                  >
-                    {state.showKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                  </button>
-                }
-              />
+            <FieldGroup>
+              <Field data-invalid={Boolean(state.error) || undefined}>
+                <FieldLabel htmlFor={keyId}>{t(`${namespace}.api_key_label`)}</FieldLabel>
+                <InputGroup className="h-9">
+                  <InputGroupInput
+                    id={keyId}
+                    type={state.showKey ? 'text' : 'password'}
+                    name={secretName}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={t(`${namespace}.api_key_placeholder`)}
+                    value={state.apiKey}
+                    onChange={(event) => onApiKeyChange(event.target.value)}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      size="icon-xs"
+                      onClick={onToggleShowKey}
+                      aria-label={toggleLabel}
+                      title={toggleLabel}
+                    >
+                      <HugeiconsIcon
+                        icon={state.showKey ? ViewOffSlashIcon : ViewIcon}
+                        strokeWidth={1.75}
+                      />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+                <FieldDescription>{t(`${namespace}.api_key_hint`)}</FieldDescription>
+              </Field>
               {fields.map((field) => (
-                <Input
-                  key={field.id}
-                  label={t(`${namespace}.${field.id}_label`)}
-                  hint={t(`${namespace}.${field.id}_hint`)}
-                  placeholder={t(`${namespace}.${field.id}_placeholder`)}
-                  type={field.type}
-                  autoComplete={field.type === 'email' ? 'email' : 'off'}
-                  spellCheck={false}
-                  value={field.value}
-                  onChange={(event) => field.onChange(event.target.value)}
-                />
+                <Field key={field.id}>
+                  <FieldLabel htmlFor={`${idPrefix}-${field.id}`}>
+                    {t(`${namespace}.${field.id}_label`)}
+                  </FieldLabel>
+                  <Input
+                    id={`${idPrefix}-${field.id}`}
+                    className="h-9"
+                    type={field.type}
+                    autoComplete={field.type === 'email' ? 'email' : 'off'}
+                    spellCheck={false}
+                    placeholder={t(`${namespace}.${field.id}_placeholder`)}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                  <FieldDescription>{t(`${namespace}.${field.id}_hint`)}</FieldDescription>
+                </Field>
               ))}
-            </div>
+            </FieldGroup>
 
-            {state.error && (
-              <div className={dialogStyles.alert} role="alert">
-                {state.error}
-              </div>
-            )}
+            {state.error && <FlowAlert>{state.error}</FlowAlert>}
 
-            <div>
-              <button
-                type="button"
-                className={dialogStyles.primary}
-                onClick={onSubmit}
-                disabled={state.loading}
-              >
-                {state.loading && (
-                  <IconLoader2 size={14} className={dialogStyles.spinning} aria-hidden="true" />
-                )}
-                {t(`${namespace}.add_button`)}
-              </button>
-            </div>
-          </div>
+            <Button type="submit" size="lg" className="h-9 w-fit px-4" disabled={state.loading}>
+              {t(`${namespace}.add_button`)}
+            </Button>
+          </form>
         )}
-      </div>
-    </Modal>
+      </FlowView>
+    </FlowDialog>
   );
 }

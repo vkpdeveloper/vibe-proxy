@@ -2,7 +2,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { Add01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+import { Page, type Tab } from '@/components/layout/Page';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
 import {
@@ -12,8 +16,7 @@ import {
   type ProviderRecentUsageMap,
 } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
-import { ProviderHeaderCard } from './components/ProviderHeaderCard';
-import { ProviderCategoryList } from './components/ProviderCategoryList';
+import { PROVIDER_LOGOS } from './brandLogos';
 import { ProviderResourcePanel } from './components/ProviderResourcePanel';
 import type { ProviderPanelControls } from './components/ProviderResourcePanel';
 import { SponsorQuickStartPanel } from './components/SponsorQuickStartPanel';
@@ -30,7 +33,18 @@ import {
   type ProvidersWorkbenchUiState,
 } from './uiState';
 import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
-import styles from './ProvidersWorkbenchPage.module.scss';
+
+/** Sign-up partners come after the regular providers in the tab list. */
+const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = ['fennoAI', 'qiniuCloud'];
+
+/**
+ * Page tabs take a Hugeicons icon, which is a list of SVG elements. A single `image` element
+ * lets the tab show the provider's own logo inside that 24x24 icon box.
+ */
+const logoIcon = (brand: ProviderBrand): IconSvgElement => {
+  const logo = PROVIDER_LOGOS[brand];
+  return [['image', { href: logo.darkSrc ?? logo.src, x: 2, y: 2, width: 20, height: 20 }]];
+};
 
 type SheetMode = 'detail' | 'create' | 'edit';
 
@@ -233,9 +247,8 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     return sorted;
   }, [filteredResources, providerSortBy, providerSortDir, selectedModels, usageByProvider]);
 
-  const toolbarControls = useMemo<ProviderPanelControls | undefined>(() => {
-    if (!activeGroup) return undefined;
-    return {
+  const toolbarControls = useMemo<ProviderPanelControls>(
+    () => ({
       sortBy: providerSortBy,
       sortDir: providerSortDir,
       onSortBy: (value: ProviderSortBy) => updateActiveFilterState({ sortBy: value }),
@@ -246,30 +259,19 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
         updateActiveFilterState({
           selectedModels: Array.from(next).sort((a, b) => a.localeCompare(b)),
         }),
-    };
-  }, [
-    activeGroup,
-    availableModels,
-    providerSortBy,
-    providerSortDir,
-    selectedModels,
-    updateActiveFilterState,
-  ]);
-
-  const totalResources = useMemo(
-    () => groups.reduce((sum, g) => sum + g.resources.length, 0),
-    [groups]
+    }),
+    [availableModels, providerSortBy, providerSortDir, selectedModels, updateActiveFilterState]
   );
 
-  const totalActive = useMemo(
-    () => groups.reduce((sum, g) => sum + g.resources.filter((r) => !r.disabled).length, 0),
-    [groups]
-  );
-
-  const providerFamilies = useMemo(
-    () => groups.filter((g) => g.resources.length > 0).length,
-    [groups]
-  );
+  const tabs = useMemo<Tab<ProviderBrand>[]>(() => {
+    const regular = groups.filter((g) => !QUICK_FILL_BRAND_ORDER.includes(g.id));
+    const quickFill = QUICK_FILL_BRAND_ORDER.flatMap((id) => groups.filter((g) => g.id === id));
+    return [...regular, ...quickFill].map((group) => ({
+      id: group.id,
+      label: t(`providersPage.providerNames.${group.id}`),
+      icon: logoIcon(group.id),
+    }));
+  }, [groups, t]);
   const quickStartResource = useMemo(
     () => (fixedBrand === 'apikeyFun' && activeGroup ? (activeGroup.resources[0] ?? null) : null),
     [activeGroup, fixedBrand]
@@ -278,14 +280,19 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
   const updatedAtLabel = workbench.snapshot
     ? formatDateTime(workbench.snapshot.fetchedAt, i18n.language)
     : t('providersPage.modelCatalog.notLoaded');
-  const headerTitle =
+  const pageTitle =
     fixedBrand === 'apikeyFun'
       ? quickStartResource
         ? APIKEY_FUN_DISPLAY_NAME
         : t('nav.quick_start')
-      : undefined;
+      : t('providersPage.header.title');
   const errorBanner = workbench.errorMessage ? (
-    <div className="error-box">{workbench.errorMessage}</div>
+    <p
+      role="alert"
+      className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+    >
+      {workbench.errorMessage}
+    </p>
   ) : null;
 
   const openCreate = useCallback(() => {
@@ -371,81 +378,84 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     closeSheet();
   }, [closeSheet, showNotification, t]);
 
-  // 加载状态
+  const selectBrand = (brand: ProviderBrand) => {
+    const isSwitching = sheetState.open && sheetState.brand !== brand;
+    const proceed =
+      isSwitching && sheetRef.current
+        ? sheetRef.current.confirmDiscardIfDirty()
+        : Promise.resolve(true);
+    void proceed.then((ok) => {
+      if (!ok) return;
+      setActiveBrand(brand);
+      if (isSwitching) {
+        closeSheet();
+      }
+    });
+  };
+
+  const refreshLabel = workbench.isFetching
+    ? t('providersPage.actions.syncing')
+    : t('providersPage.actions.refresh');
+  const actions = (
+    <div className="flex shrink-0 items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="h-9 px-3 sm:px-4"
+        onClick={() => void handleRefresh()}
+        disabled={workbench.isFetching}
+        aria-label={refreshLabel}
+        title={t('providersPage.header.updatedAt', { time: updatedAtLabel })}
+      >
+        <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+        <span className="max-sm:hidden">{refreshLabel}</span>
+      </Button>
+      {!fixedBrand ? (
+        <Button
+          type="button"
+          size="lg"
+          className="h-9 px-4"
+          onClick={openCreate}
+          disabled={!activeGroup || disableMutations}
+        >
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+          {t('providersPage.actions.new')}
+        </Button>
+      ) : null}
+    </div>
+  );
+
   if (!workbench.snapshot && workbench.isPending) {
     return (
-      <div className={styles.page}>
-        <Skeleton height={120} />
-        <div className={styles.layout}>
-          <Skeleton height={420} />
-          <Skeleton height={420} />
+      <Page title={pageTitle} actions={actions}>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </div>
-      </div>
+      </Page>
     );
   }
 
   if (!activeGroup) {
     return (
-      <div className={styles.page}>
-        <ProviderHeaderCard
-          title={headerTitle}
-          totalActive={0}
-          totalResources={0}
-          providerFamilies={0}
-          updatedAtLabel={updatedAtLabel}
-          isFetching={workbench.isFetching}
-          onRefresh={() => void handleRefresh()}
-          onNew={() => {}}
-          isNewDisabled
-          showNewAction={!fixedBrand}
-          showSummary={fixedBrand !== 'apikeyFun'}
-        />
+      <Page title={pageTitle} actions={actions}>
         {errorBanner}
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <ProviderHeaderCard
-        title={headerTitle}
-        totalActive={totalActive}
-        totalResources={totalResources}
-        providerFamilies={providerFamilies}
-        updatedAtLabel={updatedAtLabel}
-        isFetching={workbench.isFetching}
-        isNewDisabled={disableMutations}
-        showNewAction={!fixedBrand}
-        showSummary={fixedBrand !== 'apikeyFun'}
-        newLabel={t('providersPage.actions.new')}
-        variant={fixedBrand === 'apikeyFun' ? 'quickStart' : undefined}
-        onRefresh={() => void handleRefresh()}
-        onNew={openCreate}
-      />
-
-      {errorBanner}
-
-      <div className={`${styles.layout} ${fixedBrand ? styles.layoutSingle : ''}`.trim()}>
-        {!fixedBrand ? (
-          <ProviderCategoryList
-            groups={groups}
-            activeBrand={activeGroup.id}
-            onSelect={(brand) => {
-              const isSwitching = sheetState.open && sheetState.brand !== brand;
-              const proceed =
-                isSwitching && sheetRef.current
-                  ? sheetRef.current.confirmDiscardIfDirty()
-                  : Promise.resolve(true);
-              void proceed.then((ok) => {
-                if (!ok) return;
-                setActiveBrand(brand);
-                if (isSwitching) {
-                  closeSheet();
-                }
-              });
-            }}
-          />
-        ) : null}
+    <>
+      <Page
+        title={pageTitle}
+        actions={actions}
+        tabs={fixedBrand ? undefined : tabs}
+        tab={activeGroup.id}
+        onTab={selectBrand}
+      >
+        {errorBanner}
         {fixedBrand === 'apikeyFun' ? (
           <SponsorQuickStartPanel
             resource={quickStartResource}
@@ -469,7 +479,7 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
             onCreate={openCreate}
           />
         )}
-      </div>
+      </Page>
 
       {!fixedBrand ? (
         <ProviderSheet
@@ -486,6 +496,6 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
           usageByProvider={usageByProvider}
         />
       ) : null}
-    </div>
+    </>
   );
 }

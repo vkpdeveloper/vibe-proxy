@@ -1,19 +1,18 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  IconChevronDown,
-  IconEye,
-  IconEyeOff,
-  IconLoader2,
-  IconPlus,
-  IconX,
-} from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, ArrowDown01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { maskApiKey } from '@/utils/format';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import type { ApiKeyEntryInput } from '../../types';
 import type { ConnectivityState, ConnectivityStatus } from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
-import styles from './sharedForm.module.scss';
+import { SecretInput } from './FormControls';
 
 const COLLAPSED_LIMIT = 10;
 
@@ -49,19 +48,20 @@ export function ApiKeyEntriesEditor({
   onTestAll,
 }: ApiKeyEntriesEditorProps) {
   const { t } = useTranslation();
+  const id = useId();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(() =>
     entries.length === 1 && isBlankEntry(entries[0]) ? 0 : null
   );
   const [showPasswords, setShowPasswords] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
-  const togglePasswordVisibility = (idx: number) => {
+  const setPasswordVisible = (idx: number, visible: boolean) => {
     setShowPasswords((prev) => {
       const next = new Set(prev);
-      if (next.has(idx)) {
-        next.delete(idx);
-      } else {
+      if (visible) {
         next.add(idx);
+      } else {
+        next.delete(idx);
       }
       return next;
     });
@@ -97,151 +97,137 @@ export function ApiKeyEntriesEditor({
   const visible = showAll ? reversed : reversed.slice(0, COLLAPSED_LIMIT);
 
   return (
-    <div className={styles.entriesList}>
-      <div className={`${styles.entriesToolbar} ${styles.entriesToolbarSplit}`}>
-        <button type="button" className={styles.addBtn} disabled={mutating} onClick={handleAdd}>
-          <IconPlus size={12} />
-          <span>{t('providersPage.form.addApiKeyEntry')}</span>
-        </button>
-        <button
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={mutating} onClick={handleAdd}>
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
+          {t('providersPage.form.addApiKeyEntry')}
+        </Button>
+        <Button
           type="button"
-          className={styles.connectivityBtn}
+          variant="outline"
+          size="sm"
           disabled={mutating || isTestingAny}
           onClick={onTestAll}
         >
-          {isTestingAny ? (
-            <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-              <IconLoader2 size={14} />
-            </span>
-          ) : null}
-          <span>{t('providersPage.connectivity.testAll')}</span>
-        </button>
+          {t('providersPage.connectivity.testAll')}
+        </Button>
       </div>
       {visible.map(({ entry, idx }) => {
         const status = statuses[idx] ?? idleStatus;
         const expanded = expandedIdx === idx;
         const summaryKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
+        const entryId = `${id}-${idx}`;
         return (
-          <div key={idx} className={styles.entryCard}>
-            <div className={styles.entryCardHeader}>
+          <div key={idx} className="rounded-lg border">
+            <div className="flex items-center gap-1 py-1 pr-1 pl-3">
               <button
                 type="button"
-                className={styles.entryCardToggle}
+                className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm outline-none focus-visible:underline"
                 aria-expanded={expanded}
                 onClick={() => setExpandedIdx(expanded ? null : idx)}
               >
-                <span>{t('providersPage.form.apiKeyEntry', { index: idx + 1 })}</span>
-                <span className={styles.entrySummary}>
-                  {entry.proxyUrl.trim() ? (
-                    <span className={styles.entryBadge} title={entry.proxyUrl}>
-                      {t('providersPage.form.proxyBadge')}
-                    </span>
-                  ) : null}
-                  <span className={styles.entrySummaryKey}>
-                    {summaryKey ? maskApiKey(summaryKey) : t('providersPage.status.notConfigured')}
-                  </span>
+                <span className="shrink-0 font-medium">
+                  {t('providersPage.form.apiKeyEntry', { index: idx + 1 })}
                 </span>
+                <span
+                  className={cn(
+                    'min-w-0 truncate font-mono text-xs',
+                    summaryKey ? 'text-muted-foreground' : 'text-faint'
+                  )}
+                >
+                  {summaryKey ? maskApiKey(summaryKey) : t('providersPage.status.notConfigured')}
+                </span>
+                {entry.proxyUrl.trim() ? (
+                  <Badge variant="secondary" title={entry.proxyUrl}>
+                    {t('providersPage.form.proxyBadge')}
+                  </Badge>
+                ) : null}
               </button>
-              <div className={styles.entryCardHeaderRight}>
-                <ConnectivityStatusIcon state={status.state} />
-                <button
-                  type="button"
-                  className={styles.connectivityBtnGhost}
-                  disabled={mutating || status.state === 'loading'}
-                  onClick={() => onTest(idx)}
-                >
-                  {status.state === 'loading' ? (
-                    <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-                      <IconLoader2 size={14} />
-                    </span>
-                  ) : null}
-                  <span>{t('providersPage.connectivity.test')}</span>
-                </button>
-                <button
-                  type="button"
-                  className={styles.entryCardIconBtn}
-                  onClick={() => setExpandedIdx(expanded ? null : idx)}
-                  title={expanded ? t('common.collapse') : t('common.expand')}
-                  aria-label={expanded ? t('common.collapse') : t('common.expand')}
-                >
-                  <IconChevronDown
-                    className={[
-                      styles.entryCardChevron,
-                      expanded ? styles.entryCardChevronOpen : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    size={14}
-                  />
-                </button>
-                <button
-                  type="button"
-                  className={styles.removeBtn}
-                  disabled={mutating || removeDisabled}
-                  onClick={() => handleRemove(idx)}
-                >
-                  <IconX size={12} />
-                </button>
-              </div>
+              <ConnectivityStatusIcon state={status.state} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={mutating || status.state === 'loading'}
+                onClick={() => onTest(idx)}
+              >
+                {t('providersPage.connectivity.test')}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setExpandedIdx(expanded ? null : idx)}
+                title={expanded ? t('common.collapse') : t('common.expand')}
+                aria-label={expanded ? t('common.collapse') : t('common.expand')}
+              >
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  strokeWidth={1.75}
+                  className={cn(
+                    'transition-transform duration-200 ease-out motion-reduce:transition-none',
+                    expanded && 'rotate-180'
+                  )}
+                />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-destructive"
+                disabled={mutating || removeDisabled}
+                aria-label={t('common.delete')}
+                title={t('common.delete')}
+                onClick={() => handleRemove(idx)}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+              </Button>
             </div>
             {status.state === 'error' ? (
-              <div className={styles.connectivityError}>{status.message}</div>
+              <p role="alert" className="border-t px-3 py-2 text-sm text-destructive">
+                {status.message}
+              </p>
             ) : null}
             {expanded ? (
-              <div className={styles.entryCardBody}>
-                <div className={styles.field}>
-                  <label className={styles.label}>{t('providersPage.form.apiKey')}</label>
-                  <div className={styles.passwordField}>
-                    <input
-                      className={styles.passwordInput}
-                      type={showPasswords.has(idx) ? 'text' : 'password'}
-                      value={entry.apiKey}
-                      onChange={(e) => onUpdate(idx, { apiKey: e.target.value })}
-                      autoComplete="new-password"
-                      data-1p-ignore="true"
-                      data-lpignore="true"
-                      data-bwignore="true"
-                      disabled={mutating}
-                      placeholder={
-                        entry.existingApiKey
-                          ? t('providersPage.form.apiKeyEditPlaceholder')
-                          : t('providersPage.form.apiKeyCreatePlaceholder')
-                      }
-                    />
-                    <button
-                      type="button"
-                      className={styles.passwordToggle}
-                      onClick={() => togglePasswordVisibility(idx)}
-                      disabled={mutating}
-                      aria-label={
-                        showPasswords.has(idx)
-                          ? t('providersPage.form.hideApiKey')
-                          : t('providersPage.form.showApiKey')
-                      }
-                      title={
-                        showPasswords.has(idx)
-                          ? t('providersPage.form.hideApiKey')
-                          : t('providersPage.form.showApiKey')
-                      }
-                    >
-                      {showPasswords.has(idx) ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>{t('providersPage.form.proxyUrl')}</label>
-                  <input
-                    className={styles.input}
+              <div className="flex flex-col gap-5 border-t p-3">
+                <Field>
+                  <FieldLabel htmlFor={`${entryId}-key`}>
+                    {t('providersPage.form.apiKey')}
+                  </FieldLabel>
+                  <SecretInput
+                    id={`${entryId}-key`}
+                    value={entry.apiKey}
+                    onValueChange={(apiKey) => onUpdate(idx, { apiKey })}
+                    visible={showPasswords.has(idx)}
+                    onVisibleChange={(visible) => setPasswordVisible(idx, visible)}
+                    disabled={mutating}
+                    placeholder={
+                      entry.existingApiKey
+                        ? t('providersPage.form.apiKeyEditPlaceholder')
+                        : t('providersPage.form.apiKeyCreatePlaceholder')
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entryId}-proxy`}>
+                    {t('providersPage.form.proxyUrl')}
+                  </FieldLabel>
+                  <Input
+                    id={`${entryId}-proxy`}
+                    className="font-mono"
                     value={entry.proxyUrl}
                     onChange={(e) => onUpdate(idx, { proxyUrl: e.target.value })}
                     disabled={mutating}
                     placeholder="http://127.0.0.1:7890"
                   />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>{t('providersPage.form.weight')}</label>
-                  <input
-                    className={styles.input}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entryId}-weight`}>
+                    {t('providersPage.form.weight')}
+                  </FieldLabel>
+                  <Input
+                    id={`${entryId}-weight`}
                     type="number"
                     step="1"
                     max={MAX_CREDENTIAL_WEIGHT}
@@ -254,19 +240,27 @@ export function ApiKeyEntriesEditor({
                     disabled={mutating}
                     placeholder="1"
                   />
-                  <span className={styles.labelHint}>{t('providersPage.form.weightHint')}</span>
-                </div>
+                  <FieldDescription className="text-xs">
+                    {t('providersPage.form.weightHint')}
+                  </FieldDescription>
+                </Field>
               </div>
             ) : null}
           </div>
         );
       })}
       {entries.length > COLLAPSED_LIMIT ? (
-        <button type="button" className={styles.showMoreBtn} onClick={() => setShowAll((v) => !v)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => setShowAll((v) => !v)}
+        >
           {showAll
             ? t('providersPage.form.showFewerEntries')
             : t('providersPage.form.showAllEntries', { count: entries.length })}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconLoader2, IconRefreshCw, IconSearch } from '@/components/ui/icons';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import type { ModelInfo } from '@/utils/models';
-import styles from './sharedForm.module.scss';
 
 interface ModelDiscoveryPanelProps {
   loading: boolean;
@@ -29,6 +32,7 @@ export function ModelDiscoveryPanel({
   onClose,
 }: ModelDiscoveryPanelProps) {
   const { t } = useTranslation();
+  const id = useId();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -71,98 +75,94 @@ export function ModelDiscoveryPanel({
   };
 
   const renderModelLabel = (model: ModelInfo) => (
-    <span className={styles.discoveryNameGroup}>
-      <span className={styles.discoveryName}>{model.name}</span>
-      {model.alias ? <span className={styles.discoveryAlias}>{model.alias}</span> : null}
+    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+      <span className="truncate font-mono text-xs">{model.name}</span>
+      {model.alias ? (
+        <span className="truncate text-xs text-muted-foreground">{model.alias}</span>
+      ) : null}
     </span>
   );
 
+  const message = (text: string) => (
+    <p className="px-1 py-4 text-center text-sm text-muted-foreground">{text}</p>
+  );
+
   return (
-    <div className={styles.discoveryPanel}>
-      <div className={styles.discoveryToolbar}>
-        <div className={styles.discoverySearchWrap}>
-          <span className={styles.discoverySearchIcon} aria-hidden="true">
-            <IconSearch size={14} />
-          </span>
-          <input
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+      <div className="flex gap-2">
+        <InputGroup className="flex-1">
+          <InputGroupAddon>
+            <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
             type="search"
-            className={styles.discoverySearch}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('providersPage.discovery.searchPlaceholder')}
+            aria-label={t('providersPage.discovery.searchPlaceholder')}
           />
-        </div>
-        <button
-          type="button"
-          className={styles.connectivityBtn}
-          onClick={onReload}
-          disabled={loading}
-          aria-label={t('providersPage.discovery.reload')}
-        >
-          {loading ? (
-            <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-              <IconLoader2 size={14} />
-            </span>
-          ) : (
-            <IconRefreshCw size={14} />
-          )}
-          <span>{t('providersPage.discovery.reload')}</span>
-        </button>
+        </InputGroup>
+        <Button type="button" variant="outline" onClick={onReload} disabled={loading}>
+          <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+          {t('providersPage.discovery.reload')}
+        </Button>
       </div>
 
       {loading && !models.length ? (
-        <div className={styles.discoveryEmpty}>{t('providersPage.discovery.loading')}</div>
+        message(t('providersPage.discovery.loading'))
       ) : error ? (
-        <div className={styles.connectivityError}>{error}</div>
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
       ) : hasFetched && !models.length ? (
-        <div className={styles.discoveryEmpty}>{t('providersPage.discovery.empty')}</div>
+        message(t('providersPage.discovery.empty'))
       ) : models.length ? (
         <>
-          <div className={styles.discoveryBatchRow}>
-            <SelectionCheckbox
-              checked={allSelectableChecked}
-              onChange={toggleAll}
-              disabled={selectable.length === 0}
-              label={
-                <span className={styles.discoveryBatchLabel}>
-                  {allSelectableChecked
-                    ? t('providersPage.discovery.clearAll')
-                    : t('providersPage.discovery.selectAll')}
-                </span>
-              }
-            />
-            <span className={styles.discoveryCount}>
+          <div className="flex items-center justify-between gap-3 px-1">
+            <label
+              htmlFor={`${id}-all`}
+              className="flex cursor-pointer items-center gap-2 text-sm has-disabled:cursor-not-allowed has-disabled:opacity-50"
+            >
+              <Checkbox
+                id={`${id}-all`}
+                checked={allSelectableChecked}
+                onCheckedChange={toggleAll}
+                disabled={selectable.length === 0}
+              />
+              {allSelectableChecked
+                ? t('providersPage.discovery.clearAll')
+                : t('providersPage.discovery.selectAll')}
+            </label>
+            <span className="font-mono text-xs text-muted-foreground tabular-nums">
               {t('providersPage.discovery.selectedCount', {
                 selected: selected.size,
                 total: selectable.length,
               })}
             </span>
           </div>
-          <ul className={styles.discoveryList}>
-            {filtered.map((m) => {
+          <ul className="max-h-64 overflow-y-auto rounded-lg border bg-background">
+            {filtered.map((m, index) => {
               const existing = existingNames.has(m.name);
+              const itemId = `${id}-model-${index}`;
               return (
-                <li
-                  key={m.name}
-                  className={
-                    existing
-                      ? `${styles.discoveryItem} ${styles.discoveryItemExisting}`
-                      : styles.discoveryItem
-                  }
-                >
+                <li key={m.name} className="border-b last:border-b-0">
                   {existing ? (
-                    <>
+                    <div className="flex items-center gap-2 px-3 py-2 text-muted-foreground">
                       {renderModelLabel(m)}
-                      <span className={styles.discoveryAddedTag}>
-                        {t('providersPage.discovery.alreadyAdded')}
-                      </span>
-                    </>
+                      <Badge variant="secondary">{t('providersPage.discovery.alreadyAdded')}</Badge>
+                    </div>
                   ) : (
-                    <SelectionCheckbox
-                      checked={selected.has(m.name)}
-                      onChange={() => toggle(m.name)}
-                      label={renderModelLabel(m)}
-                    />
+                    <label
+                      htmlFor={itemId}
+                      className="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        id={itemId}
+                        checked={selected.has(m.name)}
+                        onCheckedChange={() => toggle(m.name)}
+                      />
+                      {renderModelLabel(m)}
+                    </label>
                   )}
                 </li>
               );
@@ -170,26 +170,21 @@ export function ModelDiscoveryPanel({
           </ul>
         </>
       ) : (
-        <div className={styles.discoveryEmpty}>{t('providersPage.discovery.notLoaded')}</div>
+        message(t('providersPage.discovery.notLoaded'))
       )}
 
-      <div className={styles.discoveryFooter}>
-        <button
-          type="button"
-          className={styles.connectivityBtnGhost}
-          onClick={onClose}
-          disabled={mutating}
-        >
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={mutating}>
           {t('providersPage.discovery.close')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={styles.discoveryApplyBtn}
+          size="sm"
           onClick={handleApply}
           disabled={mutating || selected.size === 0}
         >
           {t('providersPage.discovery.apply', { count: selected.size })}
-        </button>
+        </Button>
       </div>
     </div>
   );

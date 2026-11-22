@@ -1,15 +1,20 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import type {
   PluginStoreAuthApplyTo,
   PluginStoreAuthRule,
   PluginStoreAuthType,
 } from '@/types/visualConfig';
 import { makeClientId } from '@/types/visualConfig';
+import { OptionSelect } from '../fields/OptionSelect';
 import { ExpandableInput } from './ExpandableInput';
-import styles from './Blocks.module.scss';
+import { AddButton, RuleCard } from './parts';
+
+const fieldClass = 'flex min-w-0 flex-col gap-1.5';
+const fieldLabelClass = 'text-xs font-medium text-muted-foreground';
+const checkboxLabelClass = 'inline-flex items-center gap-2 text-[13px]';
 
 const PLUGIN_STORE_AUTH_TYPE_OPTIONS: Array<{ value: PluginStoreAuthType; labelKey: string }> = [
   { value: 'bearer', labelKey: 'config_management.visual.sections.system.store_auth_type_bearer' },
@@ -76,10 +81,21 @@ export const PluginStoreAuthEditor = memo(function PluginStoreAuthEditor({
     updateRule(rule.id, { applyTo: nextApplyTo });
   };
 
+  const envInput = (value: string, onValue: (next: string) => void, placeholder?: string) => (
+    <Input
+      className="h-9 font-mono text-[13px] md:text-[13px]"
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      spellCheck={false}
+      onChange={(event) => onValue(event.target.value)}
+    />
+  );
+
   return (
-    <div className={styles.storeAuthEditor}>
+    <div className="flex flex-col gap-3">
       {value.length === 0 ? (
-        <p className={styles.storeAuthEmpty}>
+        <p className="text-[13px] text-muted-foreground">
           {t('config_management.visual.sections.system.store_auth_empty')}
         </p>
       ) : null}
@@ -88,23 +104,18 @@ export const PluginStoreAuthEditor = memo(function PluginStoreAuthEditor({
         const usesBasic = rule.type === 'basic';
         const usesHeader = rule.type === 'header';
         return (
-          <div key={rule.id} className={styles.storeAuthRule}>
-            <div className={styles.storeAuthRuleHeader}>
-              <strong>
-                {rule.match || t('config_management.visual.sections.system.store_auth_rule')}
-              </strong>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeRule(rule.id)}
-                disabled={disabled}
-              >
-                {t('config_management.visual.common.delete')}
-              </Button>
-            </div>
-            <div className={styles.storeAuthGrid}>
-              <label className={styles.storeAuthField}>
-                <span>{t('config_management.visual.sections.system.store_auth_match')}</span>
+          <RuleCard
+            key={rule.id}
+            title={rule.match || t('config_management.visual.sections.system.store_auth_rule')}
+            removeLabel={t('config_management.visual.common.delete')}
+            onRemove={() => removeRule(rule.id)}
+            disabled={disabled}
+          >
+            <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+              <label className={fieldClass}>
+                <span className={fieldLabelClass}>
+                  {t('config_management.visual.sections.system.store_auth_match')}
+                </span>
                 <ExpandableInput
                   value={rule.match}
                   placeholder="https://api.github.com/repos/owner/repo/releases/"
@@ -112,127 +123,116 @@ export const PluginStoreAuthEditor = memo(function PluginStoreAuthEditor({
                   onChange={(match) => updateRule(rule.id, { match })}
                 />
               </label>
-              <label className={styles.storeAuthField}>
-                <span>{t('config_management.visual.sections.system.store_auth_type')}</span>
-                <Select
+              <label className={fieldClass}>
+                <span className={fieldLabelClass}>
+                  {t('config_management.visual.sections.system.store_auth_type')}
+                </span>
+                <OptionSelect
                   value={rule.type}
                   options={PLUGIN_STORE_AUTH_TYPE_OPTIONS.map((option) => ({
                     value: option.value,
                     label: t(option.labelKey),
                   }))}
                   disabled={disabled}
-                  onChange={(type) => updateRule(rule.id, { type: type as PluginStoreAuthType })}
+                  onChange={(type) => updateRule(rule.id, { type })}
                 />
               </label>
             </div>
 
-            <div className={styles.storeAuthApplyTo}>
-              <span>{t('config_management.visual.sections.system.store_auth_apply_to')}</span>
-              <div className={styles.storeAuthCheckboxes}>
+            <div className="flex flex-col gap-2">
+              <span className={fieldLabelClass}>
+                {t('config_management.visual.sections.system.store_auth_apply_to')}
+              </span>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {PLUGIN_STORE_AUTH_APPLY_TO_OPTIONS.map((option) => (
-                  <label key={option.value} className={styles.storeAuthCheckbox}>
-                    <input
-                      type="checkbox"
+                  <label key={option.value} className={checkboxLabelClass}>
+                    <Checkbox
                       checked={rule.applyTo.includes(option.value)}
                       disabled={disabled}
-                      onChange={() => toggleApplyTo(rule, option.value)}
+                      onCheckedChange={() => toggleApplyTo(rule, option.value)}
                     />
-                    <span>{t(option.labelKey)}</span>
+                    {t(option.labelKey)}
                   </label>
                 ))}
               </div>
-              <small>
+              <small className="text-xs leading-normal text-muted-foreground">
                 {t('config_management.visual.sections.system.store_auth_apply_to_hint')}
               </small>
             </div>
 
             {usesToken ? (
-              <label className={styles.storeAuthField}>
-                <span>{t('config_management.visual.sections.system.store_auth_token_env')}</span>
-                <input
-                  className="input"
-                  value={rule.tokenEnv}
-                  placeholder="CLIPROXY_PLUGIN_STORE_TOKEN"
-                  disabled={disabled}
-                  onChange={(event) => updateRule(rule.id, { tokenEnv: event.target.value })}
-                />
+              <label className={fieldClass}>
+                <span className={fieldLabelClass}>
+                  {t('config_management.visual.sections.system.store_auth_token_env')}
+                </span>
+                {envInput(
+                  rule.tokenEnv,
+                  (tokenEnv) => updateRule(rule.id, { tokenEnv }),
+                  'CLIPROXY_PLUGIN_STORE_TOKEN'
+                )}
               </label>
             ) : null}
 
             {usesBasic ? (
-              <div className={styles.storeAuthGrid}>
-                <label className={styles.storeAuthField}>
-                  <span>
+              <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+                <label className={fieldClass}>
+                  <span className={fieldLabelClass}>
                     {t('config_management.visual.sections.system.store_auth_username_env')}
                   </span>
-                  <input
-                    className="input"
-                    value={rule.usernameEnv}
-                    disabled={disabled}
-                    onChange={(event) => updateRule(rule.id, { usernameEnv: event.target.value })}
-                  />
+                  {envInput(rule.usernameEnv, (usernameEnv) =>
+                    updateRule(rule.id, { usernameEnv })
+                  )}
                 </label>
-                <label className={styles.storeAuthField}>
-                  <span>
+                <label className={fieldClass}>
+                  <span className={fieldLabelClass}>
                     {t('config_management.visual.sections.system.store_auth_password_env')}
                   </span>
-                  <input
-                    className="input"
-                    value={rule.passwordEnv}
-                    disabled={disabled}
-                    onChange={(event) => updateRule(rule.id, { passwordEnv: event.target.value })}
-                  />
+                  {envInput(rule.passwordEnv, (passwordEnv) =>
+                    updateRule(rule.id, { passwordEnv })
+                  )}
                 </label>
               </div>
             ) : null}
 
             {usesHeader ? (
-              <div className={styles.storeAuthGrid}>
-                <label className={styles.storeAuthField}>
-                  <span>
+              <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+                <label className={fieldClass}>
+                  <span className={fieldLabelClass}>
                     {t('config_management.visual.sections.system.store_auth_header_name')}
                   </span>
-                  <input
-                    className="input"
-                    value={rule.headerName}
-                    placeholder="X-Plugin-Token"
-                    disabled={disabled}
-                    onChange={(event) => updateRule(rule.id, { headerName: event.target.value })}
-                  />
+                  {envInput(
+                    rule.headerName,
+                    (headerName) => updateRule(rule.id, { headerName }),
+                    'X-Plugin-Token'
+                  )}
                 </label>
-                <label className={styles.storeAuthField}>
-                  <span>
+                <label className={fieldClass}>
+                  <span className={fieldLabelClass}>
                     {t('config_management.visual.sections.system.store_auth_header_value_env')}
                   </span>
-                  <input
-                    className="input"
-                    value={rule.headerValueEnv}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      updateRule(rule.id, { headerValueEnv: event.target.value })
-                    }
-                  />
+                  {envInput(rule.headerValueEnv, (headerValueEnv) =>
+                    updateRule(rule.id, { headerValueEnv })
+                  )}
                 </label>
               </div>
             ) : null}
 
-            <label className={styles.storeAuthCheckbox}>
-              <input
-                type="checkbox"
+            <label className={checkboxLabelClass}>
+              <Checkbox
                 checked={rule.allowInsecure}
                 disabled={disabled}
-                onChange={(event) => updateRule(rule.id, { allowInsecure: event.target.checked })}
+                onCheckedChange={(checked) =>
+                  updateRule(rule.id, { allowInsecure: checked === true })
+                }
               />
-              <span>{t('config_management.visual.sections.system.store_auth_allow_insecure')}</span>
+              {t('config_management.visual.sections.system.store_auth_allow_insecure')}
             </label>
-          </div>
+          </RuleCard>
         );
       })}
-      <div className={styles.actionRow}>
-        <Button variant="secondary" size="sm" onClick={addRule} disabled={disabled}>
-          {t('config_management.visual.sections.system.store_auth_add')}
-        </Button>
-      </div>
+      <AddButton onClick={addRule} disabled={disabled}>
+        {t('config_management.visual.sections.system.store_auth_add')}
+      </AddButton>
     </div>
   );
 });

@@ -1,6 +1,22 @@
 import type { DragEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 import type { AliasNode, ProviderNode, SourceNode } from './ModelMappingDiagramTypes';
-import styles from './ModelMappingDiagram.module.scss';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+// Canvas-style cards: rounded-xl on black with a hairline border, like VM Bridge's Canvas nodes.
+const COLUMN = 'z-[2] flex flex-none flex-col gap-3';
+const COLUMN_HEADER = 'mb-1 px-1 text-xs font-medium text-muted-foreground';
+const CARD =
+  'relative flex w-full max-w-[280px] items-center justify-between gap-2 rounded-xl border bg-card px-3.5 py-2.5 text-[13px] transition-colors duration-150 ease-out hover:z-10 hover:border-input';
+const DRAGGABLE = 'cursor-grab active:cursor-grabbing';
+const SELECTED =
+  'border-primary/40 shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_10%,transparent)]';
+const DROP_TARGET = 'border-primary bg-primary/5';
+const DRAGGING = 'border-dashed opacity-50';
+const COUNT = 'ml-1 shrink-0 font-mono text-xs text-muted-foreground tabular-nums';
+const NAME = 'min-w-0 flex-1 truncate';
 
 interface ProviderColumnProps {
   providerNodes: ProviderNode[];
@@ -29,21 +45,21 @@ export function ProviderColumn({
 }: ProviderColumnProps) {
   return (
     <div
-      className={`${styles.column} ${styles.providers}`}
+      className={cn(COLUMN, 'min-w-36 items-end')}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onContextMenu(e, 'background');
       }}
     >
-      <div className={styles.columnHeader}>{label}</div>
+      <div className={COLUMN_HEADER}>{label}</div>
       {providerNodes.map(({ provider, sources }) => {
         const collapsed = collapsedProviders.has(provider);
         const groupHeight = collapsed ? undefined : providerGroupHeights[provider];
         return (
           <div
             key={provider}
-            className={styles.providerGroup}
+            className="flex w-full items-center justify-end"
             style={groupHeight ? { height: groupHeight } : undefined}
           >
             <div
@@ -51,27 +67,32 @@ export function ProviderColumn({
                 if (el) providerRefs.current?.set(provider, el);
                 else providerRefs.current?.delete(provider);
               }}
-              className={`${styles.item} ${styles.providerItem}`}
-              style={{ borderLeftColor: getProviderColor(provider) }}
+              className={cn(CARD, 'gap-2 pl-1.5')}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onContextMenu(e, 'provider', provider);
               }}
             >
-              <button
-                type="button"
-                className={styles.collapseBtn}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="text-muted-foreground"
                 onClick={() => onToggleCollapse(provider)}
                 aria-label={collapsed ? expandLabel : collapseLabel}
                 title={collapsed ? expandLabel : collapseLabel}
               >
-                <span className={collapsed ? styles.chevronRight : styles.chevronDown} />
-              </button>
-              <span className={styles.providerLabel} style={{ color: getProviderColor(provider) }}>
-                {provider}
-              </span>
-              <span className={styles.itemCount}>{sources.length}</span>
+                <HugeiconsIcon
+                  icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
+                  strokeWidth={1.75}
+                />
+              </Button>
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ background: getProviderColor(provider) }}
+              />
+              <span className={cn(NAME, 'font-medium')}>{provider}</span>
+              <span className={COUNT}>{sources.length}</span>
             </div>
           </div>
         );
@@ -119,14 +140,14 @@ export function SourceColumn({
 }: SourceColumnProps) {
   return (
     <div
-      className={`${styles.column} ${styles.sources}`}
+      className={cn(COLUMN, 'min-w-52 items-start')}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onContextMenu(e, 'background');
       }}
     >
-      <div className={styles.columnHeader}>{label}</div>
+      <div className={COLUMN_HEADER}>{label}</div>
       {providerNodes.flatMap(({ provider, sources }) => {
         if (collapsedProviders.has(provider)) return [];
         return sources.map((source) => (
@@ -136,11 +157,13 @@ export function SourceColumn({
               if (el) sourceRefs.current?.set(source.id, el);
               else sourceRefs.current?.delete(source.id);
             }}
-            className={`${styles.item} ${styles.sourceItem} ${
-              draggedSource?.id === source.id ? styles.dragging : ''
-            } ${dropTargetSource === source.id ? styles.dropTarget : ''} ${
-              selectedSourceId === source.id ? styles.selected : ''
-            }`}
+            className={cn(
+              CARD,
+              draggable && DRAGGABLE,
+              selectedSourceId === source.id && SELECTED,
+              dropTargetSource === source.id && DROP_TARGET,
+              draggedSource?.id === source.id && DRAGGING
+            )}
             onClick={() => onSelectSource?.(source)}
             draggable={draggable}
             onDragStart={(e) => onDragStart(e, source)}
@@ -154,11 +177,11 @@ export function SourceColumn({
               onContextMenu(e, 'source', source.id);
             }}
           >
-            <span className={styles.itemName} title={source.name}>
+            <span className={cn(NAME, 'font-mono text-xs')} title={source.name}>
               {source.name}
             </span>
             <div
-              className={styles.dot}
+              className="absolute top-1/2 -right-[3px] size-1.5 -translate-y-1/2 rounded-full"
               style={{
                 background: getProviderColor(source.provider),
                 opacity: source.aliases.length > 0 ? 1 : 0.3,
@@ -206,14 +229,14 @@ export function AliasColumn({
 }: AliasColumnProps) {
   return (
     <div
-      className={`${styles.column} ${styles.aliases}`}
+      className={cn(COLUMN, 'min-w-52 items-start')}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onContextMenu(e, 'background');
       }}
     >
-      <div className={styles.columnHeader}>{label}</div>
+      <div className={COLUMN_HEADER}>{label}</div>
       {aliasNodes.map((node) => (
         <div
           key={node.id}
@@ -221,11 +244,13 @@ export function AliasColumn({
             if (el) aliasRefs.current?.set(node.id, el);
             else aliasRefs.current?.delete(node.id);
           }}
-          className={`${styles.item} ${styles.aliasItem} ${
-            dropTargetAlias === node.alias ? styles.dropTarget : ''
-          } ${draggedAlias === node.alias ? styles.dragging : ''} ${
-            selectedAlias === node.alias ? styles.selected : ''
-          }`}
+          className={cn(
+            CARD,
+            draggable && DRAGGABLE,
+            selectedAlias === node.alias && SELECTED,
+            dropTargetAlias === node.alias && DROP_TARGET,
+            draggedAlias === node.alias && DRAGGING
+          )}
           onClick={() => onSelectAlias?.(node.alias)}
           draggable={draggable}
           onDragStart={(e) => onDragStart(e, node.alias)}
@@ -239,11 +264,11 @@ export function AliasColumn({
             onContextMenu(e, 'alias', node.alias);
           }}
         >
-          <div className={`${styles.dot} ${styles.dotLeft}`} />
-          <span className={styles.itemName} title={node.alias}>
+          <div className="absolute top-1/2 -left-[3px] size-1.5 -translate-y-1/2 rounded-full bg-faint" />
+          <span className={cn(NAME, 'font-mono text-xs')} title={node.alias}>
             {node.alias}
           </span>
-          <span className={styles.itemCount}>{node.sources.length}</span>
+          <span className={COUNT}>{node.sources.length}</span>
         </div>
       ))}
     </div>

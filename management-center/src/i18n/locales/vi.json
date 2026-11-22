@@ -1,5 +1,6 @@
 {
   "common": {
+    "more": "Thêm",
     "login": "Đăng nhập",
     "logout": "Đăng xuất",
     "back": "Quay lại",
@@ -66,14 +67,16 @@
     "subtitle": "Trung tâm Quản lý"
   },
   "login": {
+    "show_key": "Hiện key",
+    "hide_key": "Ẩn key",
     "subtitle": "Vui lòng nhập thông tin kết nối để truy cập giao diện quản lý",
     "connection_current": "URL hiện tại",
     "connection_auto_hint": "Hệ thống sẽ tự động dùng URL hiện tại để kết nối",
-    "custom_connection_label": "URL kết nối tùy chỉnh:",
+    "custom_connection_label": "Địa chỉ máy chủ",
     "custom_connection_placeholder": "Ví dụ: https://example.com:8317",
     "custom_connection_hint": "Mặc định dùng URL hiện tại. Ghi đè tại đây nếu cần.",
     "remember_password_label": "Ghi nhớ mật khẩu",
-    "management_key_label": "Key quản lý:",
+    "management_key_label": "Key quản lý",
     "management_key_placeholder": "Nhập key quản lý",
     "submit_button": "Đăng nhập",
     "submitting": "Đang kết nối...",
@@ -206,7 +209,11 @@
     "cta_system_desc": "Chi tiết phiên bản và thông tin trung tâm quản lý.",
     "window_m": "{{minutes}}p",
     "window_h": "{{hours}}g",
-    "window_hm": "{{hours}}g {{minutes}}p"
+    "window_hm": "{{hours}}g {{minutes}}p",
+    "providers_title": "Nhà cung cấp",
+    "shortcuts_title": "Lối tắt",
+    "col_requests": "Yêu cầu",
+    "col_volume": "Xu hướng"
   },
   "basic_settings": {
     "debug_enable": "Bật chế độ Debug",
@@ -916,7 +923,7 @@
     "generating_link": "Đang tạo liên kết đăng nhập…",
     "waiting_background_hint": "Đóng cửa sổ không làm gián đoạn đăng nhập",
     "restart_login": "Bắt đầu lại",
-    "success_saved_hint": "Đã lưu credential — quản lý trong File xác thực.",
+    "success_saved_hint": "Đã lưu credential. Quản lý trong File xác thực.",
     "sign_up_prompt": "Chưa có tài khoản?",
     "copied": "Đã sao chép",
     "devin_oauth_cancel": "Hủy đăng nhập Devin",
@@ -1048,6 +1055,10 @@
     "history_evicted": "Vị trí đọc của bạn không còn trong cache. Vui lòng chọn vị trí mới.",
     "resume_following": "Về mới nhất · Dòng mới: {{count}}",
     "level_filter": "Cấp độ log",
+    "column_time": "Thời gian",
+    "column_level": "Cấp độ",
+    "column_request": "Yêu cầu",
+    "column_duration": "Thời lượng",
     "all_levels": "Tất cả cấp độ",
     "view_request": "Xem log cho yêu cầu {{id}}",
     "copy_line": "Sao chép dòng này",
@@ -1071,6 +1082,15 @@
       "save": "Lưu thay đổi"
     },
     "discard_confirm_message": "Hủy mọi thay đổi chưa lưu và khôi phục phiên bản máy chủ gần nhất?",
+    "tabs": {
+      "common": "Chung",
+      "connectivity": "Truy cập",
+      "network": "Mạng",
+      "logging": "Ghi log",
+      "streaming": "Streaming",
+      "advanced": "Nâng cao",
+      "payload": "Payload"
+    },
     "mode": {
       "label": "Chế độ trình chỉnh sửa",
       "visual": "Trực quan",
@@ -1798,6 +1818,7 @@
   "system_info": {
     "title": "Thông tin Trung tâm Quản lý",
     "about_title": "VProxy",
+    "tab_about": "Giới thiệu",
     "models_title": "Model khả dụng",
     "models_desc": "Hiển thị phản hồi /models và tự động dùng API key đã lưu để xác thực.",
     "models_loading": "Đang tải model khả dụng...",

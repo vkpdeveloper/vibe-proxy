@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { TFunction } from 'i18next';
 import type { ContextMenuState } from './ModelMappingDiagramTypes';
-import styles from './ModelMappingDiagram.module.scss';
+import { cn } from '@/lib/utils';
 
 interface DiagramContextMenuProps {
   contextMenu: ContextMenuState | null;
@@ -16,6 +16,32 @@ interface DiagramContextMenuProps {
   onDeleteProvider: (provider: string) => void;
   onOpenSourceSettings: (sourceId: string) => void;
 }
+
+function MenuItem({
+  onClick,
+  danger = false,
+  children,
+}: {
+  onClick: () => void;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={cn(
+        'flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-hidden select-none hover:bg-accent focus-visible:bg-accent',
+        danger && 'text-destructive hover:bg-destructive/10 focus-visible:bg-destructive/10'
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+const MenuDivider = () => <div className="-mx-1 my-1 h-px bg-border" role="separator" />;
 
 export function DiagramContextMenu({
   contextMenu,
@@ -47,25 +73,23 @@ export function DiagramContextMenu({
   const { type, data } = contextMenu;
 
   const renderBackground = () => (
-    <div className={styles.menuItem} onClick={onAddAlias}>
-      <span>{t('oauth_model_alias.diagram_add_alias')}</span>
-    </div>
+    <MenuItem onClick={onAddAlias}>{t('oauth_model_alias.diagram_add_alias')}</MenuItem>
   );
 
   const renderAlias = () => {
     if (!data) return null;
     return (
       <>
-        <div className={styles.menuItem} onClick={() => onRenameAlias(data)}>
-          <span>{t('oauth_model_alias.diagram_rename')}</span>
-        </div>
-        <div className={styles.menuItem} onClick={() => onOpenAliasSettings(data)}>
-          <span>{t('oauth_model_alias.diagram_settings')}</span>
-        </div>
-        <div className={styles.menuDivider} />
-        <div className={`${styles.menuItem} ${styles.danger}`} onClick={() => onDeleteAlias(data)}>
-          <span>{t('oauth_model_alias.diagram_delete_alias')}</span>
-        </div>
+        <MenuItem onClick={() => onRenameAlias(data)}>
+          {t('oauth_model_alias.diagram_rename')}
+        </MenuItem>
+        <MenuItem onClick={() => onOpenAliasSettings(data)}>
+          {t('oauth_model_alias.diagram_settings')}
+        </MenuItem>
+        <MenuDivider />
+        <MenuItem danger onClick={() => onDeleteAlias(data)}>
+          {t('oauth_model_alias.diagram_delete_alias')}
+        </MenuItem>
       </>
     );
   };
@@ -74,16 +98,11 @@ export function DiagramContextMenu({
     if (!data) return null;
     return (
       <>
-        <div className={styles.menuItem} onClick={() => onEditProvider(data)}>
-          <span>{t('common.edit')}</span>
-        </div>
-        <div className={styles.menuDivider} />
-        <div
-          className={`${styles.menuItem} ${styles.danger}`}
-          onClick={() => onDeleteProvider(data)}
-        >
-          <span>{t('oauth_model_alias.delete')}</span>
-        </div>
+        <MenuItem onClick={() => onEditProvider(data)}>{t('common.edit')}</MenuItem>
+        <MenuDivider />
+        <MenuItem danger onClick={() => onDeleteProvider(data)}>
+          {t('oauth_model_alias.delete')}
+        </MenuItem>
       </>
     );
   };
@@ -91,16 +110,17 @@ export function DiagramContextMenu({
   const renderSource = () => {
     if (!data) return null;
     return (
-      <div className={styles.menuItem} onClick={() => onOpenSourceSettings(data)}>
-        <span>{t('oauth_model_alias.diagram_settings')}</span>
-      </div>
+      <MenuItem onClick={() => onOpenSourceSettings(data)}>
+        {t('oauth_model_alias.diagram_settings')}
+      </MenuItem>
     );
   };
 
   return createPortal(
     <div
       ref={menuRef}
-      className={styles.contextMenu}
+      role="menu"
+      className="fixed z-50 min-w-36 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none"
       style={{ top: contextMenu.y, left: contextMenu.x }}
       onClick={(e) => e.stopPropagation()}
     >

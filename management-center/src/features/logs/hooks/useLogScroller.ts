@@ -141,7 +141,9 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
     (e: UIEvent<HTMLDivElement>) => {
       const node = e.currentTarget;
       const rows = readLogRows(node);
-      const movedUp = node.scrollTop < lastScrollTopRef.current;
+      // Growing the viewer (fullscreen, window resize) clamps scrollTop down while it
+      // stays at the bottom; that is not the reader scrolling away.
+      const movedUp = node.scrollTop < lastScrollTopRef.current && !isNearBottom(node);
       if (movedUp && followingRef.current) {
         pendingScrollToBottomRef.current = false;
         followingRef.current = false;

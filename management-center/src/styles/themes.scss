@@ -1,258 +1,90 @@
 /**
- * 主题样式
+ * Legacy theme variables. The console is dark only now, on the VM Bridge palette defined in
+ * tailwind.css. These aliases keep SCSS modules that still read the old names on that palette;
+ * new code should use the Tailwind tokens (bg-card, text-muted-foreground, border, ...) instead.
  */
 
-// 浅色主题（默认）
 :root {
-  // 极简暖灰：浅色模式
-  --bg-secondary: #faf9f5; // 页面背景（纸感）
-  --bg-primary: #f0eee8; // 容器/卡片背景
-  --bg-tertiary: #e9e6df; // hover/次级背景
-  --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #f6f4ee;
-  --bg-error-light: rgba(198, 87, 70, 0.1);
-  --floating-surface: #fffdf9;
-  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
-
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
-  --text-muted: var(--text-tertiary);
-
-  --border-color: #e3e1db; // 边框/分割线
-  --border-secondary: var(--border-color);
-  --border-primary: #d5d2cb;
-  --border-hover: #cecac4;
-
-  --primary-color: #8b8680; // 行动色（主色）
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
-  --primary-contrast: #ffffff;
-
-  --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746; // 错误/警告色
-  --error-color: #c65746;
-  --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
-
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
-  --warning-text: var(--warning-color);
-
-  --success-badge-bg: #d1fae5;
-  --success-badge-text: #065f46;
-  --success-badge-border: #6ee7b7;
-
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
-
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
-  --count-badge-text: var(--primary-active);
-
-  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
-  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
-
-  --radius-md: 8px;
-
-  // Workbench tokens (Home parity)
-  --primary-8: color-mix(in srgb, var(--primary-color) 8%, transparent);
-  --primary-10: color-mix(in srgb, var(--primary-color) 10%, transparent);
-  --primary-30: color-mix(in srgb, var(--primary-color) 30%, transparent);
-  --amber-color: #d97706;
-  --amber-text: #92400e;
-  --amber-10: color-mix(in srgb, var(--amber-color) 10%, transparent);
-  --amber-30: color-mix(in srgb, var(--amber-color) 30%, transparent);
-  --destructive-color: var(--error-color);
-  --destructive-10: color-mix(in srgb, var(--destructive-color) 10%, transparent);
-  --destructive-30: color-mix(in srgb, var(--destructive-color) 30%, transparent);
-  --muted-bg: var(--bg-tertiary);
-  --muted-foreground: var(--text-secondary);
-  --accent-bg: var(--bg-tertiary);
-
-  // Glass effect (blurred surfaces)
-  --glass-blur: 12px;
-  --glass-backdrop-filter: blur(var(--glass-blur));
-  --glass-filter: blur(var(--glass-blur));
-  --glass-bg: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-  --glass-bg-secondary: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
-  --glass-border: color-mix(in srgb, var(--border-color) 60%, transparent);
-
-  // 可视化配色：与语义色同源；深色模式下重新取步阶（见 [data-theme='dark']）。
-  // 规则：翡翠绿只表达「活的流量」。
-  --viz-success: #10b981;
-  --viz-failure: #c65746;
-
-  // 动效词汇表：内置 ease 太弱，交互反馈统一用强减速曲线。
-  // 按压 160ms / 悬停 200ms，UI 动效不超过 300ms。
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --dur-press: 160ms;
-  --dur-hover: 200ms;
-}
-
-// 纯白主题
-[data-theme='white'] {
-  --bg-secondary: #ffffff;
-  --bg-primary: #ffffff;
-  --bg-tertiary: #f6f6f6;
-  --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #ffffff;
-  --bg-error-light: rgba(198, 87, 70, 0.08);
-  --floating-surface: #ffffff;
-  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
-
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
-  --text-muted: var(--text-tertiary);
-
-  --border-color: #e5e5e5;
-  --border-secondary: var(--border-color);
-  --border-primary: #d9d9d9;
-  --border-hover: #cccccc;
-
-  --primary-color: #8b8680;
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
-  --primary-contrast: #ffffff;
-
-  --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746;
-  --error-color: #c65746;
-  --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
-
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
-  --warning-text: var(--warning-color);
-
-  --success-badge-bg: #d1fae5;
-  --success-badge-text: #065f46;
-  --success-badge-border: #6ee7b7;
-
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
-
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
-  --count-badge-text: var(--primary-active);
-
-  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
-  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
-
-  --radius-md: 8px;
-
-  // Workbench tokens (Home parity)
-  --primary-8: color-mix(in srgb, var(--primary-color) 8%, transparent);
-  --primary-10: color-mix(in srgb, var(--primary-color) 10%, transparent);
-  --primary-30: color-mix(in srgb, var(--primary-color) 30%, transparent);
-  --amber-color: #d97706;
-  --amber-text: #92400e;
-  --amber-10: color-mix(in srgb, var(--amber-color) 10%, transparent);
-  --amber-30: color-mix(in srgb, var(--amber-color) 30%, transparent);
-  --destructive-color: var(--error-color);
-  --destructive-10: color-mix(in srgb, var(--destructive-color) 10%, transparent);
-  --destructive-30: color-mix(in srgb, var(--destructive-color) 30%, transparent);
-  --muted-bg: var(--bg-tertiary);
-  --muted-foreground: var(--text-secondary);
-  --accent-bg: var(--bg-tertiary);
-}
-
-// 深色主题：Vercel dark（与 opencode vercel-dark 主题同源）
-// 纯黑页面 / #101010 面板 / #1f1f1f 元素；语义色取 Vercel 的
-// blue / green / pink / orange。
-[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg-secondary: #000000; // 页面背景
-  --bg-primary: #101010; // 容器/卡片背景
-  --bg-tertiary: #1a1a1a; // 次级背景（分段控件、代码块）
-  --bg-hover: #1f1f1f;
-  --bg-quinary: #0a0a0a;
-  --bg-error-light: rgba(247, 95, 143, 0.12);
-  --floating-surface: #101010;
-  --floating-shadow:
-    0 0 0 1px #1f1f1f,
-    0 16px 32px rgba(0, 0, 0, 0.6);
+  --bg-secondary: var(--background);
+  --bg-primary: var(--card);
+  --bg-tertiary: var(--secondary);
+  --bg-hover: var(--accent);
+  --bg-quinary: var(--card);
+  --bg-error-light: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --floating-surface: var(--popover);
+  --floating-shadow: 0 0 0 1px var(--border), 0 16px 32px rgba(0, 0, 0, 0.6);
 
-  --text-primary: #ededed;
-  --text-secondary: #a1a1a1;
-  --text-tertiary: #8f8f8f;
-  --text-quaternary: #676767;
-  --text-muted: var(--text-tertiary);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-tertiary: var(--muted-foreground);
+  --text-quaternary: var(--faint);
+  --text-muted: var(--muted-foreground);
 
-  --border-color: #1f1f1f;
-  --border-secondary: var(--border-color);
-  --border-primary: #2e2e2e;
-  --border-hover: #3e3e3e;
+  --border-color: var(--border);
+  --border-secondary: var(--border);
+  --border-primary: var(--input);
+  --border-hover: var(--faint);
 
-  --primary-color: #52a8ff;
-  --primary-hover: #6fb6ff;
-  --primary-active: #8cc5ff;
-  --primary-contrast: #000000;
+  --primary-color: var(--primary);
+  --primary-hover: color-mix(in srgb, var(--primary) 90%, white);
+  --primary-active: color-mix(in srgb, var(--primary) 80%, white);
+  --primary-contrast: var(--primary-foreground);
 
-  --success-color: #62c073;
-  --quota-medium-color: #ff9907;
-  --warning-color: #f75f8f; // 本项目中 warning 与 error 同义
-  --error-color: #f75f8f;
-  --danger-color: var(--error-color);
-  --danger-solid: #e5484d; // 实心危险按钮：白字可读的红
-  --info-color: var(--primary-color);
+  --success-color: var(--success);
+  --quota-medium-color: var(--warning);
+  --warning-color: var(--destructive);
+  --error-color: var(--destructive);
+  --danger-color: var(--destructive);
+  --danger-solid: var(--destructive);
+  --info-color: var(--primary);
 
-  --warning-bg: rgba(247, 95, 143, 0.12);
-  --warning-border: rgba(247, 95, 143, 0.4);
-  --warning-text: #ff8fb1;
+  --warning-bg: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --warning-border: color-mix(in srgb, var(--destructive) 40%, transparent);
+  --warning-text: var(--destructive);
 
-  --success-badge-bg: rgba(98, 192, 115, 0.12);
-  --success-badge-text: #62c073;
-  --success-badge-border: rgba(98, 192, 115, 0.4);
+  --success-badge-bg: color-mix(in srgb, var(--success) 12%, transparent);
+  --success-badge-text: var(--success);
+  --success-badge-border: color-mix(in srgb, var(--success) 40%, transparent);
 
-  --failure-badge-bg: rgba(247, 95, 143, 0.12);
-  --failure-badge-text: #ff8fb1;
-  --failure-badge-border: rgba(247, 95, 143, 0.4);
+  --failure-badge-bg: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --failure-badge-text: var(--destructive);
+  --failure-badge-border: color-mix(in srgb, var(--destructive) 40%, transparent);
 
-  --count-badge-bg: #1f1f1f;
-  --count-badge-text: var(--text-primary);
+  --count-badge-bg: var(--secondary);
+  --count-badge-text: var(--foreground);
 
-  --shadow: 0 0 0 1px #1f1f1f;
+  --shadow: 0 0 0 1px var(--border);
   --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.6);
 
-  --radius-md: 8px;
+  --radius-md: var(--radius);
 
-  --primary-8: color-mix(in srgb, var(--primary-color) 8%, transparent);
-  --primary-10: color-mix(in srgb, var(--primary-color) 12%, transparent);
-  --primary-30: color-mix(in srgb, var(--primary-color) 35%, transparent);
-  --amber-color: #ff9907;
-  --amber-text: #ffb54d;
-  --amber-10: color-mix(in srgb, var(--amber-color) 12%, transparent);
-  --amber-30: color-mix(in srgb, var(--amber-color) 38%, transparent);
-  --destructive-color: var(--error-color);
-  --destructive-10: color-mix(in srgb, var(--destructive-color) 12%, transparent);
-  --destructive-30: color-mix(in srgb, var(--destructive-color) 38%, transparent);
-  --muted-bg: var(--bg-tertiary);
-  --muted-foreground: var(--text-secondary);
-  --accent-bg: var(--bg-hover);
+  --primary-8: color-mix(in srgb, var(--primary) 8%, transparent);
+  --primary-10: color-mix(in srgb, var(--primary) 12%, transparent);
+  --primary-30: color-mix(in srgb, var(--primary) 35%, transparent);
+  --amber-color: var(--warning);
+  --amber-text: var(--warning);
+  --amber-10: color-mix(in srgb, var(--warning) 12%, transparent);
+  --amber-30: color-mix(in srgb, var(--warning) 38%, transparent);
+  --destructive-color: var(--destructive);
+  --destructive-10: color-mix(in srgb, var(--destructive) 12%, transparent);
+  --destructive-30: color-mix(in srgb, var(--destructive) 38%, transparent);
+  --muted-bg: var(--muted);
+  --accent-bg: var(--accent);
 
-  --glass-bg: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
-  --glass-bg-secondary: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
-  --glass-border: var(--border-color);
+  --glass-blur: 0px;
+  --glass-backdrop-filter: none;
+  --glass-filter: none;
+  --glass-bg: var(--background);
+  --glass-bg-secondary: var(--background);
+  --glass-border: var(--border);
 
-  --viz-success: #62c073;
-  --viz-failure: #f75f8f;
-}
+  --viz-success: var(--success);
+  --viz-failure: var(--destructive);
 
-@media (max-width: 768px),
-  (prefers-reduced-motion: reduce),
-  (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass-backdrop-filter: none;
-    --glass-filter: none;
-    --glass-bg: var(--bg-primary);
-    --glass-bg-secondary: var(--bg-secondary);
-    --glass-border: var(--border-color);
-  }
+  // Motion: VM Bridge moves things with ease-out over 150 to 200ms.
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-press: 150ms;
+  --dur-hover: 200ms;
 }

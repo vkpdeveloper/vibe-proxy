@@ -162,10 +162,7 @@ export function buildDevinCliQuotaData(
   };
 }
 
-const fetchDevinCliQuota = async (
-  file: AuthFileItem,
-  t: TFunction
-): Promise<DevinCliQuotaData> => {
+const fetchDevinCliQuota = async (file: AuthFileItem, t: TFunction): Promise<DevinCliQuotaData> => {
   const authIndex = normalizeAuthIndex(file['auth_index'] ?? file.authIndex);
   if (!authIndex) throw new Error(t('devin_cli_quota.missing_auth_index'));
 

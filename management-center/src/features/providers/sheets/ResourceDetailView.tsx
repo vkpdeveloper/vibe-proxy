@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { IconCheck, IconX } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
@@ -11,11 +11,25 @@ import {
   sponsorProtocolUrl,
 } from '../sponsorDefinitions';
 import type { ProviderResource, SponsorProviderRaw } from '../types';
-import styles from './forms/sharedForm.module.scss';
+import { FormSection } from './forms/FormSection';
 
 interface ResourceDetailViewProps {
   resource: ProviderResource;
   usageByProvider?: ProviderRecentUsageMap;
+}
+
+/** Label and value rows in a bordered group. */
+function DetailList({ rows }: { rows: Array<[label: string, value: string | number]> }) {
+  return (
+    <dl className="flex flex-col divide-y rounded-xl border">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+          <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+          <dd className="min-w-0 truncate text-right font-mono text-sm">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 const sponsorProtocolEntryKey = (protocol: string): string => {
@@ -58,45 +72,43 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
     };
 
     return (
-      <div>
-        <div className={styles.detailHeader}>
-          <div className={styles.sectionTitle}>{resource.name ?? resource.identifier}</div>
-          <p className={styles.sectionDesc}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-base font-medium">{resource.name ?? resource.identifier}</h3>
+          <p className="text-sm text-muted-foreground">
             {t('providersPage.sponsor.detailHint', { provider: definition.displayName })}
           </p>
         </div>
 
-        <div className={styles.sponsorProtocolGrid}>
+        <div className="grid gap-2 sm:grid-cols-2">
           {definition.protocols.map((protocol) => (
-            <div key={protocol} className={styles.sponsorProtocolCard}>
-              <span className={styles.sponsorProtocolName}>
+            <div key={protocol} className="flex min-w-0 flex-col gap-1 rounded-xl border px-4 py-3">
+              <span className="text-sm font-medium">
                 {t(`providersPage.sponsor.protocols.${sponsorProtocolI18nKey(protocol)}`)}
               </span>
-              <span className={styles.sponsorProtocolUrl}>
+              <span className="truncate font-mono text-xs text-muted-foreground">
                 {sponsorProtocolUrl(protocolUrls, protocol)}
               </span>
             </div>
           ))}
         </div>
 
-        <dl className={styles.dl} style={{ marginTop: 16 }}>
-          <div>
-            <dt className={styles.dt}>{t('providersPage.detail.fields.identifier')}</dt>
-            <dd className={styles.dd}>{firstKey ? maskApiKey(firstKey) : resource.identifier}</dd>
-          </div>
-          <div>
-            <dt className={styles.dt}>{t('providersPage.detail.fields.prefix')}</dt>
-            <dd className={styles.dd}>{resource.prefix ?? t('providersPage.status.none')}</dd>
-          </div>
-          {definition.protocols.map((protocol) => (
-            <div key={protocol}>
-              <dt className={styles.dt}>
-                {t(`providersPage.sponsor.${sponsorProtocolEntryKey(protocol)}`)}
-              </dt>
-              <dd className={styles.dd}>{protocolCounts[protocol]}</dd>
-            </div>
-          ))}
-        </dl>
+        <DetailList
+          rows={[
+            [
+              t('providersPage.detail.fields.identifier'),
+              firstKey ? maskApiKey(firstKey) : resource.identifier,
+            ],
+            [
+              t('providersPage.detail.fields.prefix'),
+              resource.prefix ?? t('providersPage.status.none'),
+            ],
+            ...definition.protocols.map((protocol): [string, number] => [
+              t(`providersPage.sponsor.${sponsorProtocolEntryKey(protocol)}`),
+              protocolCounts[protocol],
+            ]),
+          ]}
+        />
       </div>
     );
   }
@@ -121,26 +133,19 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
 
   return (
-    <div>
-      <div className={styles.detailHeader}>
-        <div className={styles.sectionTitle}>{resource.name ?? resource.identifier}</div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <h3 className="text-base font-medium">{resource.name ?? resource.identifier}</h3>
 
-      <dl className={styles.dl}>
-        {primary.map(([key, value]) => (
-          <div key={key}>
-            <dt className={styles.dt}>{t(`providersPage.detail.fields.${key}`)}</dt>
-            <dd className={styles.dd}>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <DetailList
+        rows={primary.map(([key, value]) => [t(`providersPage.detail.fields.${key}`), value])}
+      />
 
       {openaiConfig && apiKeyEntries.length > 0 ? (
-        <div className={styles.apiKeyEntriesSection}>
-          <div className={styles.apiKeyEntriesLabel}>
+        <div className="flex flex-col gap-3">
+          <h4 className="text-sm font-medium">
             {t('providersPage.form.apiKeyEntriesSection')}: {apiKeyEntries.length}
-          </div>
-          <div className={styles.apiKeyEntryList}>
+          </h4>
+          <div className="flex flex-col divide-y rounded-xl border">
             {apiKeyEntries.map((entry, entryIndex) => {
               const entryStats = usageByProvider
                 ? getProviderTotalStats(
@@ -151,20 +156,29 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                   )
                 : { success: 0, failure: 0 };
               return (
-                <div key={`${entry.apiKey}-${entryIndex}`} className={styles.apiKeyEntryCard}>
-                  <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
-                  <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
+                <div
+                  key={`${entry.apiKey}-${entryIndex}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
+                >
+                  <span className="w-5 font-mono text-xs text-faint tabular-nums">
+                    {entryIndex + 1}
+                  </span>
+                  <span className="font-mono text-sm">{maskApiKey(entry.apiKey)}</span>
                   {entry.proxyUrl ? (
-                    <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
+                    <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                      {entry.proxyUrl}
+                    </span>
                   ) : null}
-                  <div className={styles.apiKeyEntryStats}>
-                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}>
-                      <IconCheck size={12} /> {entryStats.success}
+                  <span className="ml-auto flex items-center gap-3 font-mono text-xs tabular-nums">
+                    <span className="flex items-center gap-1 text-success">
+                      <HugeiconsIcon icon={Tick02Icon} strokeWidth={1.75} className="size-3.5" />
+                      {entryStats.success}
                     </span>
-                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}>
-                      <IconX size={12} /> {entryStats.failure}
+                    <span className="flex items-center gap-1 text-destructive">
+                      <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} className="size-3.5" />
+                      {entryStats.failure}
                     </span>
-                  </div>
+                  </span>
                 </div>
               );
             })}
@@ -172,18 +186,18 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16 }}>
-        <Collapsible label={t('providersPage.detail.metadataTitle')}>
-          <dl className={styles.dl}>
-            {metadata.map(([key, value]) => (
-              <div key={key}>
-                <dt className={styles.dt}>{t(`providersPage.detail.fields.${key}`)}</dt>
-                <dd className={styles.dd}>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </Collapsible>
-      </div>
+      <FormSection label={t('providersPage.detail.metadataTitle')} flush>
+        <dl className="flex flex-col divide-y">
+          {metadata.map(([key, value]) => (
+            <div key={key} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+              <dt className="shrink-0 text-sm text-muted-foreground">
+                {t(`providersPage.detail.fields.${key}`)}
+              </dt>
+              <dd className="min-w-0 truncate text-right font-mono text-sm">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </FormSection>
     </div>
   );
 }

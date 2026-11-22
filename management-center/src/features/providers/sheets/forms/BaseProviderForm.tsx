@@ -1,15 +1,11 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  IconDownload,
-  IconEye,
-  IconEyeOff,
-  IconLoader2,
-  IconPlus,
-  IconX,
-} from '@/components/ui/icons';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { Select } from '@/components/ui/Select';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Cancel01Icon, Download04Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   DISABLE_ALL_RULE,
   ExcludedModelsPicker,
@@ -35,7 +31,8 @@ import { ModelDiscoveryPanel } from './ModelDiscoveryPanel';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import { ApiKeyEntriesEditor } from './ApiKeyEntriesEditor';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
-import styles from './sharedForm.module.scss';
+import { FormSection } from './FormSection';
+import { FormError, FormSelect, SecretInput, SwitchField } from './FormControls';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import { readRuntimePolicy, validateRuntimePolicy } from '../../runtimePolicy';
 import { readModelOptions, validateModelOptions } from '../../modelOptions';
@@ -496,131 +493,97 @@ export function BaseProviderForm({
     );
   };
 
+  const connectivityState = singleConnectivity?.status.state ?? 'idle';
+
   return (
-    <form id={formId} className={styles.form} onSubmit={handleSubmit} noValidate>
-      {/* 基础字段 */}
-      <div className={styles.section}>
+    <form id={formId} className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+      <FieldGroup>
         {descriptor.supportsName ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-name`}>
-              {t('providersPage.form.name')}
-            </label>
-            <input
+          <Field>
+            <FieldLabel htmlFor={`${fid}-name`}>{t('providersPage.form.name')}</FieldLabel>
+            <Input
               id={`${fid}-name`}
-              className={styles.input}
+              className="h-9"
               value={form.name}
               onChange={(e) => updateField('name', e.target.value)}
               disabled={mutating}
             />
-          </div>
+          </Field>
         ) : null}
 
         {descriptor.supportsApiKey ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-apiKey`}>
-              {t('providersPage.form.apiKey')}
-            </label>
-            <div className={styles.passwordField}>
-              <input
-                id={`${fid}-apiKey`}
-                className={styles.passwordInput}
-                type={showSingleApiKey ? 'text' : 'password'}
-                value={form.apiKey}
-                onChange={(e) => updateField('apiKey', e.target.value)}
-                autoComplete="new-password"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                data-bwignore="true"
-                placeholder={
-                  mode === 'edit'
-                    ? t('providersPage.form.apiKeyEditPlaceholder')
-                    : t('providersPage.form.apiKeyCreatePlaceholder')
-                }
-                disabled={mutating}
-              />
-              <button
-                type="button"
-                className={styles.passwordToggle}
-                onClick={() => setShowSingleApiKey((v) => !v)}
-                disabled={mutating}
-                aria-label={
-                  showSingleApiKey
-                    ? t('providersPage.form.hideApiKey')
-                    : t('providersPage.form.showApiKey')
-                }
-                title={
-                  showSingleApiKey
-                    ? t('providersPage.form.hideApiKey')
-                    : t('providersPage.form.showApiKey')
-                }
-              >
-                {showSingleApiKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-              </button>
-            </div>
-          </div>
+          <Field>
+            <FieldLabel htmlFor={`${fid}-apiKey`}>{t('providersPage.form.apiKey')}</FieldLabel>
+            <SecretInput
+              id={`${fid}-apiKey`}
+              className="h-9"
+              value={form.apiKey}
+              onValueChange={(value) => updateField('apiKey', value)}
+              visible={showSingleApiKey}
+              onVisibleChange={setShowSingleApiKey}
+              placeholder={
+                mode === 'edit'
+                  ? t('providersPage.form.apiKeyEditPlaceholder')
+                  : t('providersPage.form.apiKeyCreatePlaceholder')
+              }
+              disabled={mutating}
+            />
+          </Field>
         ) : null}
 
         {descriptor.supportsBaseUrl ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-baseUrl`}>
-              {t('providersPage.form.baseUrl')}
-              {descriptor.baseUrlRequired ? (
-                <span className={styles.labelHint}>
-                  {' '}
-                  · {t('providersPage.form.baseUrlRequiredHint')}
-                </span>
-              ) : null}
-            </label>
-            <input
+          <Field>
+            <FieldLabel htmlFor={`${fid}-baseUrl`}>{t('providersPage.form.baseUrl')}</FieldLabel>
+            <Input
               id={`${fid}-baseUrl`}
-              className={styles.input}
+              className="h-9 font-mono"
               value={form.baseUrl}
               onChange={(e) => updateField('baseUrl', e.target.value)}
               placeholder="https://api.example.com"
+              aria-describedby={descriptor.baseUrlRequired ? `${fid}-baseUrl-hint` : undefined}
               disabled={mutating}
             />
-          </div>
+            {descriptor.baseUrlRequired ? (
+              <FieldDescription id={`${fid}-baseUrl-hint`}>
+                {t('providersPage.form.baseUrlRequiredHint')}
+              </FieldDescription>
+            ) : null}
+          </Field>
         ) : null}
 
         {descriptor.supportsProxyUrl ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-proxy`}>
-              {t('providersPage.form.proxyUrl')}
-            </label>
-            <input
+          <Field>
+            <FieldLabel htmlFor={`${fid}-proxy`}>{t('providersPage.form.proxyUrl')}</FieldLabel>
+            <Input
               id={`${fid}-proxy`}
-              className={styles.input}
+              className="h-9 font-mono"
               value={form.proxyUrl}
               onChange={(e) => updateField('proxyUrl', e.target.value)}
               placeholder="http://127.0.0.1:7890"
               disabled={mutating}
             />
-          </div>
+          </Field>
         ) : null}
 
         {descriptor.supportsPrefix ? (
-          <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor={`${fid}-prefix`}>
-                {t('providersPage.form.prefix')}
-              </label>
-              <input
+          <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
+            <Field>
+              <FieldLabel htmlFor={`${fid}-prefix`}>{t('providersPage.form.prefix')}</FieldLabel>
+              <Input
                 id={`${fid}-prefix`}
-                className={styles.input}
+                className="h-9"
                 value={form.prefix}
                 onChange={(e) => updateField('prefix', e.target.value)}
                 disabled={mutating}
               />
-            </div>
+            </Field>
             {descriptor.supportsPriority ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor={`${fid}-prio`}>
-                  {t('providersPage.form.priority')}
-                </label>
-                <input
+              <Field>
+                <FieldLabel htmlFor={`${fid}-prio`}>{t('providersPage.form.priority')}</FieldLabel>
+                <Input
                   id={`${fid}-prio`}
                   type="number"
-                  className={styles.input}
+                  className="h-9"
                   value={form.priority ?? ''}
                   onChange={(e) =>
                     updateField(
@@ -630,273 +593,309 @@ export function BaseProviderForm({
                   }
                   disabled={mutating}
                 />
-              </div>
+              </Field>
             ) : null}
           </div>
         ) : null}
 
         {brand !== 'openaiCompatibility' ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-weight`}>
-              {t('providersPage.form.weight')}
-            </label>
-            <input
+          <Field>
+            <FieldLabel htmlFor={`${fid}-weight`}>{t('providersPage.form.weight')}</FieldLabel>
+            <Input
               id={`${fid}-weight`}
               type="number"
               step="1"
               max={MAX_CREDENTIAL_WEIGHT}
-              className={styles.input}
+              className="h-9"
               value={form.weight ?? ''}
               placeholder="1"
+              aria-describedby={`${fid}-weight-hint`}
               onChange={(e) =>
                 updateField('weight', e.target.value === '' ? undefined : Number(e.target.value))
               }
               disabled={mutating}
             />
-            <span className={styles.labelHint}>{t('providersPage.form.weightHint')}</span>
-          </div>
+            <FieldDescription id={`${fid}-weight-hint`}>
+              {t('providersPage.form.weightHint')}
+            </FieldDescription>
+          </Field>
         ) : null}
 
         {descriptor.supportsTestModel ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${fid}-testModel`}>
+          <Field>
+            <FieldLabel htmlFor={`${fid}-testModel`}>
               {t('providersPage.form.testModel')}
-              <span className={styles.labelHint}> · {t('providersPage.form.testModelHint')}</span>
-            </label>
-            <Select
-              id={`${fid}-testModel`}
-              value={form.testModel ?? ''}
-              options={testModelOptions}
-              onChange={(value) => updateField('testModel', value)}
-              disabled={mutating}
-              ariaLabel={t('providersPage.form.testModel')}
-            />
-            {singleConnectivity ? (
-              <div className={styles.connectivityRow}>
-                <button
+            </FieldLabel>
+            <div className="flex gap-2">
+              <FormSelect
+                id={`${fid}-testModel`}
+                className="flex-1 data-[size=default]:h-9"
+                value={form.testModel ?? ''}
+                options={testModelOptions}
+                onChange={(value) => updateField('testModel', value)}
+                disabled={mutating}
+                ariaLabel={t('providersPage.form.testModel')}
+                ariaDescribedBy={`${fid}-testModel-hint`}
+              />
+              {singleConnectivity ? (
+                <Button
                   type="button"
-                  className={styles.connectivityBtn}
+                  variant="outline"
+                  size="lg"
+                  className="h-9 px-4"
                   disabled={mutating || connectivity.isTestingAny}
                   onClick={() => void singleConnectivity.run()}
                 >
-                  {singleConnectivity.status.state === 'loading' ? (
-                    <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-                      <IconLoader2 size={14} />
-                    </span>
-                  ) : null}
-                  <span>{t('providersPage.connectivity.test')}</span>
-                </button>
-                <ConnectivityStatusIcon state={singleConnectivity.status.state} />
-                {singleConnectivity.status.state === 'success' ? (
-                  <span className={styles.connectivityHintSuccess}>
-                    {t('providersPage.connectivity.success')}
+                  {t('providersPage.connectivity.test')}
+                </Button>
+              ) : null}
+            </div>
+            <FieldDescription id={`${fid}-testModel-hint`}>
+              {t('providersPage.form.testModelHint')}
+            </FieldDescription>
+            {singleConnectivity && connectivityState !== 'idle' ? (
+              <div
+                role={connectivityState === 'error' ? 'alert' : 'status'}
+                className="flex items-start gap-2 text-sm"
+              >
+                <span className="flex h-5 items-center">
+                  <ConnectivityStatusIcon state={connectivityState} />
+                </span>
+                {connectivityState === 'success' ? (
+                  <span className="text-success">{t('providersPage.connectivity.success')}</span>
+                ) : null}
+                {connectivityState === 'error' ? (
+                  <span className="min-w-0 break-words text-destructive">
+                    {singleConnectivity.status.message}
                   </span>
                 ) : null}
               </div>
             ) : null}
-            {singleConnectivity?.status.state === 'error' ? (
-              <div className={styles.connectivityError}>{singleConnectivity.status.message}</div>
-            ) : null}
-          </div>
+          </Field>
+        ) : null}
+
+        {isClaudeLikeBrand(brand) ? (
+          <Field>
+            <FieldLabel htmlFor={`${fid}-fingerprint-profile`}>
+              {t('providersPage.form.fingerprintProfile')}
+            </FieldLabel>
+            <FormSelect
+              id={`${fid}-fingerprint-profile`}
+              className="data-[size=default]:h-9"
+              value={form.fingerprintProfile ?? ''}
+              options={[
+                {
+                  value: '',
+                  label: t('providersPage.form.fingerprintProfileDefault'),
+                },
+                {
+                  value: 'claude-code-cli',
+                  label: t('providersPage.form.fingerprintProfileClaudeCodeCli'),
+                },
+              ]}
+              onChange={(value) => updateField('fingerprintProfile', value)}
+              disabled={mutating}
+              ariaDescribedBy={`${fid}-fingerprint-profile-hint`}
+            />
+            <FieldDescription id={`${fid}-fingerprint-profile-hint`}>
+              {t('providersPage.form.fingerprintProfileHint')}
+            </FieldDescription>
+          </Field>
         ) : null}
 
         {descriptor.supportsWebsockets ? (
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkboxBox}
-              checked={form.websockets ?? false}
-              disabled={mutating}
-              onChange={(e) => updateField('websockets', e.target.checked)}
-            />
-            <span className={styles.checkboxText}>
-              <span>{t('providersPage.form.websockets')}</span>
-            </span>
-          </label>
+          <SwitchField
+            id={`${fid}-websockets`}
+            label={t('providersPage.form.websockets')}
+            checked={form.websockets ?? false}
+            disabled={mutating}
+            onCheckedChange={(checked) => updateField('websockets', checked)}
+          />
         ) : null}
 
         {descriptor.supportsDisabled ? (
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkboxBox}
-              checked={form.disabled}
-              disabled={mutating}
-              onChange={(e) => updateField('disabled', e.target.checked)}
-            />
-            <span className={styles.checkboxText}>
-              <span>{t('providersPage.form.disabled')}</span>
-              <small>{t('providersPage.form.disabledHint')}</small>
-            </span>
-          </label>
-        ) : null}
-      </div>
-
-      <ProviderBehaviorEditor
-        brand={brand}
-        value={form}
-        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-        disabled={mutating}
-      />
-      <RuntimePolicyEditor
-        value={form.runtimePolicy ?? readRuntimePolicy()}
-        onChange={(value) => updateField('runtimePolicy', value)}
-        disabled={mutating}
-        supportsErrors={descriptor.supportsRequestScopedErrors}
-      />
-
-      {/* 高级折叠区 */}
-      {descriptor.supportsApiKeyEntries && form.apiKeyEntries ? (
-        <Collapsible
-          label={t('providersPage.form.apiKeyEntriesSection')}
-          hint={`${
-            apiKeyEntries.filter((e) => e.apiKey.trim() || e.existingApiKey?.trim()).length
-          }`}
-          defaultOpen
-        >
-          <ApiKeyEntriesEditor
-            entries={apiKeyEntries}
-            removeDisabled={actualApiKeyEntries.length === 0}
-            mutating={mutating}
-            statuses={connectivity.openaiStatuses}
-            isTestingAny={connectivity.isTestingAny}
-            onUpdate={(idx, patch) =>
-              updateField(
-                'apiKeyEntries',
-                apiKeyEntries.map((it, i) => (i === idx ? { ...it, ...patch } : it))
-              )
-            }
-            onAdd={() => {
-              const next = [...actualApiKeyEntries, emptyApiKeyEntry()];
-              updateField('apiKeyEntries', next);
-              return next.length - 1;
-            }}
-            onRemove={(idx) =>
-              updateField(
-                'apiKeyEntries',
-                actualApiKeyEntries.filter((_, i) => i !== idx)
-              )
-            }
-            onTest={(idx) => void connectivity.runOpenAIKey(idx)}
-            onTestAll={() => void connectivity.runOpenAIAllKeys()}
+          <SwitchField
+            id={`${fid}-disabled`}
+            label={t('providersPage.form.disabled')}
+            description={t('providersPage.form.disabledHint')}
+            checked={form.disabled}
+            disabled={mutating}
+            onCheckedChange={(checked) => updateField('disabled', checked)}
           />
-        </Collapsible>
-      ) : null}
+        ) : null}
+      </FieldGroup>
 
-      {descriptor.supportsHeaders ? (
-        <Collapsible label={t('providersPage.form.headersSection')}>
-          <div className={styles.entriesList}>
-            {headersList.map((entry, idx) => (
-              <div
-                key={idx}
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}
-              >
-                <input
-                  className={styles.input}
-                  placeholder="X-Custom-Header"
-                  value={entry.key}
-                  onChange={(e) =>
-                    updateField(
-                      'headers',
-                      headersList.map((it, i) => (i === idx ? { ...it, key: e.target.value } : it))
-                    )
-                  }
-                  disabled={mutating}
-                />
-                <input
-                  className={styles.input}
-                  placeholder="value"
-                  value={entry.value}
-                  onChange={(e) =>
-                    updateField(
-                      'headers',
-                      headersList.map((it, i) =>
-                        i === idx ? { ...it, value: e.target.value } : it
+      <div className="flex flex-col gap-3">
+        <ProviderBehaviorEditor
+          brand={brand}
+          value={form}
+          onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+          disabled={mutating}
+        />
+        <RuntimePolicyEditor
+          value={form.runtimePolicy ?? readRuntimePolicy()}
+          onChange={(value) => updateField('runtimePolicy', value)}
+          disabled={mutating}
+          supportsErrors={descriptor.supportsRequestScopedErrors}
+        />
+
+        {descriptor.supportsApiKeyEntries && form.apiKeyEntries ? (
+          <FormSection
+            label={t('providersPage.form.apiKeyEntriesSection')}
+            hint={`${
+              apiKeyEntries.filter((e) => e.apiKey.trim() || e.existingApiKey?.trim()).length
+            }`}
+            defaultOpen
+          >
+            <ApiKeyEntriesEditor
+              entries={apiKeyEntries}
+              removeDisabled={actualApiKeyEntries.length === 0}
+              mutating={mutating}
+              statuses={connectivity.openaiStatuses}
+              isTestingAny={connectivity.isTestingAny}
+              onUpdate={(idx, patch) =>
+                updateField(
+                  'apiKeyEntries',
+                  apiKeyEntries.map((it, i) => (i === idx ? { ...it, ...patch } : it))
+                )
+              }
+              onAdd={() => {
+                const next = [...actualApiKeyEntries, emptyApiKeyEntry()];
+                updateField('apiKeyEntries', next);
+                return next.length - 1;
+              }}
+              onRemove={(idx) =>
+                updateField(
+                  'apiKeyEntries',
+                  actualApiKeyEntries.filter((_, i) => i !== idx)
+                )
+              }
+              onTest={(idx) => void connectivity.runOpenAIKey(idx)}
+              onTestAll={() => void connectivity.runOpenAIAllKeys()}
+            />
+          </FormSection>
+        ) : null}
+
+        {descriptor.supportsHeaders ? (
+          <FormSection label={t('providersPage.form.headersSection')}>
+            <div className="flex flex-col gap-2">
+              {headersList.map((entry, idx) => (
+                <div key={idx} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                  <Input
+                    className="font-mono"
+                    placeholder="X-Custom-Header"
+                    aria-label={t('common.custom_headers_key_placeholder')}
+                    value={entry.key}
+                    onChange={(e) =>
+                      updateField(
+                        'headers',
+                        headersList.map((it, i) =>
+                          i === idx ? { ...it, key: e.target.value } : it
+                        )
                       )
-                    )
-                  }
-                  disabled={mutating}
-                />
-                <button
-                  type="button"
-                  className={styles.removeBtn}
-                  disabled={mutating || headersList.length <= 1}
-                  onClick={() =>
-                    updateField(
-                      'headers',
-                      headersList.filter((_, i) => i !== idx)
-                    )
-                  }
-                >
-                  <IconX size={12} />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className={styles.addBtn}
-              disabled={mutating}
-              onClick={() => updateField('headers', [...headersList, emptyHeader()])}
-            >
-              <IconPlus size={12} />
-              <span>{t('providersPage.form.addHeader')}</span>
-            </button>
-          </div>
-        </Collapsible>
-      ) : null}
+                    }
+                    disabled={mutating}
+                  />
+                  <Input
+                    className="font-mono"
+                    placeholder="value"
+                    aria-label={t('common.custom_headers_value_placeholder')}
+                    value={entry.value}
+                    onChange={(e) =>
+                      updateField(
+                        'headers',
+                        headersList.map((it, i) =>
+                          i === idx ? { ...it, value: e.target.value } : it
+                        )
+                      )
+                    }
+                    disabled={mutating}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={t('common.delete')}
+                    title={t('common.delete')}
+                    disabled={mutating || headersList.length <= 1}
+                    onClick={() =>
+                      updateField(
+                        'headers',
+                        headersList.filter((_, i) => i !== idx)
+                      )
+                    }
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                disabled={mutating}
+                onClick={() => updateField('headers', [...headersList, emptyHeader()])}
+              >
+                <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
+                {t('providersPage.form.addHeader')}
+              </Button>
+            </div>
+          </FormSection>
+        ) : null}
 
-      {descriptor.supportsModels ? (
-        <Collapsible
-          label={t('providersPage.form.modelsSection')}
-          hint={`${existingModelNames.size}`}
-        >
-          <div className={styles.entriesList}>
-            {discovery.available ? (
-              <div className={styles.entriesToolbar}>
-                <button
+        {descriptor.supportsModels ? (
+          <FormSection
+            label={t('providersPage.form.modelsSection')}
+            hint={`${existingModelNames.size}`}
+          >
+            <div className="flex flex-col gap-3">
+              {discovery.available ? (
+                <Button
                   type="button"
-                  className={styles.connectivityBtn}
+                  variant="outline"
+                  size="sm"
+                  className="self-start"
                   onClick={openDiscovery}
                   disabled={mutating}
                 >
-                  <IconDownload size={14} />
-                  <span>{t('providersPage.discovery.openButton')}</span>
-                </button>
-              </div>
-            ) : null}
-            {discovery.available && discoveryOpen ? (
-              <ModelDiscoveryPanel
-                loading={discovery.loading}
-                error={discovery.error}
-                models={discovery.models}
-                hasFetched={discovery.hasFetched}
-                existingNames={existingModelNames}
+                  <HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
+                  {t('providersPage.discovery.openButton')}
+                </Button>
+              ) : null}
+              {discovery.available && discoveryOpen ? (
+                <ModelDiscoveryPanel
+                  loading={discovery.loading}
+                  error={discovery.error}
+                  models={discovery.models}
+                  hasFetched={discovery.hasFetched}
+                  existingNames={existingModelNames}
+                  mutating={mutating}
+                  onApply={(names) => {
+                    applyDiscoveredModels(names);
+                  }}
+                  onReload={() => void discovery.fetch()}
+                  onClose={closeDiscovery}
+                />
+              ) : null}
+              <ModelEntriesEditor
+                providerBrand={brand}
+                models={modelsList}
+                supportsImage={supportsModelImage}
+                supportsThinking
                 mutating={mutating}
-                onApply={(names) => {
-                  applyDiscoveredModels(names);
-                }}
-                onReload={() => void discovery.fetch()}
-                onClose={closeDiscovery}
+                removeDisabled={modelsList.length <= 1}
+                onUpdate={updateModelEntry}
+                onAdd={() => updateField('models', [...modelsList, emptyModel()])}
+                onRemove={removeModelEntry}
               />
-            ) : null}
-            <ModelEntriesEditor
-              providerBrand={brand}
-              models={modelsList}
-              supportsImage={supportsModelImage}
-              supportsThinking
-              mutating={mutating}
-              removeDisabled={modelsList.length <= 1}
-              onUpdate={updateModelEntry}
-              onAdd={() => updateField('models', [...modelsList, emptyModel()])}
-              onRemove={removeModelEntry}
-            />
-          </div>
-        </Collapsible>
-      ) : null}
+            </div>
+          </FormSection>
+        ) : null}
 
-      {descriptor.supportsExcludedModels ? (
-        <Collapsible label={t('providersPage.form.excludedSection')}>
-          <div className={styles.field}>
+        {descriptor.supportsExcludedModels ? (
+          <FormSection label={t('providersPage.form.excludedSection')}>
             <ExcludedModelsPicker
               value={excludedRules}
               onChange={(next) => updateField('excludedModelsText', formatExcludedRulesText(next))}
@@ -904,96 +903,63 @@ export function BaseProviderForm({
               catalogState={excludedCatalogState}
               onRetryCatalog={discovery.available ? () => void discovery.fetch() : undefined}
               disabled={mutating}
-              // `'*'` = 该 provider 已停用，唯一所有者是下面的 Disabled 开关。
+              // `'*'` = 该 provider 已停用，唯一所有者是上面的 Disabled 开关。
               // 传进来后 picker 双向过滤它，用户手打 `*` 也会被拦下并解释原因。
               reservedRules={DISABLE_ALL_RULES}
               reservedRuleMessage={t('providersPage.form.excludedDisabledNote')}
             />
-          </div>
-        </Collapsible>
-      ) : null}
+          </FormSection>
+        ) : null}
 
-      {isClaudeLikeBrand(brand) ? (
-        <div className={styles.field}>
-          <label id={`${fid}-fingerprint-profile-label`} className={styles.label}>
-            {t('providersPage.form.fingerprintProfile')}
-          </label>
-          <Select
-            id={`${fid}-fingerprint-profile`}
-            value={form.fingerprintProfile ?? ''}
-            options={[
-              {
-                value: '',
-                label: t('providersPage.form.fingerprintProfileDefault'),
-              },
-              {
-                value: 'claude-code-cli',
-                label: t('providersPage.form.fingerprintProfileClaudeCodeCli'),
-              },
-            ]}
-            onChange={(value) => updateField('fingerprintProfile', value)}
-            disabled={mutating}
-            ariaLabelledBy={`${fid}-fingerprint-profile-label`}
-          />
-          <small className={styles.labelHint}>
-            {t('providersPage.form.fingerprintProfileHint')}
-          </small>
-        </div>
-      ) : null}
-
-      {descriptor.supportsCloak && form.cloak ? (
-        <Collapsible label={t('providersPage.form.cloakSection')}>
-          <div className={styles.section}>
-            <div className={styles.field}>
-              <label className={styles.label}>{t('providersPage.form.cloakMode')}</label>
-              <input
-                className={styles.input}
-                value={form.cloak.mode}
-                onChange={(e) => updateCloak('mode', e.target.value)}
-                placeholder="auto / always / never"
-                disabled={mutating}
-              />
-            </div>
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                className={styles.checkboxBox}
+        {descriptor.supportsCloak && form.cloak ? (
+          <FormSection label={t('providersPage.form.cloakSection')}>
+            <FieldGroup className="gap-5">
+              <Field>
+                <FieldLabel htmlFor={`${fid}-cloak-mode`}>
+                  {t('providersPage.form.cloakMode')}
+                </FieldLabel>
+                <Input
+                  id={`${fid}-cloak-mode`}
+                  value={form.cloak.mode}
+                  onChange={(e) => updateCloak('mode', e.target.value)}
+                  placeholder="auto / always / never"
+                  disabled={mutating}
+                />
+              </Field>
+              <SwitchField
+                id={`${fid}-cloak-strict`}
+                label={t('providersPage.form.cloakStrict')}
                 checked={form.cloak.strictMode}
                 disabled={mutating}
-                onChange={(e) => updateCloak('strictMode', e.target.checked)}
+                onCheckedChange={(checked) => updateCloak('strictMode', checked)}
               />
-              <span className={styles.checkboxText}>
-                <span>{t('providersPage.form.cloakStrict')}</span>
-              </span>
-            </label>
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                className={styles.checkboxBox}
+              <SwitchField
+                id={`${fid}-cloak-cache-user-id`}
+                label={t('providersPage.form.cloakCacheUserId')}
+                description={t('providersPage.form.cloakCacheUserIdHint')}
                 checked={form.cloak.cacheUserId}
                 disabled={mutating}
-                onChange={(e) => updateCloak('cacheUserId', e.target.checked)}
+                onCheckedChange={(checked) => updateCloak('cacheUserId', checked)}
               />
-              <span className={styles.checkboxText}>
-                <span>{t('providersPage.form.cloakCacheUserId')}</span>
-                <small>{t('providersPage.form.cloakCacheUserIdHint')}</small>
-              </span>
-            </label>
-            <div className={styles.field}>
-              <label className={styles.label}>{t('providersPage.form.cloakSensitiveWords')}</label>
-              <textarea
-                className={styles.textarea}
-                rows={3}
-                value={form.cloak.sensitiveWordsText}
-                onChange={(e) => updateCloak('sensitiveWordsText', e.target.value)}
-                disabled={mutating}
-              />
-            </div>
-          </div>
-        </Collapsible>
-      ) : null}
+              <Field>
+                <FieldLabel htmlFor={`${fid}-cloak-words`}>
+                  {t('providersPage.form.cloakSensitiveWords')}
+                </FieldLabel>
+                <Textarea
+                  id={`${fid}-cloak-words`}
+                  className="font-mono"
+                  rows={3}
+                  value={form.cloak.sensitiveWordsText}
+                  onChange={(e) => updateCloak('sensitiveWordsText', e.target.value)}
+                  disabled={mutating}
+                />
+              </Field>
+            </FieldGroup>
+          </FormSection>
+        ) : null}
+      </div>
 
-      {error ? <div className={styles.errorBox}>{error}</div> : null}
+      {error ? <FormError>{error}</FormError> : null}
     </form>
   );
 }

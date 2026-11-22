@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
+import { SettingGroup } from '../fields/SettingGroup';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
+import { Section } from '@/components/layout/Page';
 import {
   BlockSetting,
   FieldStack,
@@ -15,27 +14,18 @@ import { getValidationMessage } from '../blocks/shared';
 import { StringListEditor } from '../blocks/StringListEditor';
 import { SectionDiscovery } from './SectionDiscovery';
 
-const Icon = CONFIG_TAB_ICONS.connectivity;
-
 /** 01 接入与认证：服务地址、端口、认证目录、API 密钥 + TLS / 远程管理折叠组。 */
 export function SectionConnectivity({
   values,
   validationErrors,
   disabled,
-  animateIn,
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
   const fieldProps = { values, disabled, onChange };
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.connectivity}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.connectivity.title')}
-      description={t('config_management.visual.sections.connectivity.description')}
-      animateIn={animateIn}
-    >
+    <Section title={t('config_management.visual.sections.connectivity.title')}>
       <SettingList>
         <HostField {...fieldProps} />
         <PortField {...fieldProps} error={getValidationMessage(t, validationErrors?.port)} />
@@ -80,15 +70,13 @@ export function SectionConnectivity({
         </BlockSetting>
       </SettingList>
 
-      <Collapsible
+      <SettingGroup
         label={t('config_management.visual.sections.tls.title')}
         hint={t('config_management.visual.sections.tls.description')}
-        defaultOpen={false}
       >
         <SettingList>
           <ToggleSetting
             fieldId="tlsEnable"
-            wide
             label={t('config_management.visual.sections.tls.enable')}
             description={t('config_management.visual.sections.tls.enable_desc')}
             checked={values.tlsEnable}
@@ -118,12 +106,11 @@ export function SectionConnectivity({
             </>
           ) : null}
         </SettingList>
-      </Collapsible>
+      </SettingGroup>
 
-      <Collapsible
+      <SettingGroup
         label={t('config_management.visual.sections.remote.title')}
         hint={t('config_management.visual.sections.remote.description')}
-        defaultOpen={false}
       >
         <FieldStack>
           <SettingList>
@@ -175,7 +162,7 @@ export function SectionConnectivity({
             />
           </SettingList>
         </FieldStack>
-      </Collapsible>
+      </SettingGroup>
 
       <SectionDiscovery
         values={values}
@@ -183,6 +170,6 @@ export function SectionConnectivity({
         disabled={disabled}
         onChange={onChange}
       />
-    </SectionCard>
+    </Section>
   );
 }

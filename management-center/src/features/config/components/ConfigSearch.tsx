@@ -1,9 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Input } from '@/components/ui/Input';
-import { IconSearch } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Search01Icon } from '@hugeicons/core-free-icons';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { cn } from '@/lib/utils';
 import { searchConfigFields, type ConfigFieldSearchEntry } from '../searchIndex';
-import styles from './ConfigSearch.module.scss';
 
 export type ConfigSearchProps = {
   disabled?: boolean;
@@ -65,72 +66,71 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
   }, [effectiveActiveIndex, isResultsOpen]);
 
   return (
-    <div className={styles.searchBox} ref={searchBoxRef}>
-      <Input
-        className={styles.searchControl}
-        placeholder={t('config_management.visual.search.placeholder')}
-        aria-label={t('config_management.visual.search.placeholder')}
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={isResultsOpen}
-        aria-controls={isResultsOpen ? searchListboxId : undefined}
-        aria-activedescendant={
-          isResultsOpen && effectiveActiveIndex >= 0
-            ? `${searchListboxId}-opt-${effectiveActiveIndex}`
-            : undefined
-        }
-        value={searchQuery}
-        disabled={disabled}
-        onChange={(e) => {
-          setSearchQuery(e.target.value);
-          setSearchOpen(true);
-          setActiveResultIndex(0);
-        }}
-        onFocus={() => setSearchOpen(true)}
-        onKeyDown={(e) => {
-          // Ignore keys fired while an IME is composing (e.g. picking a Chinese
-          // candidate) — otherwise candidate selection triggers navigation/jump.
-          if (e.nativeEvent.isComposing) return;
-          if (e.key === 'Escape') {
-            setSearchOpen(false);
-            return;
+    <div className="relative min-w-0 flex-1" ref={searchBoxRef}>
+      <InputGroup className="h-9">
+        <InputGroupAddon>
+          <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+        </InputGroupAddon>
+        <InputGroupInput
+          placeholder={t('config_management.visual.search.placeholder')}
+          aria-label={t('config_management.visual.search.placeholder')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isResultsOpen}
+          aria-controls={isResultsOpen ? searchListboxId : undefined}
+          aria-activedescendant={
+            isResultsOpen && effectiveActiveIndex >= 0
+              ? `${searchListboxId}-opt-${effectiveActiveIndex}`
+              : undefined
           }
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (!isResultsOpen) {
-              setSearchOpen(true);
+          value={searchQuery}
+          disabled={disabled}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setSearchOpen(true);
+            setActiveResultIndex(0);
+          }}
+          onFocus={() => setSearchOpen(true)}
+          onKeyDown={(e) => {
+            // Ignore keys fired while an IME is composing (e.g. picking a Chinese
+            // candidate) — otherwise candidate selection triggers navigation/jump.
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'Escape') {
+              setSearchOpen(false);
               return;
             }
-            if (searchResults.length === 0) return;
-            setActiveResultIndex((effectiveActiveIndex + 1) % searchResults.length);
-            return;
-          }
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (!isResultsOpen) {
-              setSearchOpen(true);
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (!isResultsOpen) {
+                setSearchOpen(true);
+                return;
+              }
+              if (searchResults.length === 0) return;
+              setActiveResultIndex((effectiveActiveIndex + 1) % searchResults.length);
               return;
             }
-            if (searchResults.length === 0) return;
-            setActiveResultIndex(
-              effectiveActiveIndex <= 0 ? searchResults.length - 1 : effectiveActiveIndex - 1
-            );
-            return;
-          }
-          if (e.key === 'Enter' && isResultsOpen && searchResults.length > 0) {
-            e.preventDefault();
-            handleResultJump(searchResults[effectiveActiveIndex] ?? searchResults[0]);
-          }
-        }}
-        rightElement={
-          <span className={styles.searchIcon} aria-hidden="true">
-            <IconSearch size={16} />
-          </span>
-        }
-      />
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (!isResultsOpen) {
+                setSearchOpen(true);
+                return;
+              }
+              if (searchResults.length === 0) return;
+              setActiveResultIndex(
+                effectiveActiveIndex <= 0 ? searchResults.length - 1 : effectiveActiveIndex - 1
+              );
+              return;
+            }
+            if (e.key === 'Enter' && isResultsOpen && searchResults.length > 0) {
+              e.preventDefault();
+              handleResultJump(searchResults[effectiveActiveIndex] ?? searchResults[0]);
+            }
+          }}
+        />
+      </InputGroup>
       {isResultsOpen ? (
         <div
-          className={styles.searchResults}
+          className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-80 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none"
           role="listbox"
           id={searchListboxId}
           aria-label={t('config_management.visual.search.placeholder')}
@@ -146,25 +146,28 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
                 data-result-index={index}
                 tabIndex={-1}
                 aria-selected={index === effectiveActiveIndex}
-                className={`${styles.searchResultItem} ${
-                  index === effectiveActiveIndex ? styles.searchResultItemActive : ''
-                }`}
+                className={cn(
+                  'flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none',
+                  index === effectiveActiveIndex && 'bg-accent'
+                )}
                 onMouseEnter={() => setActiveResultIndex(index)}
                 onClick={() => handleResultJump(entry)}
               >
-                <span className={styles.searchResultLabel}>
+                <span className="flex min-w-0 items-center gap-2 truncate">
                   {t(entry.labelKey)}
                   {entry.qualifierKey ? (
-                    <span className={styles.searchResultQualifier}>{t(entry.qualifierKey)}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {t(entry.qualifierKey)}
+                    </span>
                   ) : null}
                 </span>
-                <span className={styles.searchResultSection}>
+                <span className="shrink-0 text-xs text-faint">
                   {t(`config_management.visual.sections.${entry.sectionId}.title`)}
                 </span>
               </button>
             ))
           ) : (
-            <div className={styles.searchEmpty}>
+            <div className="px-2.5 py-2 text-sm text-muted-foreground">
               {t('config_management.visual.search.no_results')}
             </div>
           )}

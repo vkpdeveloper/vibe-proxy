@@ -1,29 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { StatusBarData, StatusBlockDetail } from '@/utils/recentRequests';
+import { cn } from '@/lib/utils';
 
-const defaultStyles: Record<string, string> = {};
-
-/**
- * 根据成功率 (0–1) 在三个色标之间做 RGB 线性插值
- * 0 → 红 (#ef4444)  →  0.5 → 金黄 (#facc15)  →  1 → 绿 (#22c55e)
- */
-const COLOR_STOPS = [
-  { r: 239, g: 68, b: 68 }, // #ef4444
-  { r: 250, g: 204, b: 21 }, // #facc15
-  { r: 34, g: 197, b: 94 }, // #22c55e
-] as const;
-
-function rateToColor(rate: number): string {
-  const t = Math.max(0, Math.min(1, rate));
-  const segment = t < 0.5 ? 0 : 1;
-  const localT = segment === 0 ? t * 2 : (t - 0.5) * 2;
-  const from = COLOR_STOPS[segment];
-  const to = COLOR_STOPS[segment + 1];
-  const r = Math.round(from.r + (to.r - from.r) * localT);
-  const g = Math.round(from.g + (to.g - from.g) * localT);
-  const b = Math.round(from.b + (to.b - from.b) * localT);
-  return `rgb(${r}, ${g}, ${b})`;
+function rateTone(rate: number): string {
+  if (rate >= 0.9) return 'bg-success';
+  if (rate >= 0.5) return 'bg-warning';
+  return 'bg-destructive';
 }
 
 function formatTime(timestamp: number): string {
@@ -38,29 +21,28 @@ function formatSuccessRate(rate: number): string {
   return `${rounded.endsWith('.0') ? rounded.slice(0, -2) : rounded}%`;
 }
 
-type StylesModule = Record<string, string>;
-
 interface ProviderStatusBarProps {
   statusData: StatusBarData;
-  styles?: StylesModule;
+  /** No longer read: the bar carries its own VM Bridge styling. Kept so callers compile. */
+  styles?: Record<string, string>;
 }
 
-export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderStatusBarProps) {
+/** Recent request health as a row of small bars, one per time block, plus the success rate. */
+export function ProviderStatusBar({ statusData }: ProviderStatusBarProps) {
   const { t } = useTranslation();
-  const s = (stylesProp || defaultStyles) as StylesModule;
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const blocksRef = useRef<HTMLDivElement>(null);
 
   const hasData = statusData.totalSuccess + statusData.totalFailure > 0;
   const rateClass = !hasData
-    ? ''
+    ? 'text-faint'
     : statusData.successRate >= 90
-      ? s.statusRateHigh
+      ? 'text-success'
       : statusData.successRate >= 50
-        ? s.statusRateMedium
-        : s.statusRateLow;
+        ? 'text-warning'
+        : 'text-destructive';
 
-  // 点击外部关闭 tooltip（移动端）
+  // Tapping outside closes the tooltip (touch).
   useEffect(() => {
     if (activeTooltip === null) return;
     const handler = (e: PointerEvent) => {
@@ -91,63 +73,67 @@ export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderSt
     }
   }, []);
 
-  const getTooltipPositionClass = (idx: number, total: number): string => {
-    if (idx <= 2) return s.statusTooltipLeft;
-    if (idx >= total - 3) return s.statusTooltipRight;
-    return '';
-  };
-
   const renderTooltip = (detail: StatusBlockDetail, idx: number) => {
     const total = detail.success + detail.failure;
-    const posClass = getTooltipPositionClass(idx, statusData.blockDetails.length);
-    const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+    const count = statusData.blockDetails.length;
+    // Edge blocks anchor the tooltip to their side so it stays inside the row.
+    const position =
+      idx <= 2 ? 'left-0' : idx >= count - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2';
+    const timeRange = `${formatTime(detail.startTime)} - ${formatTime(detail.endTime)}`;
 
     return (
-      <div className={`${s.statusTooltip} ${posClass}`}>
-        <span className={s.tooltipTime}>{timeRange}</span>
+      <div
+        className={cn(
+          'pointer-events-none absolute bottom-full z-20 mb-2 flex flex-col gap-0.5 rounded-lg bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none',
+          position
+        )}
+      >
+        <span className="font-mono text-muted-foreground">{timeRange}</span>
         {total > 0 ? (
-          <span className={s.tooltipStats}>
-            <span className={s.tooltipSuccess}>
+          <span className="flex items-center gap-2">
+            <span className="text-success">
               {t('status_bar.success_short')} {detail.success}
             </span>
-            <span className={s.tooltipFailure}>
+            <span className="text-destructive">
               {t('status_bar.failure_short')} {detail.failure}
             </span>
-            <span className={s.tooltipRate}>({(detail.rate * 100).toFixed(1)}%)</span>
+            <span className="text-muted-foreground">({(detail.rate * 100).toFixed(1)}%)</span>
           </span>
         ) : (
-          <span className={s.tooltipStats}>{t('status_bar.no_requests')}</span>
+          <span className="text-muted-foreground">{t('status_bar.no_requests')}</span>
         )}
       </div>
     );
   };
 
   return (
-    <div className={s.statusBar}>
-      <div className={s.statusBlocks} ref={blocksRef}>
+    <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 flex-1 items-center gap-0.5" ref={blocksRef}>
         {statusData.blockDetails.map((detail, idx) => {
           const isIdle = detail.rate === -1;
-          const blockStyle = isIdle ? undefined : { backgroundColor: rateToColor(detail.rate) };
           const isActive = activeTooltip === idx;
 
           return (
             <div
               key={idx}
-              className={`${s.statusBlockWrapper} ${isActive ? s.statusBlockActive : ''}`}
+              className="relative flex h-5 min-w-0 flex-1 cursor-default items-center"
               onPointerEnter={(e) => handlePointerEnter(e, idx)}
               onPointerLeave={handlePointerLeave}
               onPointerDown={(e) => handlePointerDown(e, idx)}
             >
               <div
-                className={`${s.statusBlock} ${isIdle ? s.statusBlockIdle : ''}`}
-                style={blockStyle}
+                className={cn(
+                  'h-4 w-full rounded-[2px] transition-opacity duration-150',
+                  isIdle ? 'bg-accent' : rateTone(detail.rate),
+                  activeTooltip !== null && !isActive && 'opacity-50'
+                )}
               />
               {isActive && renderTooltip(detail, idx)}
             </div>
           );
         })}
       </div>
-      <span className={`${s.statusRate} ${rateClass}`}>
+      <span className={cn('w-12 shrink-0 text-right font-mono text-xs tabular-nums', rateClass)}>
         {hasData ? formatSuccessRate(statusData.successRate) : '--'}
       </span>
     </div>

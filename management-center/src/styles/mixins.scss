@@ -1,30 +1,21 @@
 /**
- * SCSS 混入
+ * SCSS mixins
  */
 
 @use './variables.scss' as *;
 
-// 响应式断点
 @mixin mobile {
   @media (max-width: #{$breakpoint-mobile}) {
     @content;
   }
 }
 
-@mixin tablet {
-  @media (min-width: #{$breakpoint-mobile + 1}) and (max-width: #{$breakpoint-tablet}) {
-    @content;
-  }
-}
-
-// 文本截断
 @mixin text-ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-// 多行文本截断
 @mixin text-ellipsis-multiline($lines: 2) {
   display: -webkit-box;
   -webkit-line-clamp: $lines;
@@ -32,7 +23,6 @@
   overflow: hidden;
 }
 
-// 按钮重置
 @mixin button-reset {
   border: none;
   background: none;
@@ -43,8 +33,7 @@
   color: inherit;
   outline: none;
 
-  &:focus {
-    outline: 2px solid $primary-color;
-    outline-offset: 2px;
+  &:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
   }
 }

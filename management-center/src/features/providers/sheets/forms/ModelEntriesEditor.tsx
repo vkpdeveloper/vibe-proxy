@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconChevronDown, IconPlus, IconX } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, ArrowDown01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { ModelAdvancedFields } from './ModelAdvancedFields';
+import { SwitchField } from './FormControls';
 import type { ModelEntryInput, ProviderBrand } from '../../types';
-import styles from './sharedForm.module.scss';
 
 const COLLAPSED_LIMIT = 10;
 
@@ -36,8 +42,12 @@ export function ModelEntriesEditor({
   onRemove,
 }: ModelEntriesEditorProps) {
   const { t } = useTranslation();
+  const id = useId();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const aliasLabel = t(
+    oauthAliasOnly ? 'auth_files.policy_alias_name' : 'providersPage.modelOptions.modelAlias'
+  );
 
   const handleAdd = () => {
     // New rows are appended; make sure the truncated list doesn't hide them.
@@ -58,126 +68,109 @@ export function ModelEntriesEditor({
   const visible = showAll ? models : models.slice(0, COLLAPSED_LIMIT);
 
   return (
-    <>
+    <div className="flex flex-col gap-2">
       {visible.map((entry, idx) => {
         const expanded = expandedIdx === idx;
         const hasThinking = entry.thinkingEnabled ?? Boolean(entry.thinkingJson?.trim());
+        const rowId = `${id}-${idx}`;
         return (
-          <div key={idx} className={styles.modelEntry}>
-            <div className={styles.modelAliasRow}>
-              <input
-                className={styles.input}
+          <div key={idx} className="rounded-lg border">
+            <div className="flex flex-wrap items-center gap-2 p-2">
+              <Input
+                className="min-w-0 flex-1 basis-36 font-mono"
                 placeholder={t('providersPage.modelOptions.modelName')}
                 aria-label={t('providersPage.modelOptions.modelName')}
                 value={entry.name}
                 onChange={(e) => onUpdate(idx, { name: e.target.value })}
                 disabled={mutating}
               />
-              <input
-                className={styles.input}
-                placeholder={t(
-                  oauthAliasOnly
-                    ? 'auth_files.policy_alias_name'
-                    : 'providersPage.modelOptions.modelAlias'
-                )}
-                aria-label={t(
-                  oauthAliasOnly
-                    ? 'auth_files.policy_alias_name'
-                    : 'providersPage.modelOptions.modelAlias'
-                )}
+              <Input
+                className="min-w-0 flex-1 basis-36 font-mono"
+                placeholder={aliasLabel}
+                aria-label={aliasLabel}
                 required={oauthAliasOnly}
                 value={entry.alias ?? ''}
                 onChange={(e) => onUpdate(idx, { alias: e.target.value })}
                 disabled={mutating}
               />
-              <div className={styles.modelEntryActions}>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
                 {!oauthAliasOnly && supportsImage && !expanded && entry.image === true ? (
-                  <span className={styles.entryBadge}>
-                    {t('providersPage.form.modelBadgeImage')}
-                  </span>
+                  <Badge variant="secondary">{t('providersPage.form.modelBadgeImage')}</Badge>
                 ) : null}
                 {!oauthAliasOnly && supportsThinking && !expanded && hasThinking ? (
-                  <span className={styles.entryBadge}>
-                    {t('providersPage.form.modelBadgeThinking')}
-                  </span>
+                  <Badge variant="secondary">{t('providersPage.form.modelBadgeThinking')}</Badge>
                 ) : null}
-                <button
+                <Button
                   type="button"
-                  className={styles.entryCardIconBtn}
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setExpandedIdx(expanded ? null : idx)}
                   title={expanded ? t('common.collapse') : t('common.expand')}
                   aria-label={expanded ? t('common.collapse') : t('common.expand')}
                   aria-expanded={expanded}
                   disabled={mutating}
                 >
-                  <IconChevronDown
-                    className={[
-                      styles.entryCardChevron,
-                      expanded ? styles.entryCardChevronOpen : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    size={14}
+                  <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    strokeWidth={1.75}
+                    className={cn(
+                      'transition-transform duration-200 ease-out motion-reduce:transition-none',
+                      expanded && 'rotate-180'
+                    )}
                   />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className={styles.removeBtn}
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive"
                   aria-label={t('providersPage.modelOptions.removeModel')}
+                  title={t('providersPage.modelOptions.removeModel')}
                   disabled={mutating || removeDisabled}
                   onClick={() => handleRemove(idx)}
                 >
-                  <IconX size={12} />
-                </button>
+                  <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+                </Button>
               </div>
             </div>
             {expanded ? (
-              <div className={styles.modelEntryDetails}>
+              <div className="flex flex-col gap-5 border-t p-3">
                 {!oauthAliasOnly && supportsImage ? (
-                  <label className={styles.checkboxRow}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkboxBox}
-                      checked={entry.image === true}
-                      disabled={mutating}
-                      onChange={(e) => onUpdate(idx, { image: e.target.checked })}
-                    />
-                    <span className={styles.checkboxText}>
-                      <span>{t('providersPage.form.modelImage')}</span>
-                      <small>{t('providersPage.form.modelImageHint')}</small>
-                    </span>
-                  </label>
+                  <SwitchField
+                    id={`${rowId}-image`}
+                    label={t('providersPage.form.modelImage')}
+                    description={t('providersPage.form.modelImageHint')}
+                    checked={entry.image === true}
+                    disabled={mutating}
+                    onCheckedChange={(checked) => onUpdate(idx, { image: checked })}
+                  />
                 ) : null}
                 {oauthAliasOnly ? (
                   <>
-                    <div className={styles.field}>
-                      <label className={styles.label}>
+                    <Field>
+                      <FieldLabel htmlFor={`${rowId}-display-name`}>
                         {t('auth_files.policy_alias_display_name')}
-                        <input
-                          className={styles.input}
-                          value={entry.displayName ?? ''}
-                          disabled={mutating}
-                          onChange={(event) => onUpdate(idx, { displayName: event.target.value })}
-                        />
-                      </label>
-                    </div>
+                      </FieldLabel>
+                      <Input
+                        id={`${rowId}-display-name`}
+                        value={entry.displayName ?? ''}
+                        disabled={mutating}
+                        onChange={(event) => onUpdate(idx, { displayName: event.target.value })}
+                      />
+                    </Field>
                     {(['fork', 'forceMapping'] as const).map((field) => (
-                      <label key={field} className={styles.checkboxRow}>
-                        <input
-                          type="checkbox"
-                          className={styles.checkboxBox}
-                          checked={entry[field] === true}
-                          disabled={mutating}
-                          onChange={(event) => onUpdate(idx, { [field]: event.target.checked })}
-                        />
-                        <span className={styles.checkboxText}>
-                          {t(
-                            field === 'fork'
-                              ? 'auth_files.policy_alias_fork'
-                              : 'auth_files.policy_alias_force_mapping'
-                          )}
-                        </span>
-                      </label>
+                      <SwitchField
+                        key={field}
+                        id={`${rowId}-${field}`}
+                        label={t(
+                          field === 'fork'
+                            ? 'auth_files.policy_alias_fork'
+                            : 'auth_files.policy_alias_force_mapping'
+                        )}
+                        checked={entry[field] === true}
+                        disabled={mutating}
+                        onCheckedChange={(checked) => onUpdate(idx, { [field]: checked })}
+                      />
                     ))}
                   </>
                 ) : (
@@ -194,17 +187,19 @@ export function ModelEntriesEditor({
           </div>
         );
       })}
-      {models.length > COLLAPSED_LIMIT ? (
-        <button type="button" className={styles.showMoreBtn} onClick={() => setShowAll((v) => !v)}>
-          {showAll
-            ? t('providersPage.form.showFewerEntries')
-            : t('providersPage.form.showAllEntries', { count: models.length })}
-        </button>
-      ) : null}
-      <button type="button" className={styles.addBtn} disabled={mutating} onClick={handleAdd}>
-        <IconPlus size={12} />
-        <span>{t('providersPage.form.addModel')}</span>
-      </button>
-    </>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={mutating} onClick={handleAdd}>
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
+          {t('providersPage.form.addModel')}
+        </Button>
+        {models.length > COLLAPSED_LIMIT ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
+            {showAll
+              ? t('providersPage.form.showFewerEntries')
+              : t('providersPage.form.showAllEntries', { count: models.length })}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }

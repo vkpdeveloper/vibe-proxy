@@ -1,50 +1,31 @@
 /**
- * Guard for the QuotaClassMap ↔ SCSS contract.
- *
- * `bindQuotaClasses` throws at *module initialization*, and both hosts bind at
- * import time — so a contract key missing from either stylesheet does not
- * degrade one row, it white-screens the whole application. This converts that
- * into a failing test.
- *
- * The check is textual rather than a module import on purpose: under `bun test`
- * a `.module.scss` import resolves to the raw stylesheet source (a string), not
- * to the class-name object Vite produces for the browser build. Asserting on
- * keys of that object would silently pass for every key.
+ * Guard for the QuotaClassMap contract. Both hosts (quota page cards and auth file rows)
+ * share the Tailwind map in quotaClasses.ts, so a missing or empty key would render
+ * unstyled quota rows.
  */
 
 import { describe, expect, test } from 'bun:test';
 import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
+import { quotaClasses } from '@/features/quota/components/quotaClasses';
 
-const HOSTS = {
-  'QuotaBody.module.scss': 'src/features/quota/components/QuotaBody.module.scss',
-  'AuthFileQuota.module.scss': 'src/features/authFiles/components/AuthFileQuota.module.scss',
-} as const;
-
-const readHost = (path: string) => Bun.file(new URL(`../${path}`, import.meta.url)).text();
+const textSize = (classes: string) =>
+  classes.split(/\s+/).find((c) => /^text-(xs|sm|base)$/.test(c));
 
 describe('quota class contract', () => {
-  for (const [host, path] of Object.entries(HOSTS)) {
-    test(`${host} gives standalone amounts the same size as quota metadata`, async () => {
-      const css = await readHost(path);
-      // Top-level rules only; nested layout selectors reuse these class names.
-      const amount = css.match(/^\.quotaAmount\s*\{([^}]+)\}/m)?.[1] ?? '';
-      const meta = css.match(/^\.quotaMeta\s*\{([^}]+)\}/m)?.[1] ?? '';
-      const size = amount.match(/font-size:\s*([^;]+);/)?.[1];
-      expect(size).toBeDefined();
-      expect(size).toBe(meta.match(/font-size:\s*([^;]+);/)?.[1]);
-      expect(amount).toContain('font-family: $font-mono;');
-      expect(amount).toContain('font-weight: 500;');
-      expect(amount).toContain('font-variant-numeric: tabular-nums;');
-    });
+  test('the shared class map defines every QuotaClassMap key', () => {
+    const missing = QUOTA_CLASS_KEYS.filter((key) => !quotaClasses[key]?.trim());
+    expect(missing).toEqual([]);
+    expect(Object.keys(quotaClasses).sort()).toEqual([...QUOTA_CLASS_KEYS].sort());
+  });
 
-    test(`${host} defines every QuotaClassMap key`, async () => {
-      const css = await readHost(path);
-      const missing = QUOTA_CLASS_KEYS.filter(
-        (key) => !new RegExp(`^\\s*\\.${key}\\b`, 'm').test(css)
-      );
-      expect(missing).toEqual([]);
-    });
-  }
+  test('standalone amounts match quota metadata: same size, mono, medium, tabular', () => {
+    const amount = quotaClasses.quotaAmount;
+    expect(textSize(amount)).toBeDefined();
+    expect(textSize(amount)).toBe(textSize(quotaClasses.quotaMeta));
+    for (const token of ['font-mono', 'font-medium', 'tabular-nums']) {
+      expect(amount.split(/\s+/)).toContain(token);
+    }
+  });
 
   test('bindQuotaClasses reports every missing key rather than the first', () => {
     const partial = Object.fromEntries(QUOTA_CLASS_KEYS.map((key) => [key, `_${key}`]));

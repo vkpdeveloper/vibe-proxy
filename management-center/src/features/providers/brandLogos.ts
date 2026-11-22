@@ -18,10 +18,10 @@ import type { ProviderBrand } from './types';
 
 export interface ProviderBrandLogo {
   src: string;
+  /** Variant for the dark theme, which is the only theme the app renders. */
   darkSrc?: string;
-  transparent?: boolean;
+  /** The artwork carries its own rounded tile, so it is shown flush instead of inset. */
   themeSurface?: boolean;
-  invertOnDark?: boolean;
 }
 
 export type ProviderBrandLogoKey = ProviderBrand | 'devin';
@@ -30,19 +30,14 @@ export const PROVIDER_LOGOS: Record<ProviderBrandLogoKey, ProviderBrandLogo> = {
   gemini: { src: geminiLogo },
   interactions: { src: geminiLogo },
   claude: { src: claudeLogo },
-  codex: { src: codexLogo },
-  meta: { src: metaLogo, transparent: true },
-  devin: { src: devinLightLogo, darkSrc: devinDarkLogo, transparent: true },
-  xai: { src: xaiLightLogo, darkSrc: xaiDarkLogo, transparent: true },
+  codex: { src: codexLogo, themeSurface: true },
+  meta: { src: metaLogo },
+  devin: { src: devinLightLogo, darkSrc: devinDarkLogo },
+  xai: { src: xaiLightLogo, darkSrc: xaiDarkLogo },
   vertex: { src: vertexLogo },
-  openaiCompatibility: { src: openaiLightLogo, darkSrc: openaiDarkLogo, transparent: true },
+  openaiCompatibility: { src: openaiLightLogo, darkSrc: openaiDarkLogo },
   apikeyFun: { src: apikeyFunLogo },
-  fennoAI: { src: fennoAILogo, transparent: true },
-  qiniuCloud: { src: qiniuCloudLogo, transparent: true },
-  kimi: {
-    src: kimiDarkLogo,
-    darkSrc: kimiLightLogo,
-    transparent: true,
-    themeSurface: true,
-  },
+  fennoAI: { src: fennoAILogo },
+  qiniuCloud: { src: qiniuCloudLogo },
+  kimi: { src: kimiDarkLogo, darkSrc: kimiLightLogo, themeSurface: true },
 };

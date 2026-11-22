@@ -2,26 +2,37 @@ import { describe, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '@/i18n';
-import { ConfigTabs } from '@/features/config/components/ConfigTabs';
+import { Page } from '@/components/layout/Page';
+import { countSectionErrors, buildConfigTabs } from '@/features/config/uiState';
 
-const noop = () => {};
-
-describe('ConfigTabs accessibility', () => {
+describe('config tabs accessibility', () => {
   test('announces validation errors and unsaved changes in the tab name', () => {
+    const t = i18n.getFixedT('en');
+    const errorCounts = { ...countSectionErrors(undefined, false), streaming: 2 };
+    const tabs = buildConfigTabs(t, new Set(['streaming']), errorCounts);
     const markup = renderToStaticMarkup(
-      createElement(ConfigTabs, {
-        active: 'common',
-        errorCounts: { streaming: 2 },
-        dirtyTabs: new Set(['streaming']),
-        onChange: noop,
+      createElement(Page<(typeof tabs)[number]['id']>, {
+        title: 'Config',
+        tabs,
+        tab: 'common',
+        children: null,
       })
     );
-    const accessibleLabel = [
-      i18n.t('config_management.visual.sections.streaming.title'),
-      i18n.t('config_management.meta_errors', { count: 2 }),
-      i18n.t('config_management.status_dirty_short'),
-    ].join(', ');
 
-    expect(markup).toContain(`aria-label="${accessibleLabel}"`);
+    const streaming = markup.match(
+      /<button\b[^>]*data-nav-item="streaming"[^>]*>(.*?)<\/button>/
+    )?.[1];
+    const note = [
+      t('config_management.meta_errors', { count: 2 }),
+      t('config_management.status_dirty_short'),
+    ].join(', ');
+    expect(streaming).toContain(t('config_management.tabs.streaming'));
+    expect(streaming).toContain(`<span class="sr-only">, ${note}</span>`);
+    // The dot itself stays out of the accessible name.
+    expect(streaming).toMatch(/<span aria-hidden="true" class="[^"]*bg-warning/);
+
+    const common = markup.match(/<button\b[^>]*data-nav-item="common"[^>]*>(.*?)<\/button>/)?.[1];
+    expect(common).not.toContain('sr-only');
+    expect(common).not.toContain('bg-warning');
   });
 });

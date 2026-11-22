@@ -1,10 +1,13 @@
 // 配置页 UI 状态的纯函数层：状态机、徽章分桶、脏字段归属、localStorage 读取。
 // 全部无副作用，由 tests/configUiState.test.ts 覆盖。
 
+import type { useTranslation } from 'react-i18next';
+import type { Tab } from '@/components/layout/Page';
 import type { VisualConfigValidationErrors } from '@/types/visualConfig';
 import {
   COMMON_FIELD_IDS,
   CONFIG_SECTION_IDS,
+  CONFIG_TAB_ICONS,
   CONFIG_TAB_IDS,
   FIELD_VALUE_KEYS,
   SECTION_VALIDATION_FIELDS,
@@ -70,6 +73,28 @@ export function countSectionErrors(
     0
   );
   return counts;
+}
+
+/** The left tabs. A tab with errors or unsaved edits gets the dot, spelled out for screen readers. */
+export function buildConfigTabs(
+  t: ReturnType<typeof useTranslation>['t'],
+  dirtyTabs: ReadonlySet<ConfigTabId>,
+  errorCounts: Record<ConfigTabId, number>
+): Tab<ConfigTabId>[] {
+  return CONFIG_TAB_IDS.map((id) => {
+    const notes: string[] = [];
+    if (errorCounts[id] > 0) {
+      notes.push(t('config_management.meta_errors', { count: errorCounts[id] }));
+    }
+    if (dirtyTabs.has(id)) notes.push(t('config_management.status_dirty_short'));
+    return {
+      id,
+      label: t(`config_management.tabs.${id}`),
+      icon: CONFIG_TAB_ICONS[id],
+      attention: notes.length > 0,
+      attentionLabel: notes.length > 0 ? notes.join(', ') : undefined,
+    };
+  });
 }
 
 /** 全页校验错误总数（头部 meta 行）。 */

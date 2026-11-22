@@ -10,24 +10,37 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { DashboardSpeed01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { authFilesApi } from '@/services/api';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { IconSearch, IconX } from '@/components/ui/icons';
-import { Select } from '@/components/ui/Select';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Page } from '@/components/layout/Page';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useInterval } from '@/hooks/useInterval';
 import { useNow } from '@/hooks/useNow';
-import { useRevealGroup } from '@/hooks/motion';
-import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
-import type { AuthFileItem, ResolvedTheme } from '@/types';
+import { useAuthStore, useQuotaStore } from '@/stores';
+import type { AuthFileItem } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
-import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
-import { QuotaHeader } from './components/QuotaHeader';
+import { ProviderFilter } from '@/features/authFiles/components/ProviderFilter';
+import { ListPagination, SearchField } from '@/features/authFiles/components/ListControls';
 import { QuotaCard } from './components/QuotaCard';
 import {
-  CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
@@ -55,10 +68,9 @@ import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
-import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
-const SKELETON_CARD_COUNT = 6;
+const SKELETON_CARD_COUNT = 3;
 
 /** How often the open page reloads credentials to pick up the server's quota poll. */
 const QUOTA_POLL_RELOAD_MS = 60_000;
@@ -66,7 +78,6 @@ const QUOTA_POLL_RELOAD_MS = 60_000;
 export function QuotaPage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
-  const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,9 +88,6 @@ export function QuotaPage() {
   );
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  // 页头 + tabs 的入场级联（标题 → meta → 动作 → tabs，级差 70ms）
-  const revealRef = useRevealGroup<HTMLDivElement>();
 
   const disableControls = connectionStatus !== 'connected';
 
@@ -254,27 +262,19 @@ export function QuotaPage() {
     writeQuotaUiState({ sortMode: next as QuotaSortMode });
   }, []);
 
-  const sortOptions = useMemo(
+  // Credentials whose last read failed and that have nothing loaded to show instead.
+  const attentionCount = useMemo(
     () =>
-      QUOTA_SORT_MODES.map((mode) => ({ value: mode, label: t(`quota_management.sort_${mode}`) })),
-    [t]
+      entries.filter((entry) => {
+        const status = quotaByType[entry.type][getQuotaCacheKey(entry.file)]?.status;
+        const loaded =
+          status === 'success' ||
+          readSavedQuotaCard(entry.type, entry.file) ||
+          hasStoredQuotaCapacity(entry.file);
+        return !loaded && (status === 'error' || hasStoredQuotaError(entry.file));
+      }).length,
+    [entries, quotaByType]
   );
-
-  const { loadedCount, attentionCount } = useMemo(() => {
-    let loaded = 0;
-    let attention = 0;
-    entries.forEach((entry) => {
-      const status = quotaByType[entry.type][getQuotaCacheKey(entry.file)]?.status;
-      if (
-        status === 'success' ||
-        readSavedQuotaCard(entry.type, entry.file) ||
-        hasStoredQuotaCapacity(entry.file)
-      )
-        loaded += 1;
-      else if (status === 'error' || hasStoredQuotaError(entry.file)) attention += 1;
-    });
-    return { loadedCount: loaded, attentionCount: attention };
-  }, [entries, quotaByType]);
 
   // 剪枝：文件列表落定后，各 provider 缓存只保留仍存在的凭证
   useEffect(() => {
@@ -350,140 +350,120 @@ export function QuotaPage() {
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
 
-  /* ---------- 首屏卡片一次性级联入场 ----------
-   * 首批数据渲染后立即翻转 cardsAnimated；已挂载的卡片在挂载时捕获过自己的
-   * 延迟（QuotaCard 内 useState 初始化），后续切 tab/翻页/刷新新挂载的卡片
-   * 拿到 null —— 不重播。 */
-
-  const [cardsAnimated, setCardsAnimated] = useState(false);
-  const enableCardEntrance = !cardsAnimated && !loading && pageItems.length > 0;
-  useEffect(() => {
-    if (enableCardEntrance) {
-      setCardsAnimated(true);
-    }
-  }, [enableCardEntrance]);
-  const cardEntranceDelay = (index: number): number | null => {
-    if (!enableCardEntrance) return null;
-    if (pageItems.length <= 1) return 0;
-    return Math.round((index / (pageItems.length - 1)) * CARD_ENTRANCE_BUDGET_MS);
-  };
-
   /* ---------- 渲染 ---------- */
 
   const isEmpty = !loading && filteredEntries.length === 0;
 
-  return (
-    <div className={styles.page} ref={revealRef}>
-      <QuotaHeader
-        totalCount={entries.length}
-        loadedCount={loadedCount}
-        attentionCount={attentionCount}
-        refreshing={loading || batchLoading}
-        disableControls={disableControls}
-        onRefreshAll={handleRefreshAll}
-      />
+  const emptyTitle = search.trim()
+    ? t('quota_management.search_empty_title')
+    : tab === 'all'
+      ? t('quota_management.empty_title')
+      : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_title`);
+  const emptyDescription = search.trim()
+    ? t('quota_management.search_empty_desc')
+    : tab === 'all'
+      ? t('quota_management.empty_desc')
+      : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_desc`);
 
-      <section className={styles.workbench}>
-        {/* 提供商导航与搜索工具栏分层，避免不同控件争夺视觉焦点。 */}
-        <div className={styles.tabsRow} data-reveal>
-          <ProviderTabs
+  return (
+    <Page
+      title={t('nav.quota_management')}
+      actions={
+        <div className="flex items-center gap-2">
+          {attentionCount > 0 && (
+            <Badge variant="secondary" className="gap-1.5">
+              <span className="size-1.5 rounded-full bg-warning" />
+              {t('quota_management.meta_attention', { count: attentionCount })}
+            </Badge>
+          )}
+          <Button
+            size="lg"
+            className="h-9 px-4"
+            onClick={handleRefreshAll}
+            disabled={disableControls || loading || batchLoading}
+            aria-label={t('quota_management.refresh_all_credentials')}
+          >
+            <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+            <span className="max-sm:hidden">{t('quota_management.refresh_all_credentials')}</span>
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            className="min-w-48 flex-1 basis-full sm:basis-0"
+            value={search}
+            onChange={handleSearchChange}
+            placeholder={t('quota_management.search_placeholder')}
+            label={t('quota_management.search_label')}
+            clearLabel={t('quota_management.search_clear')}
+          />
+          <ProviderFilter
+            className="max-sm:flex-1"
             types={visibleTabs}
             counts={tabCounts}
             active={tab}
-            resolvedTheme={resolvedTheme}
             onChange={handleTabChange}
           />
-        </div>
-
-        <div className={styles.toolbar}>
-          <div className={styles.search}>
-            <IconSearch size={16} className={styles.searchIcon} aria-hidden="true" />
-            <input
-              ref={searchInputRef}
-              className={styles.searchInput}
-              type="search"
-              value={search}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder={t('quota_management.search_placeholder')}
-              aria-label={t('quota_management.search_label')}
-            />
-            {search && (
-              <button
-                type="button"
-                className={styles.clearSearch}
-                aria-label={t('quota_management.search_clear')}
-                title={t('quota_management.search_clear')}
-                onClick={() => {
-                  handleSearchChange('');
-                  searchInputRef.current?.focus();
-                }}
-              >
-                <IconX size={14} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-          <div className={styles.sort}>
-            <Select
-              value={sortMode}
-              options={sortOptions}
-              onChange={handleSortModeChange}
-              ariaLabel={t('quota_management.sort_label')}
-              size="sm"
-            />
-          </div>
+          <Select value={sortMode} onValueChange={handleSortModeChange}>
+            <SelectTrigger
+              aria-label={t('quota_management.sort_label')}
+              className="data-[size=default]:h-9 max-sm:flex-1"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              {QUOTA_SORT_MODES.map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {t(`quota_management.sort_${mode}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {error && (
-          <div className={styles.errorBanner} role="alert">
+          <p role="alert" className="text-sm text-destructive">
             {error}
-          </div>
+          </p>
         )}
 
         {loading ? (
-          <div className={styles.grid} aria-hidden="true">
+          <div className="flex flex-col gap-3" aria-hidden="true">
             {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-              <Skeleton key={index} height={96} rounded={0} />
+              <div key={index} className="h-36 rounded-xl border bg-card" />
             ))}
           </div>
         ) : isEmpty ? (
-          <EmptyState
-            title={
-              search.trim()
-                ? t('quota_management.search_empty_title')
-                : tab === 'all'
-                  ? t('quota_management.empty_title')
-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_title`)
-            }
-            description={
-              search.trim()
-                ? t('quota_management.search_empty_desc')
-                : tab === 'all'
-                  ? t('quota_management.empty_desc')
-                  : t(`${QUOTA_ADAPTERS[tab].i18nPrefix}.empty_desc`)
-            }
-            action={
-              search.trim() ? (
-                <Button variant="secondary" size="sm" onClick={() => handleSearchChange('')}>
-                  {t('quota_management.search_clear')}
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon icon={DashboardSpeed01Icon} strokeWidth={1.75} />
+              </EmptyMedia>
+              <EmptyTitle>{emptyTitle}</EmptyTitle>
+              <EmptyDescription>{emptyDescription}</EmptyDescription>
+            </EmptyHeader>
+            {(search.trim() || tab !== 'all') && (
+              <EmptyContent>
+                <Button
+                  variant="outline"
+                  onClick={() => (search.trim() ? handleSearchChange('') : handleTabChange('all'))}
+                >
+                  {search.trim() ? t('quota_management.search_clear') : t('auth_files.filter_all')}
                 </Button>
-              ) : tab === 'all' ? undefined : (
-                <Button variant="secondary" size="sm" onClick={() => handleTabChange('all')}>
-                  {t('auth_files.filter_all')}
-                </Button>
-              )
-            }
-          />
+              </EmptyContent>
+            )}
+          </Empty>
         ) : (
-          <div className={styles.grid}>
-            {pageItems.map((entry, index) => (
+          <div className="flex flex-col gap-3">
+            {pageItems.map((entry) => (
               <QuotaCard
                 key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
                 entry={entry}
                 quota={getQuota(entry)}
-                resolvedTheme={resolvedTheme}
                 canRefresh={canUseActions && !entry.file.disabled}
                 resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                entranceDelayMs={cardEntranceDelay(index)}
                 onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
                 onReset={(targetId) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type], targetId)}
               />
@@ -492,33 +472,14 @@ export function QuotaPage() {
         )}
 
         {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (
-          <div className={styles.pagination}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage <= 1}
-            >
-              {t('auth_files.pagination_prev')}
-            </Button>
-            <div className={styles.pageInfo}>
-              {t('auth_files.pagination_info', {
-                current: currentPage,
-                total: totalPages,
-                count: filteredEntries.length,
-              })}
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage >= totalPages}
-            >
-              {t('auth_files.pagination_next')}
-            </Button>
-          </div>
+          <ListPagination
+            page={currentPage}
+            totalPages={totalPages}
+            count={filteredEntries.length}
+            onPage={(next) => setPage(Math.min(totalPages, Math.max(1, next)))}
+          />
         )}
-      </section>
-    </div>
+      </div>
+    </Page>
   );
 }

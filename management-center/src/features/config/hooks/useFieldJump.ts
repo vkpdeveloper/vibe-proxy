@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { prefersReducedMotion } from '@/hooks/motion';
 import type { VisualConfigValues } from '@/types/visualConfig';
-import { FIELD_HIGHLIGHT_CLASS } from '../components/fields/FieldPrimitives';
+import { FIELD_HIGHLIGHT_ATTR } from '../components/fields/FieldPrimitives';
 import type { ConfigTabId } from '../constants';
 import {
   configFieldDomId,
@@ -65,7 +65,7 @@ export function useFieldJump({ values, setActiveSection }: UseFieldJumpArgs) {
       // Clear any in-flight highlight before starting a new one.
       if (highlightTimerRef.current !== null) {
         clearTimeout(highlightTimerRef.current);
-        highlightedElRef.current?.classList.remove(FIELD_HIGHLIGHT_CLASS);
+        highlightedElRef.current?.removeAttribute(FIELD_HIGHLIGHT_ATTR);
       }
 
       el.scrollIntoView({
@@ -73,10 +73,10 @@ export function useFieldJump({ values, setActiveSection }: UseFieldJumpArgs) {
         block: 'center',
         inline: 'nearest',
       });
-      el.classList.add(FIELD_HIGHLIGHT_CLASS);
+      el.setAttribute(FIELD_HIGHLIGHT_ATTR, '');
       highlightedElRef.current = el;
       highlightTimerRef.current = window.setTimeout(() => {
-        el.classList.remove(FIELD_HIGHLIGHT_CLASS);
+        el.removeAttribute(FIELD_HIGHLIGHT_ATTR);
         highlightTimerRef.current = null;
         highlightedElRef.current = null;
       }, 1800);

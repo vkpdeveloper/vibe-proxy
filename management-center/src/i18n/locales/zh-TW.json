@@ -1,5 +1,6 @@
 {
   "common": {
+    "more": "更多",
     "login": "登入",
     "logout": "登出",
     "back": "返回",
@@ -66,14 +67,16 @@
     "subtitle": "管理中心"
   },
   "login": {
+    "show_key": "顯示金鑰",
+    "hide_key": "隱藏金鑰",
     "subtitle": "連線至 CLI Proxy API v8 或更新版本",
     "connection_current": "目前位址",
     "connection_auto_hint": "系統將自動使用目前存取位址進行連線",
-    "custom_connection_label": "自訂連線位址:",
+    "custom_connection_label": "伺服器位址",
     "custom_connection_placeholder": "例如: https://example.com:8317",
     "custom_connection_hint": "預設使用目前存取位址，若需要可手動輸入其他位址。",
     "remember_password_label": "記住密碼",
-    "management_key_label": "管理金鑰:",
+    "management_key_label": "管理金鑰",
     "management_key_placeholder": "請輸入管理金鑰",
     "submit_button": "登入",
     "submitting": "連線中...",
@@ -206,7 +209,11 @@
     "cta_system_desc": "版本詳情與管理中心資訊。",
     "window_m": "{{minutes}} 分鐘",
     "window_h": "{{hours}} 小時",
-    "window_hm": "{{hours}} 小時 {{minutes}} 分"
+    "window_hm": "{{hours}} 小時 {{minutes}} 分",
+    "providers_title": "供應商",
+    "shortcuts_title": "快捷入口",
+    "col_requests": "請求",
+    "col_volume": "趨勢"
   },
   "basic_settings": {
     "debug_enable": "啟用除錯模式",
@@ -1147,6 +1154,10 @@
     "history_evicted": "閱讀位置已移出快取，請重新定位",
     "resume_following": "回到最新 · 新增 {{count}} 行",
     "level_filter": "記錄等級",
+    "column_time": "時間",
+    "column_level": "等級",
+    "column_request": "請求",
+    "column_duration": "耗時",
     "all_levels": "全部等級",
     "view_request": "查看請求 {{id}} 的封包",
     "copy_line": "複製此行",
@@ -1234,6 +1245,15 @@
       "save": "儲存變更"
     },
     "discard_confirm_message": "確定放棄所有未儲存的變更並還原到最近的伺服器版本嗎？",
+    "tabs": {
+      "common": "常用",
+      "connectivity": "接入",
+      "network": "網路",
+      "logging": "日誌",
+      "streaming": "串流傳輸",
+      "advanced": "進階",
+      "payload": "Payload"
+    },
     "mode": {
       "label": "編輯模式",
       "visual": "視覺化",
@@ -1961,6 +1981,7 @@
   "system_info": {
     "title": "管理中心資訊",
     "about_title": "VProxy",
+    "tab_about": "關於",
     "models_title": "可用模型清單",
     "models_desc": "展示 /models 回傳的模型，並自動使用伺服器儲存的 API Key 進行驗證。",
     "models_loading": "正在載入可用模型...",

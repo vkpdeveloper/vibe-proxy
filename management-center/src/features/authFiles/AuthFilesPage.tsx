@@ -1,13 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Delete02Icon,
+  RefreshIcon,
+  UserLock01Icon,
+  Upload04Icon,
+} from '@hugeicons/core-free-icons';
 import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { useRevealOnScroll } from '@/hooks/motion';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Page } from '@/components/layout/Page';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
@@ -15,7 +36,6 @@ import {
   isProblemAuthFile,
   isRuntimeOnlyAuthFile,
   normalizeProviderKey,
-  type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { AuthFileCard } from '@/features/authFiles/components/AuthFileCard';
 import { AuthFileDetailsSheet } from '@/features/authFiles/components/AuthFileDetailsSheet';
@@ -23,12 +43,11 @@ import { getAuthFileRefreshKey } from '@/features/authFiles/manualRefresh';
 import { canPreferAccount, isPreferredAccount } from '@/features/authFiles/accountPreference';
 import { AuthFileRefreshResults } from '@/features/authFiles/components/AuthFileRefreshResults';
 import { AuthFileModelsModal } from '@/features/authFiles/components/AuthFileModelsModal';
-import { AuthFilesToolbar } from '@/features/authFiles/components/AuthFilesToolbar';
 import { BatchActionBar } from '@/features/authFiles/components/BatchActionBar';
+import { ListPagination, SearchField } from '@/features/authFiles/components/ListControls';
 import { OAuthExcludedCard } from '@/features/authFiles/components/OAuthExcludedCard';
 import { OAuthModelAliasCard } from '@/features/authFiles/components/OAuthModelAliasCard';
-import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
-import { VaultHeader } from '@/features/authFiles/components/VaultHeader';
+import { ProviderFilter } from '@/features/authFiles/components/ProviderFilter';
 import { invalidateAuthFileDerivedCaches } from '@/features/authFiles/cacheInvalidation';
 import {
   buildWildcardSearch,
@@ -47,11 +66,10 @@ import {
   type AuthFilesStatusFilterMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
-import { useAuthStore, useConfigStore, useNotificationStore, useThemeStore } from '@/stores';
-import styles from './AuthFilesPage.module.scss';
+import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 
 const PAGE_SIZE = 50;
-const SKELETON_ROW_COUNT = 5;
+const SKELETON_ROW_COUNT = 4;
 
 const resolveStatusFilterMode = (
   problemOnly: boolean,
@@ -74,7 +92,6 @@ export function AuthFilesPage() {
   const quotaDrainRouting = useConfigStore(
     (state) => state.config?.routingStrategy === 'quota-drain'
   );
-  const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
@@ -441,127 +458,212 @@ export function AuthFilesPage() {
       : `${t('common.delete')} ${getTypeLabel(t, normalizedFilter)}`;
   })();
 
-  const oauthSectionRef = useRevealOnScroll<HTMLDivElement>();
-
   const isFirstRunEmpty = !loading && files.length === 0 && !error;
   const isNoResults = !loading && files.length > 0 && pageItems.length === 0;
 
   return (
-    <div className={styles.page}>
-      <VaultHeader
-        totalCount={files.length}
-        activeCount={activeCount}
-        problemCount={problemCount}
-        loading={loading}
-        refreshing={refreshing}
-        uploading={uploading}
-        disableControls={disableControls}
-        onUpload={handleUploadClick}
-        onRefresh={() => void handleHeaderRefresh()}
-        refreshingCredentials={refreshingAllCredentials}
-        credentialRefreshDisabled={Object.keys(manualRefreshing).length > 0}
-        onRefreshCredentials={handleRefreshAllCredentials}
-      />
-      <AuthFileRefreshResults results={refreshResults} onClose={closeRefreshResults} />
+    <Page
+      title={t('nav.auth_files')}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            onClick={() => void handleHeaderRefresh()}
+            disabled={loading || refreshing}
+            aria-label={t('common.refresh')}
+            title={t('common.refresh')}
+          >
+            <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+            onClick={handleRefreshAllCredentials}
+            disabled={
+              disableControls ||
+              loading ||
+              refreshingAllCredentials ||
+              Object.keys(manualRefreshing).length > 0
+            }
+            aria-label={t('auth_files.refresh_all_button')}
+            title={t('auth_files.refresh_all_button')}
+          >
+            <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} data-icon="inline-start" />
+            <span className="max-sm:hidden">{t('auth_files.refresh_all_button')}</span>
+          </Button>
+          <Button
+            size="lg"
+            className="h-9 px-4 max-sm:w-9 max-sm:px-0"
+            onClick={handleUploadClick}
+            disabled={disableControls || uploading}
+            aria-label={t('auth_files.upload_button')}
+          >
+            <HugeiconsIcon icon={Upload04Icon} strokeWidth={1.75} data-icon="inline-start" />
+            <span className="max-sm:hidden">{t('auth_files.upload_button')}</span>
+          </Button>
+        </div>
+      }
+    >
       <input
         ref={fileInputRef}
         type="file"
         accept=".json,application/json"
         multiple
-        style={{ display: 'none' }}
+        hidden
         onChange={handleFileChange}
       />
 
-      <section className={styles.workbench} aria-label={t('auth_files.title_section')}>
-        <ProviderTabs
-          types={existingTypes}
-          counts={typeCounts}
-          active={normalizedFilter}
-          resolvedTheme={resolvedTheme}
-          onChange={(type) => {
-            setFilter(type);
-            setPage(1);
-          }}
-        />
+      <section className="flex flex-col gap-4" aria-label={t('auth_files.title_section')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            className="basis-full"
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+            placeholder={t('auth_files.search_placeholder')}
+            label={t('auth_files.search_label')}
+            clearLabel={t('quota_management.search_clear')}
+          />
+          <ProviderFilter
+            className="max-sm:flex-1"
+            types={existingTypes}
+            counts={typeCounts}
+            active={normalizedFilter}
+            onChange={(type) => {
+              setFilter(type);
+              setPage(1);
+            }}
+          />
+          <Select value={sortMode} onValueChange={handleSortModeChange}>
+            <SelectTrigger
+              aria-label={t('auth_files.sort_label')}
+              className="data-[size=default]:h-9 max-sm:flex-1"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start">
+              {sortOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            spacing={0}
+            aria-label={t('auth_files.problem_filter_label')}
+            className="max-sm:w-full sm:ml-auto"
+            value={statusFilterMode}
+            onValueChange={(value) => {
+              if (isAuthFilesStatusFilterMode(value)) handleStatusFilterModeChange(value);
+            }}
+          >
+            {statusFilterOptions.map((option) => (
+              <ToggleGroupItem
+                key={option.value}
+                value={option.value}
+                className="h-9 px-3 max-sm:flex-1"
+              >
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
 
-        <AuthFilesToolbar
-          search={search}
-          onSearchChange={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          statusFilterMode={statusFilterMode}
-          statusFilterOptions={statusFilterOptions}
-          onStatusFilterChange={handleStatusFilterModeChange}
-          sortMode={sortMode}
-          sortOptions={sortOptions}
-          onSortModeChange={handleSortModeChange}
-          deleteLabel={deleteAllButtonLabel}
-          deleteDisabled={disableControls || loading || deletingAll || files.length === 0}
-          deleteLoading={deletingAll}
-          onDelete={() =>
-            handleDeleteAll({
-              filter,
-              problemOnly,
-              disabledOnly,
-              enabledOnly,
-              onResetFilterToAll: () => setFilter('all'),
-              onResetProblemOnly: () => setStatusFilterMode('all'),
-              onResetDisabledOnly: () => setStatusFilterMode('all'),
-              onResetEnabledOnly: () => setStatusFilterMode('all'),
-            })
-          }
-        />
-
-        {error && (
-          <div className={styles.errorBanner} role="alert">
-            {error}
+        {!loading && files.length > 0 && (
+          <div className="flex min-h-8 items-center justify-between gap-3">
+            <p className="flex flex-wrap items-center gap-x-3 font-mono text-xs text-muted-foreground tabular-nums">
+              <span>{t('auth_files.meta_total', { count: files.length })}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+                {t('auth_files.meta_active', { count: activeCount })}
+              </span>
+              {problemCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-warning">
+                  <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />
+                  {t('auth_files.meta_problem', { count: problemCount })}
+                </span>
+              )}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-mr-2 shrink-0 text-muted-foreground hover:text-destructive"
+              disabled={disableControls || deletingAll}
+              onClick={() =>
+                handleDeleteAll({
+                  filter,
+                  problemOnly,
+                  disabledOnly,
+                  enabledOnly,
+                  onResetFilterToAll: () => setFilter('all'),
+                  onResetProblemOnly: () => setStatusFilterMode('all'),
+                  onResetDisabledOnly: () => setStatusFilterMode('all'),
+                  onResetEnabledOnly: () => setStatusFilterMode('all'),
+                })
+              }
+            >
+              <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} data-icon="inline-start" />
+              {deleteAllButtonLabel}
+            </Button>
           </div>
         )}
 
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
         {loading ? (
-          <div className={styles.list} aria-hidden="true">
+          <div className="flex flex-col gap-3" aria-hidden="true">
             {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-              <Skeleton key={index} height={44} className={styles.skeletonRow} />
+              <div key={index} className="h-28 rounded-xl border bg-card" />
             ))}
           </div>
         ) : isFirstRunEmpty ? (
-          <EmptyState
-            title={t('auth_files.empty_title')}
-            description={t('auth_files.empty_desc')}
-            action={
-              <div className={styles.emptyActions}>
-                <Button
-                  size="sm"
-                  onClick={handleUploadClick}
-                  disabled={disableControls || uploading}
-                >
-                  {t('auth_files.upload_button')}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/oauth')}>
-                  {t('auth_files.empty_oauth_link')}
-                </Button>
-              </div>
-            }
-          />
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} />
+              </EmptyMedia>
+              <EmptyTitle>{t('auth_files.empty_title')}</EmptyTitle>
+              <EmptyDescription>{t('auth_files.empty_desc')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="flex-row justify-center">
+              <Button onClick={handleUploadClick} disabled={disableControls || uploading}>
+                {t('auth_files.upload_button')}
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/oauth')}>
+                {t('auth_files.empty_oauth_link')}
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : isNoResults ? (
-          <EmptyState
-            title={t('auth_files.search_empty_title')}
-            description={t('auth_files.search_empty_desc')}
-            action={
-              <Button variant="secondary" size="sm" onClick={clearFilters}>
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>{t('auth_files.search_empty_title')}</EmptyTitle>
+              <EmptyDescription>{t('auth_files.search_empty_desc')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button variant="outline" onClick={clearFilters}>
                 {t('auth_files.no_results_clear')}
               </Button>
-            }
-          />
+            </EmptyContent>
+          </Empty>
         ) : (
-          <div className={styles.list}>
+          <div role="list" className="flex flex-col gap-3">
             {pageItems.map((file) => (
               <AuthFileCard
                 key={getQuotaCacheKey(file)}
                 file={file}
                 selected={selectedFiles.has(file.name)}
-                resolvedTheme={resolvedTheme}
                 disableControls={disableControls}
                 deleting={deleting}
                 statusUpdating={statusUpdating}
@@ -576,7 +678,7 @@ export function AuthFilesPage() {
                 onManualRefresh={handleManualRefresh}
                 onCooldownReset={handleCooldownReset}
                 onOpenPrefixProxyEditor={openPrefixProxyEditor}
-                onDelete={handleDelete}
+                onDelete={(name) => void handleDelete(name)}
                 onToggleStatus={handleStatusToggle}
                 onToggleSelect={toggleSelect}
               />
@@ -585,63 +687,47 @@ export function AuthFilesPage() {
         )}
 
         {!loading && sorted.length > PAGE_SIZE && (
-          <div className={styles.pagination}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage <= 1}
-            >
-              {t('auth_files.pagination_prev')}
-            </Button>
-            <div className={styles.pageInfo}>
-              {t('auth_files.pagination_info', {
-                current: currentPage,
-                total: totalPages,
-                count: sorted.length,
-              })}
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage >= totalPages}
-            >
-              {t('auth_files.pagination_next')}
-            </Button>
-          </div>
+          <ListPagination
+            page={currentPage}
+            totalPages={totalPages}
+            count={sorted.length}
+            onPage={(next) => setPage(Math.min(totalPages, Math.max(1, next)))}
+          />
         )}
       </section>
 
-      <div className={styles.configGrid} ref={oauthSectionRef}>
-        <OAuthExcludedCard
-          disableControls={disableControls}
-          excludedError={excludedError}
-          excluded={excluded}
-          onRetry={loadExcluded}
-          onAdd={() => openExcludedEditor()}
-          onEdit={openExcludedEditor}
-          onDelete={deleteExcluded}
-        />
+      <OAuthExcludedCard
+        disableControls={disableControls}
+        excludedError={excludedError}
+        excluded={excluded}
+        onRetry={loadExcluded}
+        onAdd={() => openExcludedEditor()}
+        onEdit={openExcludedEditor}
+        onDelete={deleteExcluded}
+      />
 
-        <OAuthModelAliasCard
-          disableControls={disableControls}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onRetry={loadModelAlias}
-          onAdd={() => openModelAliasEditor()}
-          onEditProvider={openModelAliasEditor}
-          onDeleteProvider={deleteModelAlias}
-          modelAliasError={modelAliasError}
-          modelAlias={modelAlias}
-          allProviderModels={allProviderModels}
-          onUpdate={handleMappingUpdate}
-          onDeleteLink={handleDeleteLink}
-          onToggleFork={handleToggleFork}
-          onRenameAlias={handleRenameAlias}
-          onDeleteAlias={handleDeleteAlias}
-        />
-      </div>
+      <OAuthModelAliasCard
+        disableControls={disableControls}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onRetry={loadModelAlias}
+        onAdd={() => openModelAliasEditor()}
+        onEditProvider={openModelAliasEditor}
+        onDeleteProvider={deleteModelAlias}
+        modelAliasError={modelAliasError}
+        modelAlias={modelAlias}
+        allProviderModels={allProviderModels}
+        onUpdate={handleMappingUpdate}
+        onDeleteLink={handleDeleteLink}
+        onToggleFork={handleToggleFork}
+        onRenameAlias={handleRenameAlias}
+        onDeleteAlias={handleDeleteAlias}
+      />
+
+      {/* Room for the floating selection toolbar so it never covers the last row. */}
+      <div aria-hidden="true" className="-mt-10 h-(--auth-files-action-bar-height,0px) shrink-0" />
+
+      <AuthFileRefreshResults results={refreshResults} onClose={closeRefreshResults} />
 
       <AuthFileModelsModal
         open={modelsModalOpen}
@@ -678,6 +764,6 @@ export function AuthFilesPage() {
         onDisable={() => batchSetStatus(selectedNames, false)}
         onDelete={() => batchDelete(selectedNames)}
       />
-    </div>
+    </Page>
   );
 }

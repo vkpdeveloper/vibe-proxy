@@ -1,12 +1,157 @@
-/* Tailwind without preflight: the console's own SCSS already sets the base
- * styles, and preflight would quietly restyle buttons, headings and images. */
-@layer theme, base, components, utilities;
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
-/* The console switches themes with data-theme on <html>, not shadcn's .dark class. */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+/* The variants shadcn's components rely on (from shadcn/tailwind.css). */
+@custom-variant dark (&:is(.dark *));
+@custom-variant data-open {
+  &:where([data-state='open']),
+  &:where([data-open]:not([data-open='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state='closed']),
+  &:where([data-closed]:not([data-closed='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-checked {
+  &:where([data-state='checked']),
+  &:where([data-checked]:not([data-checked='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-unchecked {
+  &:where([data-state='unchecked']),
+  &:where([data-unchecked]:not([data-unchecked='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled='true']),
+  &:where([data-disabled]:not([data-disabled='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-active {
+  &:where([data-state='active']),
+  &:where([data-active]:not([data-active='false'])) {
+    @slot;
+  }
+}
+@custom-variant data-horizontal {
+  &:where([data-orientation='horizontal']) {
+    @slot;
+  }
+}
+@custom-variant data-vertical {
+  &:where([data-orientation='vertical']) {
+    @slot;
+  }
+}
 
+/* Dark only, on pure black. The same tokens as VM Bridge; legacy SCSS variables in
+   themes.scss alias these so older screens follow along. */
+:root {
+  --radius: 0.625rem;
+  --background: #000000;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #0f0f0f;
+  --popover-foreground: #ededed;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --secondary: #161616;
+  --secondary-foreground: #ededed;
+  --muted: #141414;
+  --muted-foreground: #8f8f8f;
+  --accent: #1a1a1a;
+  --accent-foreground: #ededed;
+  --destructive: #f2555a;
+  --border: #1f1f1f;
+  --input: #2a2a2a;
+  --ring: #8b5cf6;
+  --success: #3ecf8e;
+  --warning: #f5b74e;
+  --faint: #5c5c5c;
+}
+
+@theme inline {
+  --font-sans: 'Mona Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Fragment Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-faint: var(--faint);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color-scheme: dark;
+  }
+}
+
+/* A thin rounded thumb on no track. The transparent border insets the thumb from the edge.
+   Chrome ignores these pseudo-elements once scrollbar-color is set, so that is only for Firefox. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--input) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--faint);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
+}
+
+/* Dither engine tokens (lib/dither), kept for the charts and meters that still draw with it. */
 @theme inline {
   --color-dither-ink: var(--dither-ink);
   --color-dither-paper: var(--dither-paper);
@@ -19,31 +164,16 @@
   --color-dither-grey: var(--dither-color-grey);
 }
 
-@layer base {
-  :root {
-    --dither-ink: var(--primary-color);
-    --dither-paper: var(--bg-secondary);
-    --dither-cell: 3px;
-    --dither-color-blue: oklch(0.56 0.18 248);
-    --dither-color-purple: oklch(0.53 0.22 302);
-    --dither-color-green: oklch(0.58 0.15 152);
-    --dither-color-pink: oklch(0.58 0.21 355);
-    --dither-color-orange: oklch(0.64 0.17 52);
-    --dither-color-red: oklch(0.55 0.21 27);
-    --dither-color-grey: oklch(0.55 0 0);
-    --dither-bloom: 0.6;
-  }
-  [data-theme='dark'] {
-    --dither-ink: var(--primary-color);
-    --dither-paper: var(--bg-secondary);
-    --dither-cell: 3px;
-    --dither-color-blue: oklch(0.72 0.14 240);
-    --dither-color-purple: oklch(0.7 0.18 304);
-    --dither-color-green: oklch(0.78 0.17 152);
-    --dither-color-pink: oklch(0.74 0.17 354);
-    --dither-color-orange: oklch(0.79 0.15 62);
-    --dither-color-red: oklch(0.68 0.2 25);
-    --dither-color-grey: oklch(0.66 0 0);
-    --dither-bloom: 1;
-  }
+:root {
+  --dither-ink: var(--primary);
+  --dither-paper: var(--background);
+  --dither-cell: 3px;
+  --dither-color-blue: oklch(0.72 0.14 240);
+  --dither-color-purple: oklch(0.7 0.18 304);
+  --dither-color-green: oklch(0.78 0.17 152);
+  --dither-color-pink: oklch(0.74 0.17 354);
+  --dither-color-orange: oklch(0.79 0.15 62);
+  --dither-color-red: oklch(0.68 0.2 25);
+  --dither-color-grey: oklch(0.66 0 0);
+  --dither-bloom: 1;
 }

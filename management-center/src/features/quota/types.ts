@@ -1,10 +1,9 @@
 /**
  * 额度渲染层的类型化样式契约。
  *
- * 额度 body 在两个宿主穿不同外衣：额度页（QuotaBody.module.scss）与
- * 认证文件卡片（AuthFileQuota.module.scss）。宿主通过 bindQuotaClasses
- * 把自己的 CSS Module 绑定成 QuotaClassMap —— 缺任何一个类名会在模块
- * 初始化时抛错并列出缺失清单，替代旧字符串 styleMap 的静默 class="undefined"。
+ * 额度 body 由宿主传入 QuotaClassMap（Tailwind 类名表，见 components/quotaClasses.ts），
+ * 额度页与认证文件卡片共用同一份。bindQuotaClasses 仍可把 CSS Module 绑定成
+ * QuotaClassMap：缺任何一个类名会抛错并列出缺失清单。
  */
 
 import type { ReactNode } from 'react';

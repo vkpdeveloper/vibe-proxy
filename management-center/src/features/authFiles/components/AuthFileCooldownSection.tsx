@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { IconChevronDown, IconRefreshCw } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowDown01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { AuthFileCooldownSnapshot } from '@/types/authFile';
 import { createSharedClock } from '@/utils/time/sharedClock';
 import { formatDateTimeValue } from '@/utils/format';
 import { cooldownReasonKey, summarizeCooldowns } from '@/features/authFiles/cooldowns';
-import styles from './AuthFileCooldownSection.module.scss';
 
 // One timer for visible cooldown cards, never one interval/request per credential.
 const clock = createSharedClock({ intervalMs: 1000 });
@@ -27,7 +28,7 @@ export function AuthFileCooldownSection({
   const { t } = useTranslation();
   if (!snapshot) return null; // Old backend: no claim about cooldown support or health.
   if (snapshot.records === null) {
-    return <p className={styles.unknown}>{t('auth_files.cooldown_unknown')}</p>;
+    return <p className="text-xs text-muted-foreground">{t('auth_files.cooldown_unknown')}</p>;
   }
   if (snapshot.records.length === 0) return null;
   return (
@@ -67,37 +68,50 @@ function CooldownDetails({
     : t('auth_files.cooldown_models', { count: modelCount });
 
   return (
-    <details className={`${styles.section} ${elapsed ? styles.elapsed : ''}`}>
-      <summary className={styles.summary}>
-        <span className={styles.summaryContent}>
-          <span className={styles.scope}>
+    <details
+      className={cn(
+        'group/cooldown rounded-lg border text-xs',
+        elapsed ? 'text-muted-foreground' : 'text-warning'
+      )}
+    >
+      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <span className="font-medium">
             {elapsed ? t('auth_files.cooldown_elapsed') : scopeLabel}
           </span>
-          <span className={styles.next}>
+          <span className="font-mono text-muted-foreground tabular-nums">
             {elapsed
               ? t('auth_files.cooldown_refresh_hint')
               : t('auth_files.cooldown_earliest', { time: duration(earliestSeconds) })}
           </span>
         </span>
-        <IconChevronDown size={14} className={styles.chevron} aria-hidden="true" />
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          strokeWidth={1.75}
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-open/cooldown:rotate-180 motion-reduce:transition-none"
+        />
       </summary>
-      <div className={styles.body}>
-        <ul className={styles.list}>
+      <div className="flex flex-col gap-2 border-t px-3 pt-1 pb-3 text-muted-foreground">
+        <ul className="flex flex-col divide-y">
           {rows.map(({ record, remainingSeconds }, index) => (
-            <li className={styles.row} key={`${record.scope}:${record.modelKey ?? ''}:${index}`}>
-              <div className={styles.rowHead}>
-                <span className={styles.model}>
+            <li
+              className="flex flex-col gap-0.5 py-2"
+              key={`${record.scope}:${record.modelKey ?? ''}:${index}`}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="min-w-0 font-mono break-all text-foreground">
                   {record.scope === 'credential'
                     ? t('auth_files.cooldown_scope_credential')
                     : record.modelKey}
                 </span>
-                <span className={styles.remaining}>
+                <span className="font-mono text-warning tabular-nums">
                   {remainingSeconds > 0
                     ? duration(remainingSeconds)
                     : t('auth_files.cooldown_timer_elapsed')}
                 </span>
               </div>
-              <div className={styles.reason}>
+              <div className="flex flex-wrap gap-x-3">
                 <span>{t(cooldownReasonKey(record.reason))}</span>
                 {record.httpStatus !== undefined && (
                   <span>{t('auth_files.cooldown_http_status', { status: record.httpStatus })}</span>
@@ -106,7 +120,7 @@ function CooldownDetails({
                   <span>{t('auth_files.cooldown_backoff', { level: record.backoffLevel })}</span>
                 )}
               </div>
-              <div className={styles.deadline}>
+              <div>
                 {t('auth_files.cooldown_deadline')}{' '}
                 <time dateTime={record.retryAt}>
                   {formatDateTimeValue(record.retryAt, i18n.language)}
@@ -116,25 +130,25 @@ function CooldownDetails({
           ))}
         </ul>
         {snapshot.observedAt && (
-          <p className={styles.observed}>
+          <p>
             {t('auth_files.cooldown_observed')}{' '}
             <time dateTime={snapshot.observedAt}>
               {formatDateTimeValue(snapshot.observedAt, i18n.language)}
             </time>
           </p>
         )}
-        <p className={styles.note}>{t('auth_files.cooldown_note')}</p>
+        <p className="text-faint">{t('auth_files.cooldown_note')}</p>
         {onReset && (
-          <div className={styles.actionRow}>
+          <div>
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={onReset}
-              loading={resetting}
-              disabled={resetDisabled}
+              disabled={resetDisabled || resetting}
+              aria-busy={resetting || undefined}
               title={t('auth_files.cooldown_reset_hint')}
             >
-              {!resetting && <IconRefreshCw size={14} />}
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
               {t('auth_files.cooldown_reset_button')}
             </Button>
           </div>

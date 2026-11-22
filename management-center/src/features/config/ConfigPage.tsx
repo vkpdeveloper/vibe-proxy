@@ -2,22 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { RefreshIcon } from '@hugeicons/core-free-icons';
+import { Page } from '@/components/layout/Page';
+import { Button } from '@/components/ui/button';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useRevealGroup } from '@/hooks/motion';
+import { cn } from '@/lib/utils';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
-import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
+import { useAuthStore, useNotificationStore } from '@/stores';
 import {
   CONFIG_MODE_STORAGE_KEY,
   CONFIG_SECTION_STORAGE_KEY,
   LEGACY_EDITOR_MODE_STORAGE_KEY,
-  configPanelDomId,
-  configTabDomId,
   type ConfigEditorMode,
   type ConfigTabId,
 } from './constants';
 import {
   CONFIG_FIELD_COUNT,
+  buildConfigTabs,
   buildHeaderMeta,
   countSectionErrors,
   countTotalErrors,
@@ -25,14 +28,14 @@ import {
   readSavedSection,
   resolveDirtyTabs,
   resolveStatus,
+  type ConfigStatusTone,
+  type HeaderMetaSegment,
 } from './uiState';
 import { findConfigFieldById } from './searchIndex';
 import { shouldReloadVisualDraft, useConfigDocument } from './hooks/useConfigDocument';
 import { useFieldJump } from './hooks/useFieldJump';
 import { useSourceSearch } from './hooks/useSourceSearch';
-import { ConfigHeader } from './components/ConfigHeader';
 import { ConfigSearch } from './components/ConfigSearch';
-import { ConfigTabs } from './components/ConfigTabs';
 import { DiffModal } from './components/DiffModal';
 import { FloatingSaveBar } from './components/FloatingSaveBar';
 import { ModeSwitch } from './components/ModeSwitch';
@@ -44,10 +47,21 @@ import { SectionLogging } from './components/sections/SectionLogging';
 import { SectionNetwork } from './components/sections/SectionNetwork';
 import { SectionPayload } from './components/sections/SectionPayload';
 import { SectionStreaming } from './components/sections/SectionStreaming';
-import styles from './ConfigPage.module.scss';
 
-/** 首载入场预算：卡片延迟 0.28s + 0.45s 动画，之后关闭 animateIn，切 tab 不再重播。 */
-const ENTRANCE_BUDGET_MS = 800;
+const statusDot: Record<ConfigStatusTone, string> = {
+  error: 'bg-destructive',
+  warning: 'bg-warning',
+  busy: 'bg-primary',
+  muted: 'bg-faint',
+  ok: 'bg-success',
+};
+
+const metaTone: Record<HeaderMetaSegment['tone'], string> = {
+  muted: 'text-muted-foreground',
+  warning: 'text-warning',
+  error: 'text-destructive',
+  ok: 'text-muted-foreground',
+};
 
 export function ConfigPage() {
   const { t } = useTranslation();
@@ -61,9 +75,7 @@ export function ConfigPage() {
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.isCurrentLayer : true;
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
-  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const revealRef = useRevealGroup<HTMLDivElement>();
 
   const {
     visualValues,
@@ -87,12 +99,6 @@ export function ConfigPage() {
       readSavedSection(localStorage.getItem(CONFIG_SECTION_STORAGE_KEY))
   );
   const handledRequestedFieldRef = useRef<string | null>(null);
-  // 首载入场：挂载后一个预算周期内为 true；此后切 tab 新挂载的卡片不再播入场。
-  const [animateCards, setAnimateCards] = useState(true);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setAnimateCards(false), ENTRANCE_BUDGET_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   // 旧「简单/完整」双模式已退役，清掉遗留的持久化键。
   useEffect(() => {
@@ -268,7 +274,6 @@ export function ConfigPage() {
     validationErrors: visualValidationErrors,
     disabled:
       disableControls || doc.loading || doc.saving || doc.diffModalOpen || doc.recoveryRequired,
-    animateIn: animateCards,
     onChange: setVisualValues,
   };
 
@@ -296,69 +301,58 @@ export function ConfigPage() {
     }
   };
 
-  return (
-    <div className={styles.page} ref={revealRef}>
-      <ConfigHeader
-        meta={headerMeta}
-        reloadDisabled={doc.loading || doc.saving}
-        reloading={doc.loading}
-        onReload={doc.handleReload}
+  const tabs = buildConfigTabs(t, dirtyTabs, errorCounts);
+
+  // The field count never changes, so the header only shows the state.
+  const statusMeta = headerMeta.filter((segment) => segment.key !== 'fields');
+
+  const actions = (
+    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      <p className="flex items-center gap-2 text-[13px] max-lg:sr-only" aria-live="polite">
+        <span className={cn('size-2 rounded-full', statusDot[status.tone])} />
+        {statusMeta.map((segment, index) => (
+          <span key={segment.key} className={metaTone[segment.tone]}>
+            {index > 0 ? <span className="mr-2 text-faint">·</span> : null}
+            {segment.count !== undefined
+              ? t(segment.labelKey, { count: segment.count })
+              : t(segment.labelKey)}
+          </span>
+        ))}
+      </p>
+      <ModeSwitch
+        mode={mode}
+        disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
+        onChange={handleModeChange}
       />
+      <Button
+        variant="outline"
+        size="icon-lg"
+        onClick={doc.handleReload}
+        disabled={doc.loading || doc.saving}
+        aria-label={t('config_management.reload')}
+        title={t('config_management.reload')}
+      >
+        <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+      </Button>
+    </div>
+  );
 
-      {doc.error && (
-        <div className="error-box" role="alert">
-          {doc.error}
-        </div>
-      )}
-      {!doc.error && visualParseError && (
-        <div className="error-box" role="alert">
-          {t('config_management.visual_mode_unavailable_detail', { message: visualParseError })}
-        </div>
-      )}
+  const loadError =
+    doc.error ??
+    (visualParseError
+      ? t('config_management.visual_mode_unavailable_detail', { message: visualParseError })
+      : null);
+  const alert = loadError ? (
+    <div
+      role="alert"
+      className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+    >
+      {loadError}
+    </div>
+  ) : null;
 
-      <div className={styles.toolbar} data-reveal>
-        {mode === 'visual' ? (
-          <ConfigSearch disabled={disableControls || doc.loading} onJump={jumpToField} />
-        ) : (
-          <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
-        )}
-        <ModeSwitch
-          mode={mode}
-          disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
-          onChange={handleModeChange}
-        />
-      </div>
-
-      {mode === 'visual' ? (
-        <>
-          <div className={styles.tabsRow} data-reveal>
-            <ConfigTabs
-              active={activeSection}
-              errorCounts={errorCounts}
-              dirtyTabs={dirtyTabs}
-              disabled={doc.saving || doc.loading}
-              onChange={handleSectionChange}
-            />
-          </div>
-          <div
-            className={styles.panel}
-            role="tabpanel"
-            id={configPanelDomId(activeSection)}
-            aria-labelledby={configTabDomId(activeSection)}
-          >
-            {renderActiveSection()}
-          </div>
-        </>
-      ) : (
-        <SourcePanel
-          search={sourceSearch}
-          value={doc.content}
-          onChange={doc.handleChange}
-          theme={resolvedTheme}
-          editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
-        />
-      )}
-
+  const overlays = (
+    <>
       <FloatingSaveBar
         visible={isCurrentLayer && doc.isDirty}
         statusText={t(
@@ -384,6 +378,48 @@ export function ConfigPage() {
         onCancel={doc.closeDiff}
         loading={doc.saving}
       />
-    </div>
+    </>
+  );
+
+  if (mode === 'source') {
+    // The YAML editor uses the full width and height, so it skips Page's narrow content column.
+    return (
+      <div className="flex h-full flex-col">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-6 sm:px-10 sm:py-8">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('config_management.title')}</h1>
+          {actions}
+        </header>
+        <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:px-10">
+          {alert}
+          <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
+        </div>
+        <SourcePanel
+          search={sourceSearch}
+          value={doc.content}
+          onChange={doc.handleChange}
+          editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
+        />
+        {overlays}
+      </div>
+    );
+  }
+
+  return (
+    <Page
+      title={t('config_management.title')}
+      actions={actions}
+      tabs={tabs}
+      tab={activeSection}
+      onTab={handleSectionChange}
+    >
+      <div className="flex flex-col gap-8">
+        {alert}
+        <ConfigSearch disabled={disableControls || doc.loading} onJump={jumpToField} />
+        {renderActiveSection()}
+        {/* Room for the save bar so it never covers the last setting. */}
+        {doc.isDirty ? <div aria-hidden="true" className="h-14" /> : null}
+      </div>
+      {overlays}
+    </Page>
   );
 }

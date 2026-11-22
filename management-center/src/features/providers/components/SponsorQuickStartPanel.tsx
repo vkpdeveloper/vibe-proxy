@@ -2,15 +2,17 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useNotificationStore } from '@/stores';
-import { IconCheckCircle2, IconExternalLink, IconLoader2, IconPlus } from '@/components/ui/icons';
-import { PROVIDER_LOGOS } from '../brandLogos';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
+import { Section } from '@/components/layout/Page';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
 import { isSponsorPartialMutationError } from '../sponsorMutationRecovery';
 import type { ProviderEntryFormInput, ProviderResource } from '../types';
 import type { UseProviderWorkbenchResult } from '../useProviderWorkbench';
 import { SponsorProviderForm } from '../sheets/forms/SponsorProviderForm';
-import formStyles from '../sheets/forms/sharedForm.module.scss';
-import styles from './SponsorQuickStartPanel.module.scss';
+import { ProviderLogo } from './ProviderLogo';
 
 interface SponsorQuickStartPanelProps {
   resource: ProviderResource | null;
@@ -34,7 +36,6 @@ export function SponsorQuickStartPanel({
   const formMutating = submitting || mutationDisabled || workbench.mutating;
   const mode = resource ? 'edit' : 'create';
   const submitDisabled = formMutating || (mode === 'edit' && !isDirty);
-  const logo = PROVIDER_LOGOS.apikeyFun;
 
   useUnsavedChangesGuard({
     shouldBlock: isDirty && !submitting,
@@ -77,42 +78,28 @@ export function SponsorQuickStartPanel({
     }
   };
 
+  const title = t('providersPage.providerNames.apikeyFun');
+  const logo = <ProviderLogo brand="apikeyFun" className="size-7" />;
+
   if (!resource && !showCreateForm) {
     return (
-      <section className={styles.panel}>
-        <div className={styles.header}>
-          <div className={styles.titleRow}>
-            <img src={logo.src} alt="" aria-hidden="true" className={styles.logo} />
-            <div className={styles.titleText}>
-              <h2 className={styles.title}>{t('providersPage.providerNames.apikeyFun')}</h2>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.empty}>
-          <div>{t('providersPage.sponsor.emptyRegisterHint')}</div>
-          <div className={styles.emptyActions}>
-            <button
-              type="button"
-              className={`${styles.emptyActionButton} ${styles.emptyActionButtonPrimary}`}
-              onClick={() => setShowCreateForm(true)}
-              disabled={formMutating}
-            >
-              <IconPlus size={16} />
-              <span>{t('providersPage.actions.new')}</span>
-            </button>
-            <a
-              className={`${styles.emptyActionButton} ${styles.emptyActionButtonEmphasis}`}
-              href={APIKEY_FUN_AFFILIATE_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <IconExternalLink size={16} />
-              <span>{t('providersPage.sponsor.registerNow')}</span>
-            </a>
-          </div>
-        </div>
-      </section>
+      <Section title={title} icon={logo}>
+        <Empty className="rounded-xl border border-dashed py-10">
+          <EmptyDescription>{t('providersPage.sponsor.emptyRegisterHint')}</EmptyDescription>
+          <EmptyContent className="flex-row flex-wrap justify-center">
+            <Button type="button" onClick={() => setShowCreateForm(true)} disabled={formMutating}>
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+              {t('providersPage.actions.new')}
+            </Button>
+            <Button asChild variant="outline">
+              <a href={APIKEY_FUN_AFFILIATE_URL} target="_blank" rel="noreferrer">
+                {t('providersPage.sponsor.registerNow')}
+                <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={1.75} data-icon="inline-end" />
+              </a>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </Section>
     );
   }
 
@@ -122,36 +109,35 @@ export function SponsorQuickStartPanel({
     : t('providersPage.sponsor.registerLink');
 
   return (
-    <section className={styles.panel}>
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <img src={logo.src} alt="" aria-hidden="true" className={styles.logo} />
-          <div className={styles.titleText}>
-            <h2 className={styles.title}>{t('providersPage.providerNames.apikeyFun')}</h2>
-          </div>
-          <a className={styles.topLink} href={actionHref} target="_blank" rel="noreferrer">
-            <IconExternalLink size={14} />
-            <span>{actionLabel}</span>
+    <Section
+      title={title}
+      icon={logo}
+      actions={
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <a href={actionHref} target="_blank" rel="noreferrer">
+            {actionLabel}
+            <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={1.75} data-icon="inline-end" />
           </a>
-        </div>
-      </div>
-
+        </Button>
+      }
+    >
       <SponsorProviderForm
         key={`${mode}:${resource?.id ?? 'new'}:${formVersion}`}
         resource={resource}
         mode={mode}
         mutating={formMutating}
         formId={formId}
-        variant="quickStart"
         onSubmit={handleSubmit}
         onDirtyChange={setIsDirty}
       />
 
-      <div className={styles.footer}>
+      <div className="flex justify-end gap-2 border-t pt-5">
         {!resource ? (
-          <button
+          <Button
             type="button"
-            className={`${formStyles.footerBtn} ${formStyles.footerBtnGhost}`}
+            variant="outline"
+            size="lg"
+            className="h-9 px-4"
             onClick={() => {
               setShowCreateForm(false);
               setIsDirty(false);
@@ -160,30 +146,18 @@ export function SponsorQuickStartPanel({
             disabled={submitting}
           >
             {t('providersPage.actions.cancel')}
-          </button>
+          </Button>
         ) : null}
-        <button
+        <Button
           type="submit"
           form={formId}
-          className={`${formStyles.footerBtn} ${formStyles.footerBtnPrimary} ${
-            styles.primaryAction
-          }`}
+          size="lg"
+          className="h-9 px-4"
           disabled={submitDisabled}
         >
-          {submitting ? (
-            <IconLoader2 className={styles.spin} size={14} />
-          ) : mode === 'create' ? (
-            <IconPlus size={14} />
-          ) : (
-            <IconCheckCircle2 size={14} />
-          )}
-          <span>
-            {mode === 'create'
-              ? t('providersPage.actions.create')
-              : t('providersPage.actions.save')}
-          </span>
-        </button>
+          {mode === 'create' ? t('providersPage.actions.create') : t('providersPage.actions.save')}
+        </Button>
       </div>
-    </section>
+    </Section>
   );
 }

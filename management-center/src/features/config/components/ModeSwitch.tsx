@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import type { ConfigEditorMode } from '../constants';
-import styles from './ModeSwitch.module.scss';
 
 export type ModeSwitchProps = {
   mode: ConfigEditorMode;
@@ -8,33 +9,28 @@ export type ModeSwitchProps = {
   onChange: (mode: ConfigEditorMode) => void;
 };
 
+const MODES: readonly ConfigEditorMode[] = ['visual', 'source'];
+
 /**
- * 可视化 / 源码 segmented 切换。源码模式是整份文档的另一种表示（不是第 9 个分区），
- * 所以它不进 tabs，常驻 tabs 行右端（移动端上移到头部动作行）。
+ * Visual / source switch. Source is another view of the whole document, not another
+ * section, so it lives in the page header instead of the section tabs.
  */
 export function ModeSwitch({ mode, disabled = false, onChange }: ModeSwitchProps) {
   const { t } = useTranslation();
-
   return (
-    <div className={styles.segmented} role="group" aria-label={t('config_management.mode.label')}>
-      <button
-        type="button"
-        className={`${styles.segment} ${mode === 'visual' ? styles.segmentActive : ''}`}
-        aria-pressed={mode === 'visual'}
-        disabled={disabled}
-        onClick={() => onChange('visual')}
-      >
-        {t('config_management.mode.visual')}
-      </button>
-      <button
-        type="button"
-        className={`${styles.segment} ${mode === 'source' ? styles.segmentActive : ''}`}
-        aria-pressed={mode === 'source'}
-        disabled={disabled}
-        onClick={() => onChange('source')}
-      >
-        {t('config_management.mode.source')}
-      </button>
-    </div>
+    <ButtonGroup aria-label={t('config_management.mode.label')}>
+      {MODES.map((entry) => (
+        <Button
+          key={entry}
+          variant={mode === entry ? 'secondary' : 'outline'}
+          className="h-9 px-3"
+          aria-pressed={mode === entry}
+          disabled={disabled}
+          onClick={() => onChange(entry)}
+        >
+          {t(`config_management.mode.${entry}`)}
+        </Button>
+      ))}
+    </ButtonGroup>
   );
 }

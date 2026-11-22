@@ -1,7 +1,17 @@
 import { memo, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Copy01Icon, Delete02Icon, PencilEdit02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { apiKeyNameFingerprint, readApiKeyNames, saveApiKeyName } from '../../apiKeyNames';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -10,7 +20,6 @@ import { generateSecureApiKey } from '@/utils/apiKey';
 import { maskApiKey } from '@/utils/format';
 import { isValidApiKeyCharset } from '@/utils/validation';
 import { ApiKeyStrengthMeter } from './ApiKeyStrengthMeter';
-import styles from './Blocks.module.scss';
 
 interface ApiKeysCardEditorProps {
   value: string;
@@ -146,59 +155,81 @@ function ScopedApiKeysCardEditor({
     setFormError('');
   };
 
+  const iconButtonClass = 'text-muted-foreground';
+
   return (
-    <div className={styles.apiKeys}>
-      <div className={styles.apiKeysHeader}>
-        <div className={styles.apiKeysCopy}>
-          <span className={styles.apiKeysTitle}>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-sm font-medium">
             {t('config_management.visual.api_keys.label')}
           </span>
-          <span className={styles.apiKeysHint}>{t('config_management.visual.api_keys.hint')}</span>
+          <span className="text-[13px] leading-normal text-muted-foreground">
+            {t('config_management.visual.api_keys.hint')}
+          </span>
         </div>
-        <Button size="sm" onClick={openAddModal} disabled={disabled}>
+        <Button className="shrink-0" onClick={openAddModal} disabled={disabled}>
+          <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
           {t('config_management.visual.api_keys.add')}
         </Button>
       </div>
 
       {apiKeys.length === 0 ? (
-        <div className={styles.emptyState}>{t('config_management.visual.api_keys.empty')}</div>
+        <div className="rounded-lg border border-dashed px-3 py-4 text-center text-[13px] text-muted-foreground">
+          {t('config_management.visual.api_keys.empty')}
+        </div>
       ) : (
-        <ol className={styles.apiKeyList}>
+        <ol className="divide-y overflow-hidden rounded-lg border">
           {apiKeys.map((key, index) => (
-            <li key={renderApiKeyIds[index] ?? `${key}-${index}`} className={styles.apiKeyRow}>
-              <span className={styles.apiKeyIndex}>#{index + 1}</span>
-              <span className={styles.apiKeyMeta}>
-                <span className={styles.apiKeyName}>
+            <li
+              key={renderApiKeyIds[index] ?? `${key}-${index}`}
+              className="flex items-center gap-3 py-1.5 pr-1.5 pl-3"
+            >
+              <span className="w-6 shrink-0 font-mono text-xs text-faint tabular-nums">
+                {index + 1}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                <span className="truncate text-sm">
                   {names[nameFingerprints[index]] ??
                     t('config_management.visual.api_keys.input_label')}
                 </span>
-                <span className={styles.apiKeyValue}>{maskApiKey(String(key || ''))}</span>
+                <span className="truncate font-mono text-xs text-muted-foreground">
+                  {maskApiKey(String(key || ''))}
+                </span>
               </span>
-              <span className={styles.apiKeyActions}>
+              <span className="flex shrink-0 items-center">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon-sm"
+                  className={iconButtonClass}
                   onClick={() => handleCopy(key)}
                   disabled={disabled}
+                  aria-label={t('common.copy')}
+                  title={t('common.copy')}
                 >
-                  {t('common.copy')}
+                  <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon-sm"
+                  className={iconButtonClass}
                   onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
                   disabled={disabled}
+                  aria-label={t('config_management.visual.common.edit')}
+                  title={t('config_management.visual.common.edit')}
                 >
-                  {t('config_management.visual.common.edit')}
+                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className={styles.apiKeyDelete}
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
                   disabled={disabled}
+                  aria-label={t('config_management.visual.common.delete')}
+                  title={t('config_management.visual.common.delete')}
                 >
-                  {t('config_management.visual.common.delete')}
+                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
                 </Button>
               </span>
             </li>
@@ -206,78 +237,85 @@ function ScopedApiKeysCardEditor({
         </ol>
       )}
 
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        title={
-          editingApiKeyId !== null
-            ? t('config_management.visual.api_keys.edit_title')
-            : t('config_management.visual.api_keys.add_title')
-        }
-        footer={
-          <>
-            <Button variant="secondary" onClick={closeModal} disabled={disabled}>
-              {t('config_management.visual.common.cancel')}
-            </Button>
-            <Button onClick={handleSave} disabled={disabled}>
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
               {editingApiKeyId !== null
-                ? t('config_management.visual.common.update')
-                : t('config_management.visual.common.add')}
-            </Button>
-          </>
-        }
-      >
-        <div className="form-group">
-          <label htmlFor={nameInputId}>{t('config_management.visual.api_keys.name_label')}</label>
-          <input
-            id={nameInputId}
-            className="input"
-            value={nameValue}
-            onChange={(event) => setNameValue(event.target.value)}
-            placeholder={t('config_management.visual.api_keys.name_placeholder')}
-            aria-describedby={nameHintId}
-            disabled={disabled}
-          />
-          <div id={nameHintId} className="hint">
-            {t('config_management.visual.api_keys.name_hint')}
-          </div>
-        </div>
-        <div className="form-group">
-          <label htmlFor={apiKeyInputId}>
-            {t('config_management.visual.api_keys.input_label')}
-          </label>
-          <div className={styles.apiKeyModalInputRow}>
-            <input
-              id={apiKeyInputId}
-              className="input"
-              placeholder={t('config_management.visual.api_keys.input_placeholder')}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              disabled={disabled}
-              aria-describedby={formError ? `${apiKeyErrorId} ${apiKeyHintId}` : apiKeyHintId}
-              aria-invalid={Boolean(formError)}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleGenerate}
-              disabled={disabled}
-            >
-              {t('config_management.visual.api_keys.generate')}
-            </Button>
-          </div>
-          <ApiKeyStrengthMeter value={inputValue} />
-          <div id={apiKeyHintId} className="hint">
-            {t('config_management.visual.api_keys.input_hint')}
-          </div>
-          {formError && (
-            <div id={apiKeyErrorId} className="error-box">
-              {formError}
-            </div>
-          )}
-        </div>
-      </Modal>
+                ? t('config_management.visual.api_keys.edit_title')
+                : t('config_management.visual.api_keys.add_title')}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSave();
+            }}
+          >
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor={nameInputId}>
+                  {t('config_management.visual.api_keys.name_label')}
+                </FieldLabel>
+                <Input
+                  id={nameInputId}
+                  className="h-9"
+                  value={nameValue}
+                  onChange={(event) => setNameValue(event.target.value)}
+                  placeholder={t('config_management.visual.api_keys.name_placeholder')}
+                  aria-describedby={nameHintId}
+                  disabled={disabled}
+                />
+                <FieldDescription id={nameHintId} className="text-[13px]">
+                  {t('config_management.visual.api_keys.name_hint')}
+                </FieldDescription>
+              </Field>
+              <Field data-invalid={Boolean(formError) || undefined}>
+                <FieldLabel htmlFor={apiKeyInputId}>
+                  {t('config_management.visual.api_keys.input_label')}
+                </FieldLabel>
+                <div className="flex gap-2">
+                  <Input
+                    id={apiKeyInputId}
+                    className="h-9 font-mono text-[13px] md:text-[13px]"
+                    placeholder={t('config_management.visual.api_keys.input_placeholder')}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    disabled={disabled}
+                    aria-describedby={formError ? `${apiKeyErrorId} ${apiKeyHintId}` : apiKeyHintId}
+                    aria-invalid={Boolean(formError)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 shrink-0"
+                    onClick={handleGenerate}
+                    disabled={disabled}
+                  >
+                    {t('config_management.visual.api_keys.generate')}
+                  </Button>
+                </div>
+                <ApiKeyStrengthMeter value={inputValue} />
+                <FieldDescription id={apiKeyHintId} className="text-[13px]">
+                  {t('config_management.visual.api_keys.input_hint')}
+                </FieldDescription>
+                {formError && <FieldError id={apiKeyErrorId}>{formError}</FieldError>}
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeModal} disabled={disabled}>
+                {t('config_management.visual.common.cancel')}
+              </Button>
+              <Button type="submit" disabled={disabled}>
+                {editingApiKeyId !== null
+                  ? t('config_management.visual.common.update')
+                  : t('config_management.visual.common.add')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

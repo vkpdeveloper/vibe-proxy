@@ -7,6 +7,7 @@ import {
   type ExcludedModelsCatalogState,
 } from '@/components/excludedModels';
 import { authFilesApi } from '@/services/api';
+import { Field, FieldLabel } from '@/components/ui/field';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
 
 interface AuthFileExcludedModelsFieldProps {
@@ -86,8 +87,8 @@ export function AuthFileExcludedModelsField({
       : 'ready';
 
   return (
-    <div className="form-group">
-      <label id={labelId}>{t('auth_files.excluded_models_label')}</label>
+    <Field>
+      <FieldLabel id={labelId}>{t('auth_files.excluded_models_label')}</FieldLabel>
       <ExcludedModelsPicker
         value={rules}
         onChange={(next) => onChange(formatExcludedRulesText(next))}
@@ -96,6 +97,6 @@ export function AuthFileExcludedModelsField({
         disabled={disabled}
         labelledBy={labelId}
       />
-    </div>
+    </Field>
   );
 }

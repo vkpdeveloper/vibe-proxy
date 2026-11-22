@@ -1,5 +1,6 @@
 {
   "common": {
+    "more": "Ещё",
     "login": "Войти",
     "logout": "Выйти",
     "back": "Назад",
@@ -66,14 +67,16 @@
     "subtitle": "Центр управления"
   },
   "login": {
+    "show_key": "Показать ключ",
+    "hide_key": "Скрыть ключ",
     "subtitle": "Подключение к CLI Proxy API v8 или новее",
     "connection_current": "Текущий URL",
     "connection_auto_hint": "Система автоматически использует текущий URL для подключения",
-    "custom_connection_label": "Пользовательский URL подключения:",
+    "custom_connection_label": "Адрес сервера",
     "custom_connection_placeholder": "Напр.: https://example.com:8317",
     "custom_connection_hint": "По умолчанию используется текущий URL. При необходимости замените его.",
     "remember_password_label": "Запомнить пароль",
-    "management_key_label": "Ключ управления:",
+    "management_key_label": "Ключ управления",
     "management_key_placeholder": "Введите ключ управления",
     "submit_button": "Войти",
     "submitting": "Подключение...",
@@ -205,7 +208,11 @@
     "cta_system_desc": "Информация о версии и центре управления.",
     "window_m": "{{minutes}} мин",
     "window_h": "{{hours}} ч",
-    "window_hm": "{{hours}} ч {{minutes}} мин"
+    "window_hm": "{{hours}} ч {{minutes}} мин",
+    "providers_title": "Провайдеры",
+    "shortcuts_title": "Быстрые ссылки",
+    "col_requests": "Запросы",
+    "col_volume": "Динамика"
   },
   "basic_settings": {
     "debug_enable": "Включить режим отладки",
@@ -1095,7 +1102,7 @@
     "generating_link": "Создание ссылки для входа…",
     "waiting_background_hint": "Закрытие окна не прервёт вход",
     "restart_login": "Начать заново",
-    "success_saved_hint": "Учётные данные сохранены — управляйте ими в файлах аутентификации.",
+    "success_saved_hint": "Учётные данные сохранены. Управляйте ими в файлах аутентификации.",
     "sign_up_prompt": "Нет аккаунта?",
     "copied": "Скопировано",
     "account_name_label": "Название",
@@ -1124,6 +1131,10 @@
     "history_evicted": "Текущая позиция чтения больше не находится в кэше. Выберите новую позицию.",
     "resume_following": "К последним записям · Новых строк: {{count}}",
     "level_filter": "Уровень журнала",
+    "column_time": "Время",
+    "column_level": "Уровень",
+    "column_request": "Запрос",
+    "column_duration": "Длительность",
     "all_levels": "Все уровни",
     "view_request": "Просмотреть журнал запроса {{id}}",
     "copy_line": "Скопировать эту строку",
@@ -1211,6 +1222,15 @@
       "save": "Сохранить изменения"
     },
     "discard_confirm_message": "Отменить все несохранённые изменения и восстановить последнюю версию с сервера?",
+    "tabs": {
+      "common": "Основные",
+      "connectivity": "Доступ",
+      "network": "Сеть",
+      "logging": "Логи",
+      "streaming": "Стриминг",
+      "advanced": "Дополнительно",
+      "payload": "Нагрузка"
+    },
     "mode": {
       "label": "Режим редактора",
       "visual": "Визуальный",
@@ -1929,6 +1949,7 @@
   "system_info": {
     "title": "Информация о центре управления",
     "about_title": "VProxy",
+    "tab_about": "О программе",
     "models_title": "Доступные модели",
     "models_desc": "Показывает ответ /models и автоматически использует сохранённые API-ключи для авторизации.",
     "models_loading": "Загрузка доступных моделей...",

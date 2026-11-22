@@ -37,8 +37,11 @@ describe('error-rule editor UI', () => {
     expect(html).toContain('Add rule');
     expect(html).toContain('Add condition');
     expect(html).not.toContain('JSON');
-    expect(html).not.toContain('<select');
+    // Menus are the custom listbox Select. Radix only adds a hidden native select for forms.
     expect(html).toContain('aria-haspopup="listbox"');
+    for (const select of html.matchAll(/<select\b[^>]*>/g)) {
+      expect(select[0]).toContain('aria-hidden="true"');
+    }
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     expect(new Set(ids).size).toBe(ids.length);
     for (const label of html.matchAll(/\bfor="([^"]+)"/g)) expect(ids).toContain(label[1]);

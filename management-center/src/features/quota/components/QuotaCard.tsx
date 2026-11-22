@@ -3,38 +3,31 @@
  * Claude observations remain visible while refreshing or after a failed read.
  */
 
-import { useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconNetwork, IconRefreshCw } from '@/components/ui/icons';
-import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { RefreshIcon } from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Private } from '@/components/ui/private';
 import { useNow } from '@/hooks/useNow';
 import type {
   AuthFileItem,
   ClaudeQuotaState,
   QuotaCapacityState,
   QuotaCapacityWindow,
-  ResolvedTheme,
 } from '@/types';
 import { buildResetDisplay, formatQuotaResetTime, resolveQuotaErrorMessage } from '@/utils/quota';
-import {
-  getAuthFileIcon,
-  getThemeSurfaceIconBackground,
-  getTypeLabel,
-  isThemeSurfaceIconProvider,
-} from '@/features/authFiles/constants';
+import { getTypeLabel } from '@/features/authFiles/constants';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
-import { bindQuotaClasses } from '../types';
+import { ProviderLogo } from '@/features/authFiles/components/ProviderLogo';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
+import { QuotaMeter } from './QuotaMeter';
 import { QuotaResetLabel } from './QuotaResetLabel';
+import { quotaClasses } from './quotaClasses';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { ClaudeResetGrantDetails } from '../providers/claude/ClaudeResetGrantDetails';
 import { hasClaudeUsageData } from '../providers/claude/data';
-import bodyStyles from './QuotaBody.module.scss';
-import styles from './QuotaCard.module.scss';
-
-/** Bind the quota-page styles to the shared rendering contract. */
-const quotaClasses = bindQuotaClasses(bodyStyles, 'QuotaBody.module.scss');
 
 interface StoredQuotaSnapshot {
   state: QuotaCapacityState;
@@ -98,27 +91,21 @@ const resolveStoredQuotaSnapshot = (item: AuthFileItem): StoredQuotaSnapshot | n
 export type QuotaCardProps = {
   entry: QuotaFileEntry;
   quota?: QuotaCardState;
-  resolvedTheme: ResolvedTheme;
   canRefresh: boolean;
   resetting: boolean;
-  /** Initial cascade delay; null disables entrance motion for later mounts. */
-  entranceDelayMs?: number | null;
   onRefresh: () => void;
   /** `targetId` spends one specific reset credit. */
   onReset: (targetId?: string) => void;
 };
 
-export function QuotaCard(props: QuotaCardProps) {
-  const {
-    entry,
-    quota,
-    resolvedTheme,
-    canRefresh,
-    resetting,
-    entranceDelayMs,
-    onRefresh,
-    onReset,
-  } = props;
+export function QuotaCard({
+  entry,
+  quota,
+  canRefresh,
+  resetting,
+  onRefresh,
+  onReset,
+}: QuotaCardProps) {
   const { t, i18n } = useTranslation();
   const now = useNow();
   const adapter = QUOTA_ADAPTERS[entry.type];
@@ -128,17 +115,9 @@ export function QuotaCard(props: QuotaCardProps) {
   const retainedClaudeUsage =
     entry.type === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
 
-  // Capture the entrance delay only at mount, without a render-time ref read.
-  const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);
-  const entranceStyle =
-    mountEntranceDelayMs === null
-      ? undefined
-      : ({ '--card-delay': `${mountEntranceDelayMs}ms` } as CSSProperties);
-
   const status = quota?.status ?? 'idle';
   const loading = status === 'loading';
   const storedSnapshot = status === 'idle' ? resolveStoredQuotaSnapshot(file) : null;
-  const hasStoredSnapshot = storedSnapshot !== null;
   const routingSelection = file.routing_selection ?? file.routingSelection;
   const isRoutingSelected = routingSelection?.selected === true;
   const routingSelectionTitle = isRoutingSelected
@@ -163,7 +142,6 @@ export function QuotaCard(props: QuotaCardProps) {
           file.quotaProvider ?? file['quota_provider'] ?? file.provider ?? file.type ?? 'plugin'
         )
       : entry.type;
-  const iconSrc = getAuthFileIcon(providerType, resolvedTheme);
   const typeLabel = getTypeLabel(t, providerType);
   const errorMessage = resolveQuotaErrorMessage(
     t,
@@ -198,199 +176,167 @@ export function QuotaCard(props: QuotaCardProps) {
     Boolean(adapter.resetQuota) &&
     quota !== undefined &&
     Boolean(adapter.canResetQuota?.(quota));
+  const showActions = status !== 'idle' || storedSnapshot !== null;
+  const body = quota ? (
+    <adapter.Body
+      quota={quota}
+      classes={quotaClasses}
+      planItems={claudePlanItems}
+      afterPlan={claudeAfterPlan}
+      onUseReset={showReset ? onReset : undefined}
+      useResetDisabled={!canRefresh || loading || resetting}
+    />
+  ) : null;
 
   return (
-    <article
-      className={`${styles.card} ${isRoutingSelected ? styles.cardRoutingSelected : ''} ${mountEntranceDelayMs === null ? '' : styles.cardEnter}`}
-      style={entranceStyle}
-    >
-      <header className={styles.head}>
-        <span
-          className={styles.iconWrap}
-          title={typeLabel}
-          style={
-            isThemeSurfaceIconProvider(providerType)
-              ? { background: getThemeSurfaceIconBackground(resolvedTheme) }
-              : undefined
-          }
-        >
-          {iconSrc ? (
-            <img src={iconSrc} alt="" className={styles.icon} />
-          ) : (
-            <span className={styles.iconFallback}>{typeLabel.slice(0, 1).toUpperCase()}</span>
-          )}
-        </span>
-        {isRoutingSelected && (
-          <span className={styles.routingSelectionBadge} title={routingSelectionTitle}>
-            <IconNetwork className={styles.routingSelectionIcon} size={12} />
-            {t('auth_files.routing_selected')}
-          </span>
-        )}
-        <span
-          className={styles.fileName}
-          title={identity.kind === 'email' ? undefined : displayIdentity}
-        >
-          {identity.kind === 'email' ? (
-            <EmailPrivacyText text={displayIdentity} />
-          ) : (
-            displayIdentity
-          )}
-        </span>
-      </header>
-
-      <div className={styles.body}>
-        {status === 'idle' && storedSnapshot ? (
-          <div className={styles.snapshotBody}>
-            {storedSnapshot.windows.map((window) => {
-              const remaining =
-                window.known === true && Number.isFinite(window.remaining_percent)
-                  ? Math.max(0, Math.min(100, window.remaining_percent))
-                  : null;
-              const resetAtMs = parseTimestamp(window.reset_at);
-              const resetDisplay = buildResetDisplay(null, resetAtMs, now, i18n.resolvedLanguage);
-              const descriptionKey = STORED_WINDOW_DESCRIPTIONS[entry.type]?.[window.id];
-
-              return (
-                <div key={window.id} className={styles.snapshotRow}>
-                  <div className={styles.snapshotRowHeader}>
-                    <span className={styles.snapshotLabel}>
-                      <span className={styles.snapshotModel}>{window.label}</span>
-                      {descriptionKey && (
-                        <span className={styles.snapshotDescription}>{t(descriptionKey)}</span>
-                      )}
-                    </span>
-                    <div className={styles.snapshotMeta}>
-                      <span className={styles.snapshotPercent}>
-                        {remaining === null
-                          ? t('quota_management.usage_not_reported')
-                          : t('auth_files.quota_drain_remaining', {
-                              percent: Math.round(remaining),
-                            })}
-                      </span>
-                      {resetDisplay && (
-                        <QuotaResetLabel display={resetDisplay} classes={quotaClasses} />
-                      )}
-                    </div>
-                  </div>
-                  {remaining !== null && (
-                    <div className={styles.snapshotTrack}>
-                      <div className={styles.snapshotFill} style={{ width: `${remaining}%` }} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <div className={styles.snapshotMetaRow}>
-              {storedSnapshot.fetchedAt && (
-                <span>
-                  {t('quota_management.snapshot_updated', {
-                    time: formatQuotaResetTime(storedSnapshot.fetchedAt),
-                  })}
-                </span>
-              )}
-              {storedSnapshot.stale && (
-                <span className={styles.snapshotStale}>{t('auth_files.quota_drain_stale')}</span>
-              )}
-            </div>
-            {storedSnapshot.state.last_error && (
-              <div className={styles.snapshotError}>
-                {t('auth_files.quota_drain_refresh_error', {
-                  message: storedSnapshot.state.last_error,
-                })}
-              </div>
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <ProviderLogo type={providerType} className="size-9 rounded-lg" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <span
+              className="min-w-0 truncate"
+              title={identity.kind === 'email' ? undefined : displayIdentity}
+            >
+              {identity.kind === 'email' ? <Private>{displayIdentity}</Private> : displayIdentity}
+            </span>
+            {isRoutingSelected && (
+              <Badge variant="secondary" className="gap-1.5" title={routingSelectionTitle}>
+                <span className="size-1.5 rounded-full bg-primary" />
+                {t('auth_files.routing_selected')}
+              </Badge>
             )}
           </div>
-        ) : status === 'idle' ? (
-          <button
-            type="button"
-            className={styles.idleBody}
-            onClick={onRefresh}
-            disabled={!canRefresh}
-          >
-            <IconRefreshCw size={15} aria-hidden="true" className={styles.idleGlyph} />
-            <span className={styles.idleHint}>{t(`${adapter.i18nPrefix}.idle`)}</span>
-          </button>
-        ) : loading && !retainedClaudeUsage ? (
-          <div className={styles.skeleton} aria-busy="true">
-            <span className={styles.srOnly}>{t(`${adapter.i18nPrefix}.loading`)}</span>
-            {[0, 1].map((row) => (
-              <div key={row} className={styles.skeletonRow} aria-hidden="true">
-                <span className={styles.skeletonLabel} />
-                <span className={styles.skeletonTrack} />
-              </div>
-            ))}
-          </div>
-        ) : status === 'error' ? (
-          <div className={styles.errorStrip} role="alert">
-            {t(`${adapter.i18nPrefix}.load_failed`, { message: errorMessage })}
-          </div>
-        ) : quota && !retainedClaudeUsage ? (
-          <adapter.Body
-            quota={quota}
-            classes={quotaClasses}
-            planItems={claudePlanItems}
-            afterPlan={claudeAfterPlan}
-            onUseReset={showReset ? onReset : undefined}
-            useResetDisabled={!canRefresh || loading || resetting}
-          />
-        ) : !retainedClaudeUsage ? (
-          <div className={styles.idleHint}>{t(`${adapter.i18nPrefix}.idle`)}</div>
-        ) : null}
-        {loading && retainedClaudeUsage && (
-          <div role="status" aria-busy="true" className={quotaClasses.quotaMessage}>
-            {t(`${adapter.i18nPrefix}.loading`)}
+          <span className="text-xs text-muted-foreground">{typeLabel}</span>
+        </div>
+        {showActions && (
+          <div className="ml-auto flex items-center gap-1.5">
+            {entry.type === 'claude' && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={claudeReset.blocked}
+                onClick={() => claudeReset.confirm()}
+              >
+                {t(`claude_reset.${claudeReset.buttonLabel}`)}
+              </Button>
+            )}
+            {showReset && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onReset()}
+                disabled={!canRefresh || loading || resetting}
+              >
+                {t('codex_quota.reset_button')}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onRefresh}
+              disabled={isQuotaRefreshDisabled(canRefresh, loading, resetting || claudeReset.busy)}
+              title={t('auth_files.quota_refresh_hint')}
+              aria-label={t('auth_files.quota_refresh_single')}
+            >
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+            </Button>
           </div>
         )}
-        {retainedClaudeUsage && quota && (
-          <adapter.Body
-            quota={quota}
-            classes={quotaClasses}
-            planItems={claudePlanItems}
-            afterPlan={claudeAfterPlan}
-            onUseReset={showReset ? onReset : undefined}
-            useResetDisabled={!canRefresh || loading || resetting}
-          />
-        )}
-      </div>
+      </header>
 
-      {(status !== 'idle' || hasStoredSnapshot) && (
-        <footer className={styles.actionRow}>
-          {entry.type === 'claude' && (
-            <button
-              type="button"
-              className={styles.actionPill}
-              disabled={claudeReset.blocked}
-              onClick={() => claudeReset.confirm()}
-              title={t(`claude_reset.${claudeReset.buttonLabel}`)}
-            >
-              <IconRefreshCw size={13} className={claudeReset.busy ? styles.spinning : undefined} />
-              {t(`claude_reset.${claudeReset.buttonLabel}`)}
-            </button>
+      {status === 'idle' && storedSnapshot ? (
+        <div className="flex flex-col gap-4">
+          {storedSnapshot.windows.map((window, index) => {
+            const remaining =
+              window.known === true && Number.isFinite(window.remaining_percent)
+                ? Math.max(0, Math.min(100, window.remaining_percent))
+                : null;
+            const resetAtMs = parseTimestamp(window.reset_at);
+            const resetDisplay = buildResetDisplay(null, resetAtMs, now, i18n.resolvedLanguage);
+            const descriptionKey = STORED_WINDOW_DESCRIPTIONS[entry.type]?.[window.id];
+
+            return (
+              <div key={window.id} className={quotaClasses.quotaRow}>
+                <div className={quotaClasses.quotaRowHeader}>
+                  <span className={quotaClasses.quotaLabel}>
+                    <span className={quotaClasses.quotaModel}>{window.label}</span>
+                    {descriptionKey && (
+                      <span className={quotaClasses.quotaDescription}>{t(descriptionKey)}</span>
+                    )}
+                  </span>
+                  <div className={quotaClasses.quotaMeta}>
+                    <span className={quotaClasses.quotaPercent}>
+                      {remaining === null
+                        ? t('quota_management.usage_not_reported')
+                        : t('auth_files.quota_drain_remaining', {
+                            percent: Math.round(remaining),
+                          })}
+                    </span>
+                    {resetDisplay && (
+                      <QuotaResetLabel display={resetDisplay} classes={quotaClasses} />
+                    )}
+                  </div>
+                </div>
+                {remaining !== null && (
+                  <QuotaMeter percent={remaining} classes={quotaClasses} index={index} />
+                )}
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-faint">
+            {storedSnapshot.fetchedAt && (
+              <span>
+                {t('quota_management.snapshot_updated', {
+                  time: formatQuotaResetTime(storedSnapshot.fetchedAt),
+                })}
+              </span>
+            )}
+            {storedSnapshot.stale && (
+              <span className="text-warning">{t('auth_files.quota_drain_stale')}</span>
+            )}
+          </div>
+          {storedSnapshot.state.last_error && (
+            <p className="text-xs text-destructive">
+              {t('auth_files.quota_drain_refresh_error', {
+                message: storedSnapshot.state.last_error,
+              })}
+            </p>
           )}
-          {showReset && (
-            <button
-              type="button"
-              className={styles.actionPill}
-              onClick={() => onReset()}
-              disabled={!canRefresh || loading || resetting}
-              title={t('codex_quota.reset_button')}
-            >
-              <IconRefreshCw size={13} className={resetting ? styles.spinning : undefined} />
-              {t('codex_quota.reset_button')}
-            </button>
-          )}
-          <button
-            type="button"
-            className={styles.actionPill}
-            onClick={onRefresh}
-            disabled={isQuotaRefreshDisabled(canRefresh, loading, resetting || claudeReset.busy)}
-            title={t('auth_files.quota_refresh_hint')}
-          >
-            <IconRefreshCw size={13} className={loading ? styles.spinning : undefined} />
-            {t('auth_files.quota_refresh_single')}
-          </button>
-        </footer>
+        </div>
+      ) : status === 'idle' ? (
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-5 text-sm text-muted-foreground transition-colors duration-150 ease-out outline-none hover:bg-muted/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none"
+          onClick={onRefresh}
+          disabled={!canRefresh}
+        >
+          <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} className="size-4" />
+          {t(`${adapter.i18nPrefix}.idle`)}
+        </button>
+      ) : loading && !retainedClaudeUsage ? (
+        <div className="flex flex-col gap-4" aria-busy="true">
+          <span className="sr-only">{t(`${adapter.i18nPrefix}.loading`)}</span>
+          {[0, 1].map((row) => (
+            <div key={row} className="flex flex-col gap-2" aria-hidden="true">
+              <span className="h-3.5 w-28 rounded-sm bg-muted/60" />
+              <span className="h-1 w-full rounded-full bg-muted" />
+            </div>
+          ))}
+        </div>
+      ) : status === 'error' ? (
+        <p role="alert" className="text-sm text-destructive">
+          {t(`${adapter.i18nPrefix}.load_failed`, { message: errorMessage })}
+        </p>
+      ) : !retainedClaudeUsage ? (
+        (body ?? <p className="text-sm text-muted-foreground">{t(`${adapter.i18nPrefix}.idle`)}</p>)
+      ) : null}
+      {loading && retainedClaudeUsage && (
+        <div role="status" aria-busy="true" className={quotaClasses.quotaMessage}>
+          {t(`${adapter.i18nPrefix}.loading`)}
+        </div>
       )}
+      {retainedClaudeUsage && body}
     </article>
   );
 }

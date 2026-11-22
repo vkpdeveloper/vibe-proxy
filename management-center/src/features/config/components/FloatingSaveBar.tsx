@@ -1,21 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { animate } from 'motion/mini';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { IconCheck } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon, Tick02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
 import { prefersReducedMotion } from '@/hooks/motion';
-import { useActionBarHeightVar } from '@/hooks/useActionBarHeightVar';
+import { cn } from '@/lib/utils';
 import type { ConfigStatusTone } from '../uiState';
-import styles from './FloatingSaveBar.module.scss';
-
-const easeOutQuart = (progress: number) => 1 - (1 - progress) ** 4;
-const easeInCubic = (progress: number) => progress ** 3;
-const BASE_TRANSFORM = 'translateX(-50%)';
-const HIDDEN_TRANSFORM = 'translateX(-50%) translateY(56px)';
 
 export type FloatingSaveBarProps = {
-  /** 有未保存修改时可见（与未保存离开守卫的 block 条件一致）。 */
+  /** Shown while there are unsaved changes (the same condition as the leave guard). */
   visible: boolean;
   statusText: string;
   statusTone: ConfigStatusTone;
@@ -26,143 +20,78 @@ export type FloatingSaveBarProps = {
   onDiscard: () => void;
 };
 
+const toneDot: Record<ConfigStatusTone, string> = {
+  error: 'bg-destructive',
+  warning: 'bg-warning',
+  busy: 'bg-primary',
+  muted: 'bg-faint',
+  ok: 'bg-success',
+};
+
 /**
- * 悬浮保存栏：portal 到 body 的玻璃工具栏，仅在 dirty 时出现。
- * - 上浮入场 0.28s 强减速，退场 0.22s 加速后卸载；
- * - reduced-motion 只做透明度淡入淡出（保留 translateX(-50%)，防止错位半宽）；
- * - 实时高度写入 --config-action-bar-height 供页面底部留白。
+ * A small bar at the bottom of the screen while the config has unsaved changes.
+ * It slides in and out with CSS (ease-out in, ease-in out) and unmounts after the exit.
  */
-export function FloatingSaveBar(props: FloatingSaveBarProps) {
-  const {
-    visible,
-    statusText,
-    statusTone,
-    saving,
-    saveDisabled,
-    discardDisabled,
-    onSave,
-    onDiscard,
-  } = props;
+export function FloatingSaveBar({
+  visible,
+  statusText,
+  statusTone,
+  saving,
+  saveDisabled,
+  discardDisabled,
+  onSave,
+  onDiscard,
+}: FloatingSaveBarProps) {
   const { t } = useTranslation();
+  // Stays mounted through the exit animation; reduced motion has no animation, so it unmounts now.
+  const [leaving, setLeaving] = useState(false);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    setLeaving(!visible && !prefersReducedMotion());
+  }
 
-  const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const animationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const visibleRef = useRef(visible);
-  const previousVisibleRef = useRef(false);
-
-  useActionBarHeightVar(containerRef, '--config-action-bar-height', mounted);
-
-  useEffect(() => {
-    visibleRef.current = visible;
-    if (visible) setMounted(true);
-  }, [visible]);
-
-  useLayoutEffect(() => {
-    if (!mounted) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const wasVisible = previousVisibleRef.current;
-
-    animationRef.current?.stop();
-    animationRef.current = null;
-
-    const reduced = prefersReducedMotion();
-
-    if (visible && !wasVisible) {
-      if (reduced) {
-        el.style.transform = BASE_TRANSFORM;
-        animationRef.current = animate(
-          el,
-          { opacity: [0, 1] },
-          {
-            duration: 0.15,
-            ease: 'linear',
-            onComplete: () => {
-              el.style.opacity = '1';
-            },
-          }
-        );
-      } else {
-        animationRef.current = animate(
-          el,
-          { transform: [HIDDEN_TRANSFORM, BASE_TRANSFORM], opacity: [0, 1] },
-          {
-            duration: 0.28,
-            ease: easeOutQuart,
-            onComplete: () => {
-              el.style.transform = BASE_TRANSFORM;
-              el.style.opacity = '1';
-            },
-          }
-        );
-      }
-    } else if (!visible && wasVisible) {
-      const finishExit = () => {
-        if (!visibleRef.current) setMounted(false);
-      };
-      if (reduced) {
-        el.style.transform = BASE_TRANSFORM;
-        animationRef.current = animate(
-          el,
-          { opacity: [1, 0] },
-          { duration: 0.12, ease: 'linear', onComplete: finishExit }
-        );
-      } else {
-        animationRef.current = animate(
-          el,
-          { transform: [BASE_TRANSFORM, HIDDEN_TRANSFORM], opacity: [1, 0] },
-          { duration: 0.22, ease: easeInCubic, onComplete: finishExit }
-        );
-      }
-    }
-
-    previousVisibleRef.current = visible;
-  }, [mounted, visible]);
-
-  useEffect(
-    () => () => {
-      animationRef.current?.stop();
-      animationRef.current = null;
-    },
-    []
-  );
-
-  if (!mounted || typeof document === 'undefined') return null;
-
-  const toneClass: Record<ConfigStatusTone, string> = {
-    error: styles.statusError,
-    warning: styles.statusWarning,
-    busy: styles.statusBusy,
-    muted: styles.statusMuted,
-    ok: styles.statusOk,
-  };
+  if ((!visible && !leaving) || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className={styles.container} ref={containerRef}>
-      <div className={styles.bar} role="group" aria-label={t('config_management.status_dirty')}>
-        <span className={`${styles.status} ${toneClass[statusTone]}`} aria-live="polite">
-          {statusText}
+    <div
+      className={cn(
+        'fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 sm:bottom-6',
+        'pointer-events-none'
+      )}
+    >
+      <div
+        role="group"
+        aria-label={t('config_management.status_dirty')}
+        onAnimationEnd={() => {
+          if (!visible) setLeaving(false);
+        }}
+        className={cn(
+          'pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border bg-popover py-2 pr-2 pl-3.5 shadow-lg shadow-black/60 motion-reduce:animate-none',
+          visible
+            ? 'animate-in fade-in-0 slide-in-from-bottom-4 duration-200 ease-out'
+            : 'animate-out fade-out-0 slide-out-to-bottom-4 fill-mode-forwards duration-150 ease-in'
+        )}
+      >
+        <span
+          className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted-foreground"
+          aria-live="polite"
+        >
+          <span className={cn('size-2 shrink-0 rounded-full', toneDot[statusTone])} />
+          <span className="truncate max-sm:sr-only">{statusText}</span>
         </span>
-        <div className={styles.actionsGroup}>
-          <button
-            type="button"
-            className={styles.ghostAction}
-            onClick={onDiscard}
-            disabled={discardDisabled}
-          >
-            {t('config_management.actions.discard')}
-          </button>
-          <button
-            type="button"
-            className={styles.savePill}
-            onClick={onSave}
-            disabled={saveDisabled}
-          >
-            {saving ? <LoadingSpinner size={14} /> : <IconCheck size={15} />}
-            {t('config_management.actions.save')}
-          </button>
-        </div>
+        <Button variant="ghost" className="h-8" onClick={onDiscard} disabled={discardDisabled}>
+          {t('config_management.actions.discard')}
+        </Button>
+        <Button className="h-8" onClick={onSave} disabled={saveDisabled}>
+          <HugeiconsIcon
+            icon={saving ? Loading03Icon : Tick02Icon}
+            data-icon="inline-start"
+            strokeWidth={2}
+            className={cn(saving && 'animate-spin motion-reduce:animate-none')}
+          />
+          {t('config_management.actions.save')}
+        </Button>
       </div>
     </div>,
     document.body

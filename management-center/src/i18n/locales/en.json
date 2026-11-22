@@ -1,5 +1,6 @@
 {
   "common": {
+    "more": "More",
     "login": "Login",
     "logout": "Logout",
     "back": "Back",
@@ -66,14 +67,16 @@
     "subtitle": "Management Center"
   },
   "login": {
+    "show_key": "Show key",
+    "hide_key": "Hide key",
     "subtitle": "Connect to CLI Proxy API v8 or later",
     "connection_current": "Current URL",
     "connection_auto_hint": "The system will automatically use the current URL for connection",
-    "custom_connection_label": "Custom Connection URL:",
+    "custom_connection_label": "Server address",
     "custom_connection_placeholder": "Eg: https://example.com:8317",
     "custom_connection_hint": "By default the current URL is used. Override it here if needed.",
     "remember_password_label": "Remember password",
-    "management_key_label": "Management Key:",
+    "management_key_label": "Management key",
     "management_key_placeholder": "Enter the management key",
     "submit_button": "Login",
     "submitting": "Connecting...",
@@ -206,7 +209,11 @@
     "cta_system_desc": "Version details and management center info.",
     "window_m": "{{minutes}}m",
     "window_h": "{{hours}}h",
-    "window_hm": "{{hours}}h {{minutes}}m"
+    "window_hm": "{{hours}}h {{minutes}}m",
+    "providers_title": "Providers",
+    "shortcuts_title": "Shortcuts",
+    "col_requests": "Requests",
+    "col_volume": "Volume"
   },
   "basic_settings": {
     "debug_enable": "Enable Debug Mode",
@@ -848,7 +855,7 @@
     "list_aria": "Models",
     "no_results": "No model matches “{{query}}”",
     "catalog_loading": "Loading models…",
-    "catalog_unavailable": "Model list unavailable — rules still apply.",
+    "catalog_unavailable": "Model list unavailable, rules still apply.",
     "catalog_error": "Could not load models.",
     "catalog_retry": "Retry",
     "catalog_empty": "No models to list.",
@@ -859,7 +866,7 @@
     "badge_wildcard": "By rule",
     "badge_unknown": "Not in list",
     "wildcard_reason": "Matched by rule {{rule}}",
-    "wildcard_locked": "Excluded by rule {{rule}} — edit the rule below",
+    "wildcard_locked": "Excluded by rule {{rule}}: edit the rule below",
     "also_wildcard": "Also matched by {{rule}}",
     "chips_more": "+{{n}} more",
     "chip_remove": "Stop excluding {{rule}}",
@@ -868,7 +875,7 @@
     "rules_hint": "* matches any characters. Matching is case-insensitive.",
     "rules_match_count": "matches {{n}} models",
     "rules_match_none": "matches no model in the list",
-    "rules_reserved": "“*” disables the whole provider — use the Disabled switch instead"
+    "rules_reserved": "“*” disables the whole provider, use the Disabled switch instead"
   },
   "oauth_model_alias": {
     "editor_description": "Give provider models consistent names for use in your clients.",
@@ -904,7 +911,7 @@
     "delete_failed": "Failed to delete model aliases",
     "no_models": "No model aliases",
     "model_count": "{{count}} aliases",
-    "list_empty_all": "No model aliases yet—use “Add Alias” to create one.",
+    "list_empty_all": "No model aliases yet. Use “Add Alias” to create one.",
     "chart_title": "All mappings overview",
     "diagram_providers": "Providers",
     "diagram_source_models": "Source Models",
@@ -926,7 +933,7 @@
     "diagram_rename_btn": "Rename",
     "diagram_add_btn": "Add",
     "diagram_settings": "Settings",
-    "diagram_settings_title": "Alias settings — {{alias}}",
+    "diagram_settings_title": "Alias settings: {{alias}}",
     "diagram_settings_source_title": "Source model settings",
     "diagram_settings_empty": "No mappings for this alias yet.",
     "diagram_tap_hint": "On touch devices: tap a source model, then tap an alias to link.",
@@ -1092,7 +1099,7 @@
     "generating_link": "Generating sign-in link…",
     "waiting_background_hint": "Closing this window won't stop sign-in",
     "restart_login": "Start over",
-    "success_saved_hint": "The credential is saved — manage it in Auth Files.",
+    "success_saved_hint": "The credential is saved. Manage it in Auth Files.",
     "sign_up_prompt": "No account yet?",
     "copied": "Copied",
     "account_name_label": "Name",
@@ -1121,6 +1128,10 @@
     "history_evicted": "Your reading position is no longer cached. Please choose a new position.",
     "resume_following": "Back to latest · New lines: {{count}}",
     "level_filter": "Log level",
+    "column_time": "Time",
+    "column_level": "Level",
+    "column_request": "Request",
+    "column_duration": "Duration",
     "all_levels": "All levels",
     "view_request": "View log for request {{id}}",
     "copy_line": "Copy this line",
@@ -1208,6 +1219,15 @@
       "save": "Save changes"
     },
     "discard_confirm_message": "Discard all unsaved changes and restore the last server version?",
+    "tabs": {
+      "common": "Common",
+      "connectivity": "Access",
+      "network": "Network",
+      "logging": "Logging",
+      "streaming": "Streaming",
+      "advanced": "Advanced",
+      "payload": "Payload"
+    },
     "mode": {
       "label": "Editor mode",
       "visual": "Visual",
@@ -1906,7 +1926,7 @@
     "no_matches_desc": "No plugins match the current search or filter.",
     "clear_filters": "Clear filters",
     "security_banner_title": "Third-party plugins run with full backend access",
-    "security_banner_text": "Plugins execute code inside the proxy service and can read your credentials and traffic. Only install plugins you trust — be especially careful with any plugin not published by the official router-for-me organization.",
+    "security_banner_text": "Plugins execute code inside the proxy service and can read your credentials and traffic. Only install plugins you trust, and be especially careful with any plugin not published by the official router-for-me organization.",
     "badge_untrusted": "Third-party",
     "gate_title": "Install {{name}}",
     "gate_title_update": "Update {{name}}",
@@ -1935,6 +1955,7 @@
   "system_info": {
     "title": "Management Center Info",
     "about_title": "VProxy",
+    "tab_about": "About",
     "models_title": "Available Models",
     "models_desc": "Shows the /models response and uses saved API keys for auth automatically.",
     "models_loading": "Loading available models...",
@@ -2275,7 +2296,7 @@
       "headersSection": "Request headers",
       "addHeader": "Add header",
       "excludedSection": "Excluded models",
-      "excludedDisabledNote": "“*” means the whole provider is disabled — use the Disabled switch above instead.",
+      "excludedDisabledNote": "“*” means the whole provider is disabled. Use the Disabled switch above instead.",
       "cloakSection": "Cloak settings",
       "cloakMode": "Mode",
       "cloakStrict": "Strict mode",

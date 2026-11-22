@@ -1,18 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
+import { Section } from '@/components/layout/Page';
 import { SettingList, TextSetting } from '../fields/FieldPrimitives';
 import { getValidationMessage } from '../blocks/shared';
-
-const Icon = CONFIG_TAB_ICONS.streaming;
 
 /** 04 流式传输：keepalive 与 bootstrap 重试；nonstream-keepalive-interval 是顶层 YAML 键。 */
 export function SectionStreaming({
   values,
   validationErrors,
   disabled,
-  animateIn,
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
@@ -29,13 +25,7 @@ export function SectionStreaming({
     !nonstreamKeepaliveError && Number(streaming.nonstreamKeepaliveInterval) <= 0;
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.streaming}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.streaming.title')}
-      description={t('config_management.visual.sections.streaming.description')}
-      animateIn={animateIn}
-    >
+    <Section title={t('config_management.visual.sections.streaming.title')}>
       <SettingList>
         <TextSetting
           fieldId="streamingKeepaliveSeconds"
@@ -85,6 +75,6 @@ export function SectionStreaming({
           adornment={isNonstreamKeepaliveOff ? disabledBadge : undefined}
         />
       </SettingList>
-    </SectionCard>
+    </Section>
   );
 }

@@ -1,12 +1,36 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconChevronDown, IconChevronUp, IconSlidersHorizontal } from '@/components/ui/icons';
-import { Select } from '@/components/ui/Select';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  ArrowDown01Icon,
+  FilterHorizontalIcon,
+  Search01Icon,
+  SortingAZ02Icon,
+  SortingZA01Icon,
+} from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ProviderSortBy, SortDir } from '../types';
-import styles from './ProviderResourceToolbar.module.scss';
+
+const SORT_OPTIONS: ReadonlyArray<{ value: ProviderSortBy; labelKey: string }> = [
+  { value: 'name', labelKey: 'providersPage.toolbar.sort.name' },
+  { value: 'priority', labelKey: 'providersPage.toolbar.sort.priority' },
+  { value: 'recent-success', labelKey: 'providersPage.toolbar.sort.recentSuccess' },
+];
 
 interface ProviderResourceToolbarProps {
+  filter: string;
+  onFilterChange: (value: string) => void;
   sortBy: ProviderSortBy;
   sortDir: SortDir;
   onSortBy: (value: ProviderSortBy) => void;
@@ -16,7 +40,10 @@ interface ProviderResourceToolbarProps {
   onSelectedModelsChange: (next: Set<string>) => void;
 }
 
+/** Search, sort and model filter for the resource list of one provider. */
 export function ProviderResourceToolbar({
+  filter,
+  onFilterChange,
   sortBy,
   sortDir,
   onSortBy,
@@ -26,31 +53,11 @@ export function ProviderResourceToolbar({
   onSelectedModelsChange,
 }: ProviderResourceToolbarProps) {
   const { t } = useTranslation();
-  const [filterOpen, setFilterOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const sortOptions = useMemo(
-    () => [
-      { value: 'name', label: t('providersPage.toolbar.sort.name') },
-      { value: 'priority', label: t('providersPage.toolbar.sort.priority') },
-      {
-        value: 'recent-success',
-        label: t('providersPage.toolbar.sort.recentSuccess'),
-      },
-    ],
-    [t]
-  );
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onClickOutside = (e: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onClickOutside);
-    return () => document.removeEventListener('pointerdown', onClickOutside);
-  }, [filterOpen]);
+  const idPrefix = useId();
+  const directionLabel =
+    sortDir === 'asc'
+      ? t('providersPage.toolbar.sort.directionAsc')
+      : t('providersPage.toolbar.sort.directionDesc');
 
   const toggleModel = (name: string) => {
     const next = new Set(selectedModels);
@@ -58,9 +65,6 @@ export function ProviderResourceToolbar({
     else next.add(name);
     onSelectedModelsChange(next);
   };
-
-  const selectAll = () => onSelectedModelsChange(new Set(availableModels));
-  const clearAll = () => onSelectedModelsChange(new Set());
 
   const filterLabel =
     selectedModels.size === 0
@@ -71,84 +75,108 @@ export function ProviderResourceToolbar({
         });
 
   return (
-    <div className={styles.root}>
-      <div className={styles.sortGroup}>
-        <span className={styles.label}>{t('providersPage.toolbar.sortBy')}</span>
-        <Select
-          value={sortBy}
-          options={sortOptions}
-          onChange={(value) => onSortBy(value as ProviderSortBy)}
-          ariaLabel={t('providersPage.toolbar.sortBy')}
-          size="sm"
+    <div className="flex flex-wrap items-center gap-2">
+      <InputGroup className="h-9 min-w-0 basis-full sm:basis-0 sm:flex-1">
+        <InputGroupAddon>
+          <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+        </InputGroupAddon>
+        <InputGroupInput
+          type="search"
+          value={filter}
+          onChange={(event) => onFilterChange(event.target.value)}
+          placeholder={t('providersPage.table.filterPlaceholder')}
+          aria-label={t('providersPage.table.filterPlaceholder')}
         />
-        <button
+      </InputGroup>
+
+      <div className="flex min-w-0 items-center gap-1">
+        <Select value={sortBy} onValueChange={(value) => onSortBy(value as ProviderSortBy)}>
+          <SelectTrigger className="h-9 min-w-0" aria-label={t('providersPage.toolbar.sortBy')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {SORT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
           type="button"
-          className={styles.dirBtn}
+          variant="ghost"
+          size="icon-lg"
           onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-          aria-label={
-            sortDir === 'asc'
-              ? t('providersPage.toolbar.sort.directionAsc')
-              : t('providersPage.toolbar.sort.directionDesc')
-          }
-          title={
-            sortDir === 'asc'
-              ? t('providersPage.toolbar.sort.directionAsc')
-              : t('providersPage.toolbar.sort.directionDesc')
-          }
+          aria-label={directionLabel}
+          title={directionLabel}
         >
-          {sortDir === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
-        </button>
+          <HugeiconsIcon
+            icon={sortDir === 'asc' ? SortingAZ02Icon : SortingZA01Icon}
+            strokeWidth={1.75}
+          />
+        </Button>
       </div>
 
-      <div className={styles.filterGroup} ref={containerRef}>
-        <button
-          type="button"
-          className={styles.filterTrigger}
-          onClick={() => setFilterOpen((v) => !v)}
-          disabled={availableModels.length === 0}
-        >
-          <IconSlidersHorizontal size={14} />
-          <span>{filterLabel}</span>
-          <IconChevronDown size={12} />
-        </button>
-        {filterOpen ? (
-          <div className={styles.filterPanel}>
-            <div className={styles.filterToolbar}>
-              <button
-                type="button"
-                className={styles.filterToolbarBtn}
-                onClick={selectAll}
-                disabled={availableModels.length === 0}
-              >
-                {t('providersPage.toolbar.filter.selectAll')}
-              </button>
-              <button
-                type="button"
-                className={styles.filterToolbarBtn}
-                onClick={clearAll}
-                disabled={selectedModels.size === 0}
-              >
-                {t('providersPage.toolbar.filter.clear')}
-              </button>
-            </div>
-            {availableModels.length === 0 ? (
-              <div className={styles.filterEmpty}>{t('providersPage.toolbar.filter.empty')}</div>
-            ) : (
-              <ul className={styles.filterList}>
-                {availableModels.map((name) => (
-                  <li key={name} className={styles.filterItem}>
-                    <SelectionCheckbox
-                      checked={selectedModels.has(name)}
-                      onChange={() => toggleModel(name)}
-                      label={<span className={styles.filterItemLabel}>{name}</span>}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="min-w-0"
+            disabled={availableModels.length === 0}
+          >
+            <HugeiconsIcon
+              icon={FilterHorizontalIcon}
+              strokeWidth={1.75}
+              data-icon="inline-start"
+            />
+            <span className="truncate">{filterLabel}</span>
+            <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={1.75} data-icon="inline-end" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72 gap-1 p-1">
+          <div className="flex items-center justify-between gap-2 px-2 py-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => onSelectedModelsChange(new Set(availableModels))}
+            >
+              {t('providersPage.toolbar.filter.selectAll')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => onSelectedModelsChange(new Set())}
+              disabled={selectedModels.size === 0}
+            >
+              {t('providersPage.toolbar.filter.clear')}
+            </Button>
           </div>
-        ) : null}
-      </div>
+          <ul className="flex max-h-72 flex-col overflow-y-auto border-t pt-1">
+            {availableModels.map((name, index) => {
+              const id = `${idPrefix}-model-${index}`;
+              return (
+                <li key={name}>
+                  <Label
+                    htmlFor={id}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 font-normal hover:bg-accent"
+                  >
+                    <Checkbox
+                      id={id}
+                      checked={selectedModels.has(name)}
+                      onCheckedChange={() => toggleModel(name)}
+                    />
+                    <span className="min-w-0 truncate font-mono text-xs">{name}</span>
+                  </Label>
+                </li>
+              );
+            })}
+          </ul>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

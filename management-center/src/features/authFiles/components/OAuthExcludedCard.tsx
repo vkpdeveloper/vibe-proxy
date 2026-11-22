@@ -1,8 +1,20 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Delete02Icon, PencilEdit02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item';
+import { Section } from '@/components/layout/Page';
 import type { OAuthConfigLoadError } from '@/features/authFiles/constants';
-import styles from './OAuthConfigPanels.module.scss';
+import { OAuthConfigEmpty } from './OAuthConfigEmpty';
+import { ProviderLogo } from './ProviderLogo';
 
 export type OAuthExcludedCardProps = {
   disableControls: boolean;
@@ -17,61 +29,71 @@ export type OAuthExcludedCardProps = {
 export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
   const { t } = useTranslation();
   const { disableControls, excludedError, excluded, onRetry, onAdd, onEdit, onDelete } = props;
+  const entries = Object.entries(excluded);
 
   return (
-    <section className={styles.panel}>
-      <header className={styles.panelHead}>
-        <h3 className={styles.panelTitle}>{t('oauth_excluded.title')}</h3>
-        <div className={styles.panelExtra}>
-          <Button size="sm" onClick={onAdd} disabled={disableControls || excludedError !== null}>
-            {t('oauth_excluded.add')}
-          </Button>
-        </div>
-      </header>
-      <div className={styles.panelBody}>
-        {excludedError === 'unsupported' ? (
-          <EmptyState
-            title={t('oauth_excluded.upgrade_required_title')}
-            description={t('oauth_excluded.upgrade_required_desc')}
-          />
-        ) : excludedError === 'load' ? (
-          <EmptyState
-            title={t('notification.refresh_failed')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void onRetry()}>
-                {t('common.refresh')}
-              </Button>
-            }
-          />
-        ) : excludedError === 'loading' ? (
-          <EmptyState title={t('common.loading')} />
-        ) : Object.keys(excluded).length === 0 ? (
-          <EmptyState title={t('oauth_excluded.list_empty_all')} />
-        ) : (
-          <div className={styles.list}>
-            {Object.entries(excluded).map(([provider, models]) => (
-              <div key={provider} className={styles.item}>
-                <div className={styles.itemInfo}>
-                  <div className={styles.itemProvider}>{provider}</div>
-                  <div className={styles.itemCount}>
-                    {models?.length
-                      ? t('oauth_excluded.model_count', { count: models.length })
-                      : t('oauth_excluded.no_models')}
-                  </div>
-                </div>
-                <div className={styles.itemActions}>
-                  <Button variant="secondary" size="sm" onClick={() => onEdit(provider)}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => onDelete(provider)}>
-                    {t('oauth_excluded.delete')}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
+    <Section
+      title={t('oauth_excluded.title')}
+      actions={
+        <Button
+          variant="outline"
+          onClick={onAdd}
+          disabled={disableControls || excludedError !== null}
+        >
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+          {t('oauth_excluded.add')}
+        </Button>
+      }
+    >
+      {excludedError !== null || entries.length === 0 ? (
+        <OAuthConfigEmpty
+          error={excludedError}
+          upgradeTitle={t('oauth_excluded.upgrade_required_title')}
+          upgradeDescription={t('oauth_excluded.upgrade_required_desc')}
+          emptyTitle={t('oauth_excluded.list_empty_all')}
+          onRetry={onRetry}
+        />
+      ) : (
+        <ItemGroup className="gap-0 overflow-hidden rounded-xl border">
+          {entries.map(([provider, models]) => (
+            <Item key={provider} className="rounded-none border-0 not-last:border-b">
+              <ItemMedia>
+                <ProviderLogo type={provider} className="size-8 rounded-lg" />
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle className="font-mono">{provider}</ItemTitle>
+                <ItemDescription>
+                  {models?.length
+                    ? t('oauth_excluded.model_count', { count: models.length })
+                    : t('oauth_excluded.no_models')}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions className="gap-0">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('common.edit')}
+                  title={t('common.edit')}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onEdit(provider)}
+                >
+                  <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('oauth_excluded.delete')}
+                  title={t('oauth_excluded.delete')}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => onDelete(provider)}
+                >
+                  <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                </Button>
+              </ItemActions>
+            </Item>
+          ))}
+        </ItemGroup>
+      )}
+    </Section>
   );
 }

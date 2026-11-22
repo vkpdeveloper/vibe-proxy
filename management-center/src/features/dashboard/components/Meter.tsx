@@ -1,38 +1,29 @@
-import { fillStyle } from '@/lib/dither';
-import type { DitherColor } from '@/lib/dither';
+import { cn } from '@/lib/utils';
 import { toneForSuccessRate, type MeterTone } from '../utils';
-import styles from './Meter.module.scss';
 
-const TONE_COLORS: Record<MeterTone, DitherColor> = {
-  good: 'green',
-  warning: 'orange',
-  critical: 'red',
-  idle: 'grey',
+const TONE_FILL: Record<MeterTone | 'neutral', string> = {
+  good: 'bg-success',
+  warning: 'bg-warning',
+  critical: 'bg-destructive',
+  idle: 'bg-faint',
+  neutral: 'bg-foreground/50',
 };
 
-const METER_CELL = 2;
-
 interface MeterProps {
-  /** 0–100；null 表示窗口内无请求 */
+  /** 0-100; null means there is nothing to measure yet */
   value: number | null;
-  tone?: MeterTone;
-  /** Overrides the tone colour, for meters that show a share rather than health. */
-  color?: DitherColor;
+  /** Severity colour. Defaults to the success-rate scale; `neutral` is for shares, not health. */
+  tone?: MeterTone | 'neutral';
   ariaLabel: string;
   className?: string;
 }
 
-/**
- * Dithered bar meter: the fill colour carries severity, and the track is a
- * sparse dotted run of the same colour so the state reads along the whole bar.
- */
-export function Meter({ value, tone, color: colorOverride, ariaLabel, className }: MeterProps) {
-  const color = colorOverride ?? TONE_COLORS[tone ?? toneForSuccessRate(value)];
+/** A thin bar meter, like VM Bridge's resource meters. The number beside it carries the value. */
+export function Meter({ value, tone, ariaLabel, className }: MeterProps) {
   const clamped = value === null ? 0 : Math.max(0, Math.min(100, value));
-
   return (
     <div
-      className={[styles.track, className].filter(Boolean).join(' ')}
+      className={cn('h-1 overflow-hidden rounded-full bg-accent', className)}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -40,15 +31,11 @@ export function Meter({ value, tone, color: colorOverride, ariaLabel, className 
       aria-label={ariaLabel}
     >
       <div
-        className="absolute inset-0 opacity-70"
-        style={fillStyle('dotted', { color, cell: METER_CELL })}
-      />
-      <div
-        className={styles.fill}
-        style={{
-          width: `${clamped}%`,
-          ...fillStyle('gradient', { color, cell: METER_CELL, edge: 'right', length: 24, to: 0.5 }),
-        }}
+        className={cn(
+          'h-full rounded-full transition-[width] duration-200 ease-out motion-reduce:transition-none',
+          TONE_FILL[tone ?? toneForSuccessRate(value)]
+        )}
+        style={{ width: `${clamped}%` }}
       />
     </div>
   );

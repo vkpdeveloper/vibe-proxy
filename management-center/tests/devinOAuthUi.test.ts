@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import { createInstance } from 'i18next';
 import { OAuthPage } from '@/features/oauth/OAuthPage';
-import { OAuthFlowDialog } from '@/features/oauth/components/OAuthFlowDialog';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { OAuthFlowContent } from '@/features/oauth/components/OAuthFlowDialog';
 import type { ProviderFlowState } from '@/features/oauth/hooks/useOAuthFlows';
 import { OAUTH_PROVIDERS, supportsManualCallback } from '@/features/oauth/providers';
 import { validateDevinCallback } from '@/features/oauth/devinOAuth';
@@ -36,25 +37,30 @@ describe('Devin OAuth login UI', () => {
         createElement(
           I18nextProvider,
           { i18n },
-          createElement(OAuthFlowDialog, {
-            open: true,
-            providerId: 'devin',
-            heading: { title: i18n.t(devin!.titleKey), caption: 'Browser sign-in', icon: '' },
-            state,
-            text: (suffix: string) => i18n.t(`auth_login.devin_${suffix}`),
-            supportsCallback: true,
-            onStart: () => {},
-            onCancel: () => {},
-            onCallbackChange: () => {},
-            onCallbackSubmit: () => {},
-            onViewAuthFiles: () => {},
-            onClose: () => {},
-          })
+          createElement(
+            TooltipProvider,
+            null,
+            createElement(OAuthFlowContent, {
+              open: true,
+              providerId: 'devin',
+              heading: { title: i18n.t(devin!.titleKey), caption: 'Browser sign-in', icon: '' },
+              state,
+              text: (suffix: string) => i18n.t(`auth_login.devin_${suffix}`),
+              supportsCallback: true,
+              onStart: () => {},
+              onCancel: () => {},
+              onCallbackChange: () => {},
+              onCallbackSubmit: () => {},
+              onViewAuthFiles: () => {},
+              onClose: () => {},
+            })
+          )
         )
       );
 
+    // The dialog body renders without the Radix portal; the header title comes from this key.
+    expect(i18n.t(devin!.titleKey)).toBe('Devin OAuth');
     const idle = renderDialog({});
-    expect(idle).toContain('Devin OAuth');
     expect(idle).toContain('Start Devin Login');
     expect(idle).toContain('v7.3.1');
     expect(idle).toContain('five minutes');

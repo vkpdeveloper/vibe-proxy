@@ -12,7 +12,6 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { OAuthModelAliasEntry } from '@/types';
-import { useThemeStore } from '@/stores';
 import { AliasColumn, ProviderColumn, SourceColumn } from './ModelMappingDiagramColumns';
 import { DiagramContextMenu } from './ModelMappingDiagramContextMenu';
 import {
@@ -29,7 +28,7 @@ import type {
   SourceNode,
 } from './ModelMappingDiagramTypes';
 import { hasModelAliasConflict } from './aliasValidation';
-import styles from './ModelMappingDiagram.module.scss';
+import { cn } from '@/lib/utils';
 
 export interface ModelMappingDiagramProps {
   modelAlias: Record<string, OAuthModelAliasEntry[]>;
@@ -44,16 +43,19 @@ export interface ModelMappingDiagramProps {
   className?: string;
 }
 
+// Theme tokens from tailwind.css, so providers stay apart without hard-coded colors.
 const PROVIDER_COLORS = [
-  '#8b8680',
-  '#10b981',
-  '#f59e0b',
-  '#c65746',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
-  '#84cc16',
+  'var(--primary)',
+  'var(--success)',
+  'var(--warning)',
+  'var(--dither-color-blue)',
+  'var(--dither-color-pink)',
+  'var(--dither-color-orange)',
+  'var(--destructive)',
+  'var(--dither-color-grey)',
 ];
+/** Provider-to-model branches stay faint, like VM Bridge's idle Canvas edges. */
+const BRANCH_COLOR = 'var(--input)';
 
 function getProviderColor(provider: string): string {
   const hash = provider.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -82,8 +84,6 @@ export const ModelMappingDiagram = forwardRef<ModelMappingDiagramRef, ModelMappi
     ref
   ) {
     const { t } = useTranslation();
-    const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
-    const isDark = resolvedTheme === 'dark';
     const enableTapLinking = useMemo(() => {
       if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') return false;
       return (
@@ -254,7 +254,7 @@ export const ModelMappingDiagram = forwardRef<ModelMappingDiagramRef, ModelMappi
           newLines.push({
             id: `provider-${provider}-source-${source.id}`,
             path: bezier(px, py, sx, sy),
-            color,
+            color: BRANCH_COLOR,
           });
         });
         // Source → Alias: one line per alias
@@ -550,12 +550,19 @@ export const ModelMappingDiagram = forwardRef<ModelMappingDiagramRef, ModelMappi
     };
 
     return (
-      <div className={[styles.scrollContainer, className].filter(Boolean).join(' ')}>
+      <div
+        className={cn(
+          'w-full overflow-x-auto overscroll-x-contain rounded-xl border bg-background bg-[radial-gradient(var(--border)_1px,transparent_1px)] bg-size-[16px_16px] px-4',
+          className
+        )}
+      >
         {enableTapLinking && onUpdate && (
-          <div className={styles.tapHint}>{t('oauth_model_alias.diagram_tap_hint')}</div>
+          <div className="sticky left-0 z-[3] pt-3 text-xs text-muted-foreground">
+            {t('oauth_model_alias.diagram_tap_hint')}
+          </div>
         )}
         <div
-          className={styles.container}
+          className="relative inline-flex min-h-[300px] min-w-full justify-between gap-8 py-5 select-none max-md:min-w-[max(100%,960px)] max-md:py-3"
           ref={containerRef}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -563,13 +570,15 @@ export const ModelMappingDiagram = forwardRef<ModelMappingDiagramRef, ModelMappi
             handleContextMenu(e, 'background');
           }}
         >
-          <svg className={styles.connections}>
+          <svg className="pointer-events-none absolute inset-0 z-[1] size-full overflow-visible">
             {lines.map((line) => (
               <path
                 key={line.id}
                 d={line.path}
-                stroke={line.color}
-                strokeOpacity={isDark ? 0.4 : 0.3}
+                fill="none"
+                strokeWidth={1.5}
+                style={{ stroke: line.color }}
+                strokeOpacity={line.color === BRANCH_COLOR ? 1 : 0.6}
               />
             ))}
           </svg>

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function ProtectedRoute({ children }: { children: ReactElement }) {
   const location = useLocation();
@@ -25,13 +24,8 @@ export function ProtectedRoute({ children }: { children: ReactElement }) {
     tryRestore();
   }, [apiBase, isAuthenticated, managementKey, checkAuth]);
 
-  if (checking) {
-    return (
-      <div className="main-content">
-        <LoadingSpinner />
-      </div>
-    );
-  }
+  // Like VM Bridge, nothing shows while the session is checked; it takes a moment at most.
+  if (checking) return null;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;

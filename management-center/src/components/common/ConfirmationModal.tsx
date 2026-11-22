@@ -1,77 +1,83 @@
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { useNotificationStore } from '@/stores';
 
+/** The store-driven confirmation behind `showConfirmation`. */
 export function ConfirmationModal() {
   const { t } = useTranslation();
   const confirmation = useNotificationStore((state) => state.confirmation);
   const hideConfirmation = useNotificationStore((state) => state.hideConfirmation);
   const setConfirmationLoading = useNotificationStore((state) => state.setConfirmationLoading);
-
   const { isOpen, isLoading, options } = confirmation;
 
-  if (!isOpen || !options) {
-    return null;
-  }
-
-  const {
-    title,
-    message,
-    onConfirm,
-    onCancel,
-    confirmText,
-    cancelText,
-    variant = 'primary',
-  } = options;
-
   const handleConfirm = async () => {
+    if (!options) return;
     try {
       setConfirmationLoading(true);
-      await onConfirm();
+      await options.onConfirm();
       hideConfirmation();
     } catch (error) {
+      // The caller reports its own errors; keep the dialog open so it can be retried.
       console.error('Confirmation action failed:', error);
-      // Optional: show error notification here if needed,
-      // but usually the calling component handles specific errors.
     } finally {
       setConfirmationLoading(false);
     }
   };
 
   const handleCancel = () => {
-    if (isLoading) {
-      return;
-    }
-    if (onCancel) {
-      onCancel();
-    }
+    if (isLoading) return;
+    options?.onCancel?.();
     hideConfirmation();
   };
 
+  const message = options?.message;
+
   return (
-    <Modal
-      open={isOpen}
-      onClose={handleCancel}
-      title={typeof title === 'string' ? <EmailPrivacyText text={title} /> : title}
-      closeDisabled={isLoading}
+    <AlertDialog
+      open={isOpen && Boolean(options)}
+      onOpenChange={(open) => {
+        if (!open) handleCancel();
+      }}
     >
-      {typeof message === 'string' ? (
-        <p style={{ margin: '1rem 0' }}>
-          <EmailPrivacyText text={message} />
-        </p>
-      ) : (
-        <div style={{ margin: '1rem 0' }}>{message}</div>
+      {options && (
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {options.title ? <EmailPrivacyText text={options.title} /> : t('common.confirm')}
+            </AlertDialogTitle>
+            {typeof message === 'string' ? (
+              <AlertDialogDescription>
+                <EmailPrivacyText text={message} />
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription asChild>
+                <div>{message}</div>
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
+              {options.cancelText || t('common.cancel')}
+            </Button>
+            <Button
+              variant={options.variant === 'danger' ? 'destructive' : 'default'}
+              onClick={() => void handleConfirm()}
+              disabled={isLoading}
+            >
+              {options.confirmText || t('common.confirm')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       )}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-        <Button variant="ghost" onClick={handleCancel} disabled={isLoading}>
-          {cancelText || t('common.cancel')}
-        </Button>
-        <Button variant={variant} onClick={handleConfirm} loading={isLoading}>
-          {confirmText || t('common.confirm')}
-        </Button>
-      </div>
-    </Modal>
+    </AlertDialog>
   );
 }

@@ -1,12 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconCheck, IconSearch } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Search01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { cn } from '@/lib/utils';
 import {
   getModelExclusionState,
   type ExclusionStats,
   type ModelExclusionState,
 } from './excludedModelRules';
-import styles from './ExcludedModelsPicker.module.scss';
 
 export interface ExcludedModelCandidate {
   id: string;
@@ -123,38 +126,42 @@ export function ExcludedModelsPanel({
   };
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.searchRow}>
-        <IconSearch size={14} className={styles.searchIcon} aria-hidden="true" />
-        <input
-          ref={inputRef}
-          type="text"
-          className={styles.search}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setHighlight(0);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={t('excluded_models.search_placeholder')}
-          aria-label={t('excluded_models.search_aria')}
-          aria-controls={listboxId}
-          aria-activedescendant={activeId}
-          disabled={disabled}
-          autoComplete="off"
-          spellCheck={false}
-        />
+    <div className="mt-1.5 flex flex-col overflow-hidden rounded-xl border bg-card duration-200 animate-in fade-in-0 zoom-in-[0.98] motion-reduce:animate-none">
+      <div className="border-b p-2">
+        <InputGroup className="h-7">
+          <InputGroupAddon>
+            <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+          </InputGroupAddon>
+          <InputGroupInput
+            ref={inputRef}
+            type="text"
+            className="h-7 text-[13px]"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setHighlight(0);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={t('excluded_models.search_placeholder')}
+            aria-label={t('excluded_models.search_aria')}
+            aria-controls={listboxId}
+            aria-activedescendant={activeId}
+            disabled={disabled}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </InputGroup>
       </div>
 
       <div
         id={listboxId}
-        className={styles.list}
+        className="flex max-h-64 flex-col overflow-y-auto overscroll-contain p-1"
         role="listbox"
         aria-multiselectable="true"
         aria-label={t('excluded_models.list_aria')}
       >
         {visible.length === 0 ? (
-          <p className={styles.noResults}>
+          <p className="px-2 py-6 text-center text-[13px] text-muted-foreground">
             {query.trim()
               ? t('excluded_models.no_results', { query: query.trim() })
               : t('excluded_models.catalog_empty')}
@@ -174,28 +181,30 @@ export function ExcludedModelsPanel({
         )}
       </div>
 
-      <div className={styles.footer}>
-        <span className={styles.footerCount}>
+      <div className="flex items-center justify-between gap-2 border-t bg-muted/50 px-3 py-1.5">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {t('excluded_models.footer_count', { excluded: stats.excluded, total: stats.total })}
         </span>
-        <span className={styles.footerActions}>
-          <button
+        <span className="flex items-center gap-1">
+          <Button
             type="button"
-            className={styles.footerButton}
+            variant="ghost"
+            size="xs"
             onClick={onSelectAll}
             disabled={disabled || candidates.length === 0}
           >
             {t('excluded_models.select_all')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.footerButton}
+            variant="ghost"
+            size="xs"
             onClick={onClear}
             disabled={disabled}
             aria-label={t('excluded_models.clear_aria')}
           >
             {t('excluded_models.clear')}
-          </button>
+          </Button>
         </span>
       </div>
     </div>
@@ -235,15 +244,6 @@ function ExcludedModelRow({
         }
       : null;
 
-  const rowClass = [
-    styles.row,
-    excluded ? styles.rowExcluded : '',
-    lockedByRule ? styles.rowLocked : '',
-    highlighted ? styles.rowHighlighted : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   return (
     <div
       id={id}
@@ -253,22 +253,39 @@ function ExcludedModelRow({
       tabIndex={-1}
       aria-selected={excluded}
       aria-disabled={lockedByRule || undefined}
-      className={rowClass}
+      className={cn(
+        'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 select-none',
+        highlighted && 'bg-accent',
+        lockedByRule && 'cursor-default opacity-60'
+      )}
       onMouseEnter={onHover}
       onClick={onToggle}
     >
-      <span className={styles.checkbox} aria-hidden="true">
-        {excluded ? <IconCheck size={12} /> : null}
+      <span
+        className={cn(
+          'flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input bg-input/30 transition-colors',
+          excluded && 'border-primary bg-primary text-primary-foreground'
+        )}
+        aria-hidden="true"
+      >
+        {excluded ? <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" /> : null}
       </span>
-      <span className={styles.rowText}>
-        <span className={styles.rowId}>{candidate.id}</span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-mono text-xs">{candidate.id}</span>
         {candidate.displayName && candidate.displayName !== candidate.id ? (
-          <span className={styles.rowDisplayName}>{candidate.displayName}</span>
+          <span className="truncate text-xs text-muted-foreground">{candidate.displayName}</span>
         ) : null}
-        {wildcardReason ? <span className={styles.rowReason}>{wildcardReason.text}</span> : null}
+        {wildcardReason ? (
+          <span className="truncate text-xs text-muted-foreground">{wildcardReason.text}</span>
+        ) : null}
       </span>
       {wildcardReason ? (
-        <span className={`${styles.badge} ${wildcardReason.muted ? styles.badgeMuted : ''}`.trim()}>
+        <span
+          className={cn(
+            'shrink-0 rounded-full border border-dashed border-primary/35 px-1.5 py-px text-[10px] text-muted-foreground',
+            wildcardReason.muted && 'border-dotted border-input text-faint'
+          )}
+        >
           {t('excluded_models.badge_wildcard')}
         </span>
       ) : null}

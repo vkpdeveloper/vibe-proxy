@@ -1,32 +1,36 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { SearchField } from '@/features/authFiles/components/ListControls';
 
-const source = readFileSync('src/features/quota/QuotaPage.tsx', 'utf8');
-const styles = readFileSync('src/features/quota/QuotaPage.module.scss', 'utf8');
+const render = (value: string) =>
+  renderToStaticMarkup(
+    createElement(SearchField, {
+      value,
+      onChange: () => {},
+      placeholder: 'Search',
+      label: 'Search quotas',
+      clearLabel: 'Clear search',
+    })
+  );
 
-describe('quota toolbar presentation contracts', () => {
-  test('uses a named, explicit clear action and restores input focus', () => {
-    expect(source).toContain('type="search"');
-    expect(source).toContain('ref={searchInputRef}');
-    expect(source).toContain('{search && (');
-    expect(source).toContain("aria-label={t('quota_management.search_clear')}");
-    expect(source).toContain(
-      "handleSearchChange('');\n                  searchInputRef.current?.focus();"
-    );
-    expect(source).toContain('<IconX size={14} aria-hidden="true" />');
-    expect(styles).toMatch(/&::-webkit-search-cancel-button,[\s\S]*?appearance: none;/);
+describe('quota search field', () => {
+  test('is a named search input that hides the native clear button', () => {
+    const markup = render('');
+    expect(markup).toContain('type="search"');
+    expect(markup).toContain('aria-label="Search quotas"');
+    expect(markup).toContain('[&amp;::-webkit-search-cancel-button]:hidden');
   });
 
-  test('groups search and sorting separately from provider navigation', () => {
-    const toolbarStart = source.indexOf('<div className={styles.toolbar}>');
-    const searchStart = source.indexOf('<div className={styles.search}>');
-    const sortStart = source.indexOf('<div className={styles.sort}>');
-    expect(toolbarStart).toBeGreaterThan(source.indexOf('<ProviderTabs'));
-    expect(searchStart).toBeGreaterThan(toolbarStart);
-    expect(sortStart).toBeGreaterThan(searchStart);
-    expect(styles).toMatch(/\.toolbar\s*\{[^}]*flex-wrap: wrap;/);
-    expect(styles).toContain('&:focus-within');
-    expect(styles).toContain('&:focus-visible');
-    expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
+  test('offers a named clear action only while there is a query', () => {
+    expect(render('')).not.toContain('aria-label="Clear search"');
+    expect(render('claude')).toContain('aria-label="Clear search"');
+  });
+
+  test('the quota page uses it and clearing restores input focus', () => {
+    expect(readFileSync('src/features/quota/QuotaPage.tsx', 'utf8')).toContain('<SearchField');
+    const field = readFileSync('src/features/authFiles/components/ListControls.tsx', 'utf8');
+    expect(field).toMatch(/onChange\(''\);\s*inputRef\.current\?\.focus\(\);/);
   });
 });

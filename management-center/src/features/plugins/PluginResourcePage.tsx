@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { PlugSocketIcon } from '@hugeicons/core-free-icons';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { pluginsApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
@@ -12,7 +20,20 @@ import {
   PLUGIN_RESOURCES_REFRESH_EVENT,
   resolvePluginAssetURL,
 } from './pluginResources';
-import styles from './PluginResourcePage.module.scss';
+
+function ResourceState({ title, description }: { title: string; description?: string }) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={PlugSocketIcon} strokeWidth={1.75} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {description ? <EmptyDescription>{description}</EmptyDescription> : null}
+      </EmptyHeader>
+    </Empty>
+  );
+}
 
 const hasStatus = (error: unknown, status: number) => isRecord(error) && error.status === status;
 
@@ -87,33 +108,28 @@ export function PluginResourcePage() {
 
   const iframeSrc = resource ? resolvePluginAssetURL(resource.menu.path, apiBase) : '';
 
+  // The frame and every state keep the theme background, so the page never flashes white.
   return (
-    <div className={styles.page}>
+    <div className="flex size-full min-h-0 min-w-0 flex-auto bg-background">
       {loading ? (
-        <div className={styles.stateShell}>
-          <div className={styles.statusPanel}>{t('common.loading')}</div>
+        <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
+          {t('common.loading')}
         </div>
       ) : error ? (
-        <div className={styles.stateShell}>
-          <EmptyState title={t('plugin_resource.unavailable')} description={error} />
-        </div>
+        <ResourceState title={t('plugin_resource.unavailable')} description={error} />
       ) : !resource ? (
-        <div className={styles.stateShell}>
-          <EmptyState
-            title={t('plugin_resource.not_found')}
-            description={t('plugin_resource.not_found_desc')}
-          />
-        </div>
+        <ResourceState
+          title={t('plugin_resource.not_found')}
+          description={t('plugin_resource.not_found_desc')}
+        />
       ) : !iframeSrc ? (
-        <div className={styles.stateShell}>
-          <EmptyState
-            title={t('plugin_resource.empty_src')}
-            description={t('plugin_resource.empty_src_desc')}
-          />
-        </div>
+        <ResourceState
+          title={t('plugin_resource.empty_src')}
+          description={t('plugin_resource.empty_src_desc')}
+        />
       ) : (
         <iframe
-          className={styles.frame}
+          className="block size-full min-h-0 min-w-0 flex-auto border-0 bg-background"
           src={iframeSrc}
           title={resource.label}
           referrerPolicy="no-referrer"

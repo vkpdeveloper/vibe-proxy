@@ -24,8 +24,17 @@ import type {
 export type QuotaUpdater<T> = T | ((prev: T) => T);
 
 export type QuotaProviderType =
-  | 'antigravity' | 'claude' | 'codex' | 'cursor' | 'devin-cli' | 'devin'
-  | 'kimi' | 'meta' | 'opencode-go' | 'plugin' | 'xai';
+  | 'antigravity'
+  | 'claude'
+  | 'codex'
+  | 'cursor'
+  | 'devin-cli'
+  | 'devin'
+  | 'kimi'
+  | 'meta'
+  | 'opencode-go'
+  | 'plugin'
+  | 'xai';
 
 /** useQuotaStore 的结构契约（storeSelector/storeSetter 依赖）。 */
 export interface QuotaStore {

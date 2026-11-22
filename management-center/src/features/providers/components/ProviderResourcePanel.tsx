@@ -1,15 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { IconExternalLink, IconPlus, IconSearch } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
+import { Section } from '@/components/layout/Page';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import type { ProviderRecentUsageMap } from '@/components/providers/utils';
-import { PROVIDER_LOGOS } from '../brandLogos';
 import { getKimiAffiliateUrl } from '../kimi';
-import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
 import { getSponsorProviderDefinition } from '../sponsorDefinitions';
-import type { ProviderGroup, ProviderResource } from '../types';
-import { ProviderResourceTable } from './ProviderResourceTable';
+import type { ProviderGroup, ProviderResource, ProviderSortBy, SortDir } from '../types';
+import { ProviderLogo } from './ProviderLogo';
+import { ProviderResourceList } from './ProviderResourceList';
 import { ProviderResourceToolbar } from './ProviderResourceToolbar';
-import type { ProviderSortBy, SortDir } from '../types';
-import styles from './ProviderResourcePanel.module.scss';
 
 export interface ProviderPanelControls {
   sortBy: ProviderSortBy;
@@ -29,7 +30,7 @@ interface ProviderResourcePanelProps {
   selectedId: string | null;
   disableMutations?: boolean;
   usageByProvider?: ProviderRecentUsageMap;
-  toolbarControls?: ProviderPanelControls;
+  toolbarControls: ProviderPanelControls;
   onView: (resource: ProviderResource) => void;
   onEdit: (resource: ProviderResource) => void;
   onDelete: (resource: ProviderResource) => void;
@@ -37,6 +38,7 @@ interface ProviderResourcePanelProps {
   onCreate: () => void;
 }
 
+/** One provider: its logo and sign-up link, the toolbar and its credentials. */
 export function ProviderResourcePanel({
   group,
   filter,
@@ -53,162 +55,64 @@ export function ProviderResourcePanel({
   onCreate,
 }: ProviderResourcePanelProps) {
   const { t, i18n } = useTranslation();
-  const logo = PROVIDER_LOGOS[group.id];
-  const providerTitle = t(`providersPage.providerNames.${group.id}`);
-  const hasProviderInfo = group.resources.length > 0;
-  const showSponsorRegistrationLink = group.id === 'apikeyFun' && !hasProviderInfo;
-  const showSponsorDashboardLink = group.id === 'apikeyFun' && hasProviderInfo;
   const registrationUrl =
     group.id === 'kimi'
       ? getKimiAffiliateUrl(i18n.resolvedLanguage ?? i18n.language)
       : group.id === 'fennoAI' || group.id === 'qiniuCloud'
         ? getSponsorProviderDefinition(group.id).affiliateUrl
         : null;
-  const registrationLabel = t(
-    group.id === 'kimi' ? 'providersPage.sponsor.registerNow' : 'providersPage.sponsor.registerLink'
-  );
-  const emptyText = showSponsorRegistrationLink
-    ? t('providersPage.sponsor.emptyRegisterHint')
-    : t('providersPage.table.empty');
-  const logoClassName = [
-    styles.logo,
-    logo?.themeSurface ? styles.logoThemeSurface : '',
-    logo?.darkSrc ? styles.logoThemeLight : '',
-    logo?.invertOnDark ? styles.logoInvertOnDark : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const darkLogoClassName = [
-    styles.logo,
-    logo?.themeSurface ? styles.logoThemeSurface : '',
-    styles.logoThemeDark,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const titleContent = (
-    <>
-      {logo ? (
-        <>
-          <img src={logo.src} alt="" aria-hidden="true" className={logoClassName} />
-          {logo.darkSrc ? (
-            <img src={logo.darkSrc} alt="" aria-hidden="true" className={darkLogoClassName} />
-          ) : null}
-        </>
-      ) : null}
-      <h2 className={styles.title}>{providerTitle}</h2>
-      {showSponsorDashboardLink ? (
-        <IconExternalLink className={styles.titleExternalIcon} size={16} />
-      ) : null}
-    </>
-  );
+  const activeCount = group.resources.filter((resource) => !resource.disabled).length;
 
   return (
-    <section className={styles.panel}>
-      <div className={styles.header}>
-        <div className={styles.headerMain}>
-          <div className={styles.titleArea}>
-            {showSponsorDashboardLink ? (
-              <a
-                className={`${styles.titleRow} ${styles.titleLink}`}
-                href={APIKEY_FUN_DASHBOARD_URL}
-                target="_blank"
-                rel="noreferrer"
-                title={t('providersPage.sponsor.dashboardLink')}
-              >
-                {titleContent}
-              </a>
-            ) : (
-              <div className={styles.titleRow}>{titleContent}</div>
-            )}
-            {showSponsorDashboardLink ? (
-              <a
-                className={styles.sponsorLink}
-                href={APIKEY_FUN_DASHBOARD_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span className={styles.sponsorLinkText}>
-                  {t('providersPage.sponsor.dashboardLink')}
-                </span>
-                <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
-              </a>
-            ) : registrationUrl ? (
-              <>
-                <a
-                  className={[
-                    styles.sponsorLink,
-                    styles.sponsorLinkEmphasis,
-                    group.id === 'kimi' ? styles.sponsorLinkKimi : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  href={registrationUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span className={styles.sponsorLinkText}>{registrationLabel}</span>
-                  <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
-                </a>
-                {group.id === 'kimi' ? (
-                  <p className={styles.kimiPromo}>{t('providersPage.sponsor.kimiPromo')}</p>
-                ) : null}
-              </>
-            ) : null}
-          </div>
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon} aria-hidden="true">
-              <IconSearch size={16} />
-            </span>
-            <input
-              type="search"
-              className={styles.searchInput}
-              value={filter}
-              onChange={(event) => onFilterChange(event.target.value)}
-              placeholder={t('providersPage.table.filterPlaceholder')}
-            />
-          </div>
+    <Section
+      title={t(`providersPage.providerNames.${group.id}`)}
+      icon={<ProviderLogo brand={group.id} className="size-7" />}
+      actions={
+        <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+          {t('providersPage.categories.activeCount', {
+            active: activeCount,
+            total: group.resources.length,
+          })}
+        </span>
+      }
+    >
+      {registrationUrl ? (
+        <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button asChild variant="outline" size="sm">
+            <a href={registrationUrl} target="_blank" rel="noreferrer">
+              {t(
+                group.id === 'kimi'
+                  ? 'providersPage.sponsor.registerNow'
+                  : 'providersPage.sponsor.registerLink'
+              )}
+              <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={1.75} data-icon="inline-end" />
+            </a>
+          </Button>
+          {group.id === 'kimi' ? (
+            <p className="text-sm text-muted-foreground">{t('providersPage.sponsor.kimiPromo')}</p>
+          ) : null}
         </div>
-        {toolbarControls ? (
-          <div className={styles.headerToolbarRow}>
-            <ProviderResourceToolbar
-              key={group.id}
-              sortBy={toolbarControls.sortBy}
-              sortDir={toolbarControls.sortDir}
-              onSortBy={toolbarControls.onSortBy}
-              onSortDir={toolbarControls.onSortDir}
-              availableModels={toolbarControls.availableModels}
-              selectedModels={toolbarControls.selectedModels}
-              onSelectedModelsChange={toolbarControls.onSelectedModelsChange}
-            />
-          </div>
-        ) : null}
-      </div>
+      ) : null}
+
+      <ProviderResourceToolbar
+        key={group.id}
+        filter={filter}
+        onFilterChange={onFilterChange}
+        {...toolbarControls}
+      />
 
       {filteredResources.length === 0 ? (
-        <div className={styles.empty}>
-          <div>{emptyText}</div>
-          <div className={styles.emptyAction}>
-            {showSponsorRegistrationLink ? (
-              <a
-                className={`${styles.emptyActionButton} ${styles.emptyActionButtonEmphasis}`}
-                href={APIKEY_FUN_AFFILIATE_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <IconExternalLink size={16} />
-                <span>{t('providersPage.sponsor.registerLink')}</span>
-              </a>
-            ) : (
-              <button type="button" className={styles.emptyActionButton} onClick={onCreate}>
-                <IconPlus size={16} />
-                <span>{t('providersPage.actions.new')}</span>
-              </button>
-            )}
-          </div>
-        </div>
+        <Empty className="rounded-xl border border-dashed py-10">
+          <EmptyDescription>{t('providersPage.table.empty')}</EmptyDescription>
+          <EmptyContent>
+            <Button type="button" variant="outline" onClick={onCreate} disabled={disableMutations}>
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+              {t('providersPage.actions.new')}
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
-        <ProviderResourceTable
+        <ProviderResourceList
           resources={filteredResources}
           selectedId={selectedId}
           disableMutations={disableMutations}
@@ -219,6 +123,6 @@ export function ProviderResourcePanel({
           onToggleDisabled={onToggleDisabled}
         />
       )}
-    </section>
+    </Section>
   );
 }

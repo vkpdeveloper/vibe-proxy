@@ -64,6 +64,10 @@ export default defineConfig({
       }
     }
   },
+  // Local development against a running proxy: VPROXY_DEV_API=http://host:port bun run dev
+  server: process.env.VPROXY_DEV_API
+    ? { proxy: { '/api': { target: process.env.VPROXY_DEV_API, changeOrigin: true, ws: true } } }
+    : undefined,
   build: {
     target: 'es2020',
     outDir: 'dist',

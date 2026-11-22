@@ -1,11 +1,17 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ErrorRulesEditor } from '@/features/providers/sheets/forms/ErrorRulesEditor';
 import { ModelEntriesEditor } from '@/features/providers/sheets/forms/ModelEntriesEditor';
-import styles from './AuthFilePolicyFields.module.scss';
 import {
   credentialPolicyError,
   type CredentialPolicyDraft,
@@ -13,6 +19,8 @@ import {
   type CredentialPolicyValues,
   type PolicyMode,
 } from '../credentialPolicy';
+
+const POLICY_MODES: PolicyMode[] = ['inherit', 'custom'];
 
 export function AuthFilePolicyFields({
   draft,
@@ -27,53 +35,69 @@ export function AuthFilePolicyFields({
   const id = useId();
   const error = credentialPolicyError(draft);
   const modeSelect = (field: CredentialPolicyField, label: string) => (
-    <>
-      <label id={`${id}-${field}`}>{t(label)}</label>
+    <div className="flex items-center justify-between gap-3">
+      <FieldLabel id={`${id}-${field}`}>{t(label)}</FieldLabel>
       <Select
-        ariaLabelledBy={`${id}-${field}`}
         value={draft[field].mode}
-        options={[
-          { value: 'inherit', label: t('auth_files.policy_inherit') },
-          { value: 'custom', label: t('auth_files.policy_custom') },
-        ]}
         disabled={disabled}
-        onChange={(mode) => onChange(field, { ...draft[field], mode: mode as PolicyMode })}
-      />
-    </>
+        onValueChange={(mode) => {
+          if (mode === 'inherit' || mode === 'custom') onChange(field, { ...draft[field], mode });
+        }}
+      >
+        <SelectTrigger aria-labelledby={`${id}-${field}`} className="w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" align="end">
+          {POLICY_MODES.map((mode) => (
+            <SelectItem key={mode} value={mode}>
+              {t(`auth_files.policy_${mode}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
+
   return (
-    <div className={styles.policyFields}>
-      <div className="form-group">
+    <>
+      <Field data-invalid={error === 'auth_files.policy_retry_invalid' || undefined}>
         {modeSelect('requestRetry', 'auth_files.policy_retry_label')}
+        <FieldDescription>{t('auth_files.policy_retry_hint')}</FieldDescription>
         {draft.requestRetry.mode === 'custom' && (
-          <Input
-            label={t('auth_files.policy_retry_count')}
-            type="number"
-            min={0}
-            step={1}
-            value={draft.requestRetry.value}
-            disabled={disabled}
-            error={error === 'auth_files.policy_retry_invalid' ? t(error) : undefined}
-            onChange={(event) =>
-              onChange('requestRetry', { ...draft.requestRetry, value: event.target.value })
-            }
-          />
+          <>
+            <Input
+              aria-label={t('auth_files.policy_retry_count')}
+              placeholder={t('auth_files.policy_retry_count')}
+              type="number"
+              min={0}
+              step={1}
+              value={draft.requestRetry.value}
+              disabled={disabled}
+              aria-invalid={error === 'auth_files.policy_retry_invalid'}
+              onChange={(event) =>
+                onChange('requestRetry', { ...draft.requestRetry, value: event.target.value })
+              }
+            />
+            {error === 'auth_files.policy_retry_invalid' && <FieldError>{t(error)}</FieldError>}
+          </>
         )}
-        <div className="hint">{t('auth_files.policy_retry_hint')}</div>
-      </div>
+      </Field>
       {(['modelAliases', 'errorRules'] as const).map((field) => {
         const key = field === 'modelAliases' ? 'aliases' : 'rules';
         const policy = draft[field];
         return (
-          <div className="form-group" key={field}>
+          <Field key={field}>
             {modeSelect(field, `auth_files.policy_${key}_label`)}
-            <div className="hint">{t(`auth_files.policy_${key}_hint`)}</div>
+            <FieldDescription>{t(`auth_files.policy_${key}_hint`)}</FieldDescription>
             {policy.mode === 'custom' &&
               (policy.rows === null ? (
-                <div className={styles.unsupported}>
-                  <p className="hint">{t('auth_files.policy_unsupported')}</p>
+                <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed p-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t('auth_files.policy_unsupported')}
+                  </p>
                   <Button
-                    variant="secondary"
+                    variant="outline"
+                    size="sm"
                     disabled={disabled}
                     onClick={() => onChange(field, { mode: 'custom', rows: [] })}
                   >
@@ -91,7 +115,7 @@ export function AuthFilePolicyFields({
                   onUpdate={(index, patch) =>
                     onChange('modelAliases', {
                       mode: 'custom',
-                      rows: draft.modelAliases.rows!.map((row, i) =>
+                      rows: (draft.modelAliases.rows ?? []).map((row, i) =>
                         i === index ? { ...row, ...patch } : row
                       ),
                     })
@@ -99,13 +123,13 @@ export function AuthFilePolicyFields({
                   onAdd={() =>
                     onChange('modelAliases', {
                       mode: 'custom',
-                      rows: [...draft.modelAliases.rows!, { name: '', alias: '' }],
+                      rows: [...(draft.modelAliases.rows ?? []), { name: '', alias: '' }],
                     })
                   }
                   onRemove={(index) =>
                     onChange('modelAliases', {
                       mode: 'custom',
-                      rows: draft.modelAliases.rows!.filter((_, i) => i !== index),
+                      rows: (draft.modelAliases.rows ?? []).filter((_, i) => i !== index),
                     })
                   }
                 />
@@ -116,14 +140,14 @@ export function AuthFilePolicyFields({
                   onChange={(rows) => onChange('errorRules', { mode: 'custom', rows })}
                 />
               ))}
-          </div>
+          </Field>
         );
       })}
-      {error && (
-        <div className="error-box" role="alert">
+      {error && error !== 'auth_files.policy_retry_invalid' && (
+        <p role="alert" className="text-sm text-destructive">
           {t(error)}
-        </div>
+        </p>
       )}
-    </div>
+    </>
   );
 }

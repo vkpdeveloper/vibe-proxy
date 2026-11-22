@@ -1,44 +1,44 @@
-import {
-  ReactNode,
-  RefObject,
-  SVGProps,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type SyntheticEvent,
-} from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { PageTransition } from '@/components/common/PageTransition';
-import { SignalField } from '@/components/dither/SignalField';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import {
+  Analytics01Icon,
+  DashboardSquare01Icon,
+  DashboardSpeed01Icon,
+  File01Icon,
+  FileKeyIcon,
+  GlobeIcon,
+  InformationCircleIcon,
+  Key01Icon,
+  Login03Icon,
+  Logout01Icon,
+  MoreHorizontalIcon,
+  PuzzleIcon,
+  Refresh01Icon,
+  Settings01Icon,
+} from '@hugeicons/core-free-icons';
+import { Logo } from '@/components/brand';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { boxStyle, NavIndicator, useSlidingNav } from '@/components/layout/nav';
+import { cn } from '@/lib/utils';
 import { MainRoutes } from '@/router/MainRoutes';
 import { authFilesApi, pluginsApi } from '@/services/api';
-import {
-  IconSidebarAuthFiles,
-  IconSidebarConfig,
-  IconSidebarDashboard,
-  IconSidebarLogs,
-  IconSidebarOauth,
-  IconSidebarPlugins,
-  IconSidebarQuota,
-  IconSidebarSystem,
-  IconSidebarUsage,
-  IconKey,
-  IconChevronDown,
-} from '@/components/ui/icons';
-import vibeProxyLogo from '@/assets/vibe-proxy-logo.svg';
-import {
-  useAuthStore,
-  useConfigStore,
-  useLanguageStore,
-  useNotificationStore,
-  useThemeStore,
-} from '@/stores';
+import { useAuthStore, useConfigStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { AUTH_FILES_CHANGED_EVENT } from '@/features/authFiles/authFilesEvents';
 import {
   collectPluginResourceEntries,
@@ -48,431 +48,100 @@ import {
 } from '@/features/plugins/pluginResources';
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
-import { isSupportedLanguage } from '@/utils/language';
-import { getSidebarShortcutLabel, isSidebarToggleShortcut } from '@/utils/sidebarShortcut';
-import type { Theme } from '@/types';
 
-const sidebarIcons: Record<string, ReactNode> = {
-  dashboard: <IconSidebarDashboard size={18} />,
-  authFiles: <IconSidebarAuthFiles size={18} />,
-  oauth: <IconSidebarOauth size={18} />,
-  quota: <IconSidebarQuota size={18} />,
-  config: <IconSidebarConfig size={18} />,
-  logs: <IconSidebarLogs size={18} />,
-  system: <IconSidebarSystem size={18} />,
-  usage: <IconSidebarUsage size={18} />,
-  apiKeys: <IconKey size={18} />,
-};
-
-interface SidebarNavLinkItem {
-  kind?: 'link';
+/** A destination in the rail. `phone` ones stay in the bottom bar; the rest move into "More". */
+interface Destination {
+  id: string;
   path: string;
-  labelKey?: string;
-  metaKey?: string;
-  label?: string;
-  meta?: string;
-  badge?: number;
-  badgeLabel?: string;
+  label: string;
   icon: ReactNode;
+  phone?: boolean;
+  /** A count shown in the tooltip, with its spoken form for screen readers. */
+  count?: { value: number; label: string };
 }
 
-interface SidebarNavDrawerItem {
-  kind: 'drawer';
+/** One rail button per plugin: a single page links straight to it, several open a menu. */
+interface PluginGroup {
   id: string;
   label: string;
-  meta?: string;
-  icon: ReactNode;
-  children: SidebarNavLinkItem[];
+  logo: string;
+  pages: PluginResourceEntry[];
 }
 
-type SidebarNavItem = SidebarNavLinkItem | SidebarNavDrawerItem;
+const railIcon = (icon: IconSvgElement) => (
+  <HugeiconsIcon icon={icon} className="size-5" strokeWidth={1.75} />
+);
 
-const NAV_TOOLTIP_ID = 'sidebar-nav-tooltip';
-const NAV_TOOLTIP_VIEWPORT_MARGIN = 8;
+const isActivePath = (path: string, pathname: string) =>
+  path === '/'
+    ? pathname === '/' || pathname === '/dashboard'
+    : pathname === path || pathname.startsWith(`${path}/`);
 
-interface SidebarNavGroup {
-  id: string;
-  labelKey: string;
-  items: SidebarNavItem[];
-}
-
-const flattenNavItems = (items: SidebarNavItem[]): SidebarNavLinkItem[] =>
-  items.flatMap((item) => (item.kind === 'drawer' ? item.children : [item]));
-
-/** 点击菜单外或按下 Escape 时关闭弹出菜单 */
-function useMenuDismiss(
-  open: boolean,
-  menuRef: RefObject<HTMLDivElement | null>,
-  onClose: () => void
-) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [open, menuRef, onClose]);
-}
-
-function PluginSidebarIcon({ src }: { src: string }) {
+function PluginIcon({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
-
-  return showImage ? (
-    <img src={src} alt="" onError={() => setFailed(true)} />
-  ) : (
-    <IconSidebarPlugins size={18} />
+  if (!src || failed) return railIcon(PuzzleIcon);
+  return (
+    <img
+      src={src}
+      alt=""
+      className="size-5 rounded object-contain"
+      onError={() => setFailed(true)}
+    />
   );
 }
 
-// Header action icons - smaller size for header buttons
-const headerIconProps: SVGProps<SVGSVGElement> = {
-  width: 16,
-  height: 16,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': 'true',
-  focusable: 'false',
-};
-
-const headerIcons = {
-  refresh: (
-    <svg {...headerIconProps}>
-      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-    </svg>
-  ),
-  menu: (
-    <svg {...headerIconProps}>
-      <path d="M4 7h16" />
-      <path d="M4 12h16" />
-      <path d="M4 17h16" />
-    </svg>
-  ),
-  close: (
-    <svg {...headerIconProps}>
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
-  ),
-  chevronLeft: (
-    <svg {...headerIconProps}>
-      <path d="m14 18-6-6 6-6" />
-    </svg>
-  ),
-  chevronRight: (
-    <svg {...headerIconProps}>
-      <path d="m10 6 6 6-6 6" />
-    </svg>
-  ),
-  language: (
-    <svg {...headerIconProps}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M2 12h20" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  ),
-  sun: (
-    <svg {...headerIconProps}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="m4.93 4.93 1.41 1.41" />
-      <path d="m17.66 17.66 1.41 1.41" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="m6.34 17.66-1.41 1.41" />
-      <path d="m19.07 4.93-1.41 1.41" />
-    </svg>
-  ),
-  moon: (
-    <svg {...headerIconProps}>
-      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
-    </svg>
-  ),
-  whiteTheme: (
-    <svg {...headerIconProps}>
-      <circle cx="12" cy="12" r="7" />
-      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  autoTheme: (
-    <svg {...headerIconProps}>
-      <defs>
-        <clipPath id="mainLayoutAutoThemeSunLeftHalf">
-          <rect x="0" y="0" width="12" height="24" />
-        </clipPath>
-      </defs>
-      <circle cx="12" cy="12" r="4" />
-      <circle
-        cx="12"
-        cy="12"
-        r="4"
-        clipPath="url(#mainLayoutAutoThemeSunLeftHalf)"
-        fill="currentColor"
-      />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="M4.93 4.93l1.41 1.41" />
-      <path d="M17.66 17.66l1.41 1.41" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="M6.34 17.66l-1.41 1.41" />
-      <path d="M19.07 4.93l-1.41 1.41" />
-    </svg>
-  ),
-  logout: (
-    <svg {...headerIconProps}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="m16 17 5-5-5-5" />
-      <path d="M21 12H9" />
-    </svg>
-  ),
-};
-
-const THEME_CARDS: Array<{
-  key: Theme;
-  labelKey: string;
-  colors: { bg: string; card: string; border: string; text: string; textMuted: string };
-}> = [
-  {
-    key: 'auto',
-    labelKey: 'theme.auto',
-    colors: {
-      bg: 'linear-gradient(135deg, #ffffff 0 50%, #111111 50% 100%)',
-      card: 'linear-gradient(135deg, #ffffff 0 50%, #1a1a1a 50% 100%)',
-      border: '#bdbdbd',
-      text: '#2d2a26',
-      textMuted: 'linear-gradient(135deg, #c9c9c9 0 50%, #5a5a5a 50% 100%)',
-    },
-  },
-  {
-    key: 'white',
-    labelKey: 'theme.white',
-    colors: {
-      bg: '#ffffff',
-      card: '#ffffff',
-      border: '#e5e5e5',
-      text: '#2d2a26',
-      textMuted: '#a29c95',
-    },
-  },
-  {
-    key: 'light',
-    labelKey: 'theme.light',
-    colors: {
-      bg: '#faf9f5',
-      card: '#f0eee8',
-      border: '#e3e1db',
-      text: '#2d2a26',
-      textMuted: '#a29c95',
-    },
-  },
-  {
-    key: 'dark',
-    labelKey: 'theme.dark',
-    colors: {
-      bg: '#000000',
-      card: '#101010',
-      border: '#1f1f1f',
-      text: '#ededed',
-      textMuted: '#a1a1a1',
-    },
-  },
-];
+/** Phones get the bottom bar, so a few destinations move into a menu there. */
+function usePhone() {
+  const query = '(max-width: 639px)';
+  const [phone, setPhone] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setPhone(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return phone;
+}
 
 export function MainLayout() {
   const { t } = useTranslation();
-  const { showNotification } = useNotificationStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const showNotification = useNotificationStore((state) => state.showNotification);
 
   const logout = useAuthStore((state) => state.logout);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const apiBase = useAuthStore((state) => state.apiBase);
   const supportsPlugin = useAuthStore((state) => state.supportsPlugin);
-
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
 
-  const theme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
-  const language = useLanguageStore((state) => state.language);
-  const setLanguage = useLanguageStore((state) => state.setLanguage);
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [authFilesCount, setAuthFilesCount] = useState<number | null>(null);
-  const [railTooltip, setRailTooltip] = useState<{
-    targetID: string;
-    label: string;
-    meta?: string;
-    anchorTop: number;
-    top: number;
-  } | null>(null);
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [pluginResources, setPluginResources] = useState<PluginResourceEntry[]>([]);
-  const [expandedPluginResourceIDs, setExpandedPluginResourceIDs] = useState<Set<string>>(
-    () => new Set()
-  );
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const authFilesCountRequestRef = useRef(0);
-  const railTooltipRef = useRef<HTMLDivElement | null>(null);
-  const focusedRailItemRef = useRef<HTMLElement | null>(null);
-  const languageMenuRef = useRef<HTMLDivElement | null>(null);
-  const themeMenuRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLElement | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const phone = usePhone();
 
-  const fullBrandName = 'VProxy';
-  const abbrBrandName = t('title.abbr');
-  const isLogsPage = location.pathname.startsWith('/logs');
-  const isPluginResourcePage = location.pathname.startsWith('/plugin-pages');
-  const showSidebarLabels = !sidebarCollapsed || sidebarOpen;
-
-  // Keep floating header height available to sticky mobile elements and overlays.
+  // Floating save and batch bars center themselves on the content panel.
   useLayoutEffect(() => {
-    const updateHeaderHeight = () => {
-      const height = headerRef.current?.offsetHeight;
-      if (height) {
-        document.documentElement.style.setProperty('--header-height', `${height}px`);
-      }
-    };
-
-    updateHeaderHeight();
-
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined' && headerRef.current
-        ? new ResizeObserver(updateHeaderHeight)
-        : null;
-    if (resizeObserver && headerRef.current) {
-      resizeObserver.observe(headerRef.current);
-    }
-
-    window.addEventListener('resize', updateHeaderHeight);
-
-    return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      window.removeEventListener('resize', updateHeaderHeight);
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!railTooltip) return;
-
-    const updateRailTooltipPosition = () => {
-      const tooltip = railTooltipRef.current;
-      if (!tooltip) return;
-
-      const halfHeight = tooltip.offsetHeight / 2;
-      const minTop = NAV_TOOLTIP_VIEWPORT_MARGIN + halfHeight;
-      const maxTop = Math.max(
-        minTop,
-        window.innerHeight - NAV_TOOLTIP_VIEWPORT_MARGIN - halfHeight
+    const main = mainRef.current;
+    if (!main) return;
+    const update = () => {
+      const rect = main.getBoundingClientRect();
+      document.documentElement.style.setProperty(
+        '--content-center-x',
+        `${rect.left + rect.width / 2}px`
       );
-      const top = Math.min(maxTop, Math.max(minTop, railTooltip.anchorTop));
-
-      setRailTooltip((current) => {
-        if (!current || current.targetID !== railTooltip.targetID || current.top === top) {
-          return current;
-        }
-        return { ...current, top };
-      });
     };
-
-    updateRailTooltipPosition();
-    window.addEventListener('resize', updateRailTooltipPosition);
-    return () => window.removeEventListener('resize', updateRailTooltipPosition);
-  }, [railTooltip]);
-
-  // Keep the content center available to bottom overlays that align with the main area.
-  useLayoutEffect(() => {
-    const updateContentCenter = () => {
-      const el = contentRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      document.documentElement.style.setProperty('--content-center-x', `${centerX}px`);
-    };
-
-    updateContentCenter();
-
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined' && contentRef.current
-        ? new ResizeObserver(updateContentCenter)
-        : null;
-
-    if (resizeObserver && contentRef.current) {
-      resizeObserver.observe(contentRef.current);
-    }
-
-    window.addEventListener('resize', updateContentCenter);
-
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(main);
     return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      window.removeEventListener('resize', updateContentCenter);
+      observer.disconnect();
       document.documentElement.style.removeProperty('--content-center-x');
     };
   }, []);
-
-  const closeLanguageMenu = useCallback(() => setLanguageMenuOpen(false), []);
-  const closeThemeMenu = useCallback(() => setThemeMenuOpen(false), []);
-  useMenuDismiss(languageMenuOpen, languageMenuRef, closeLanguageMenu);
-  useMenuDismiss(themeMenuOpen, themeMenuRef, closeThemeMenu);
-
-  const toggleLanguageMenu = useCallback(() => {
-    setLanguageMenuOpen((prev) => !prev);
-    setThemeMenuOpen(false);
-  }, []);
-
-  const toggleThemeMenu = useCallback(() => {
-    setThemeMenuOpen((prev) => !prev);
-    setLanguageMenuOpen(false);
-  }, []);
-
-  const handleThemeSelect = useCallback(
-    (nextTheme: Theme) => {
-      setTheme(nextTheme);
-      setThemeMenuOpen(false);
-    },
-    [setTheme]
-  );
-
-  const handleLanguageSelect = useCallback(
-    (nextLanguage: string) => {
-      if (!isSupportedLanguage(nextLanguage)) {
-        return;
-      }
-      setLanguage(nextLanguage);
-      setLanguageMenuOpen(false);
-    },
-    [setLanguage]
-  );
 
   useEffect(() => {
     fetchConfig().catch(() => {
@@ -485,7 +154,6 @@ export function MainLayout() {
       setPluginResources([]);
       return;
     }
-
     try {
       const plugins = await pluginsApi.list();
       setPluginResources(collectPluginResourceEntries(plugins.plugins));
@@ -500,7 +168,6 @@ export function MainLayout() {
       setAuthFilesCount(null);
       return;
     }
-
     try {
       const response = await authFilesApi.list();
       if (requestID !== authFilesCountRequestRef.current) return;
@@ -516,10 +183,8 @@ export function MainLayout() {
       void loadPluginResources();
       void loadAuthFilesCount();
     }, 0);
-
     window.addEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadPluginResources);
     window.addEventListener(AUTH_FILES_CHANGED_EVENT, loadAuthFilesCount);
-
     return () => {
       authFilesCountRequestRef.current += 1;
       window.clearTimeout(timer);
@@ -528,192 +193,8 @@ export function MainLayout() {
     };
   }, [apiBase, loadPluginResources, loadAuthFilesCount]);
 
-  const pluginResourceGroups = pluginResources.reduce<
-    Array<{ pluginID: string; pluginTitle: string; entries: PluginResourceEntry[] }>
-  >((groups, resource) => {
-    const group = groups.find((item) => item.pluginID === resource.pluginID);
-    if (group) {
-      group.entries.push(resource);
-      return groups;
-    }
-
-    groups.push({
-      pluginID: resource.pluginID,
-      pluginTitle: resource.pluginTitle,
-      entries: [resource],
-    });
-    return groups;
-  }, []);
-
-  const pluginPageNavItems: SidebarNavItem[] = supportsPlugin
-    ? pluginResourceGroups.flatMap((group): SidebarNavItem[] => {
-        if (group.entries.length === 1) {
-          const resource = group.entries[0];
-          const pluginLogo = resolvePluginAssetURL(resource.pluginLogo, apiBase);
-          return [
-            {
-              path: resource.route,
-              label: resource.label,
-              meta: resource.description,
-              icon: <PluginSidebarIcon src={pluginLogo} />,
-            },
-          ];
-        }
-
-        const pluginLogo = resolvePluginAssetURL(group.entries[0]?.pluginLogo ?? '', apiBase);
-        return [
-          {
-            kind: 'drawer',
-            id: `plugin-pages-${group.pluginID}`,
-            label: group.pluginTitle,
-            meta: t('plugin_resource.page_count', { count: group.entries.length }),
-            icon: <PluginSidebarIcon src={pluginLogo} />,
-            children: group.entries.map((resource) => ({
-              path: resource.route,
-              label: resource.label,
-              meta: resource.description,
-              icon: <span className="nav-sub-dot" aria-hidden="true" />,
-            })),
-          },
-        ];
-      })
-    : [];
-
-  const navGroups: SidebarNavGroup[] = [
-    {
-      id: 'operate',
-      labelKey: 'nav_groups.operate',
-      items: [
-        {
-          path: '/',
-          labelKey: 'nav.dashboard',
-          metaKey: 'nav_meta.dashboard',
-          icon: sidebarIcons.dashboard,
-        },
-      ],
-    },
-    {
-      id: 'gateway',
-      labelKey: 'nav_groups.gateway',
-      items: [
-        {
-          path: '/api-keys',
-          labelKey: 'nav.client_api_keys',
-          metaKey: 'nav_meta.client_api_keys',
-          icon: sidebarIcons.apiKeys,
-        },
-        {
-          path: '/auth-files',
-          labelKey: 'nav.auth_files',
-          metaKey: 'nav_meta.auth_files',
-          badge: authFilesCount ?? undefined,
-          badgeLabel:
-            typeof authFilesCount === 'number'
-              ? t('sidebar.auth_files_count', { count: authFilesCount })
-              : undefined,
-          icon: sidebarIcons.authFiles,
-        },
-        {
-          path: '/oauth',
-          labelKey: 'nav.oauth',
-          metaKey: 'nav_meta.oauth',
-          icon: sidebarIcons.oauth,
-        },
-      ],
-    },
-    {
-      id: 'observe',
-      labelKey: 'nav_groups.observe',
-      items: [
-        {
-          path: '/usage',
-          labelKey: 'nav.usage',
-          metaKey: 'nav_meta.usage',
-          icon: sidebarIcons.usage,
-        },
-        {
-          path: '/quota',
-          labelKey: 'nav.quota_management',
-          metaKey: 'nav_meta.quota_management',
-          icon: sidebarIcons.quota,
-        },
-        {
-          path: '/logs',
-          labelKey: 'nav.logs',
-          metaKey: 'nav_meta.logs',
-          icon: sidebarIcons.logs,
-        },
-      ],
-    },
-    {
-      id: 'control',
-      labelKey: 'nav_groups.control',
-      items: [
-        {
-          path: '/config',
-          labelKey: 'nav.config_management',
-          metaKey: 'nav_meta.config_management',
-          icon: sidebarIcons.config,
-        },
-        {
-          path: '/system',
-          labelKey: 'nav.system_info',
-          metaKey: 'nav_meta.system_info',
-          icon: sidebarIcons.system,
-        },
-      ],
-    },
-    ...(pluginPageNavItems.length > 0
-      ? [
-          {
-            id: 'plugin-pages',
-            labelKey: 'nav_groups.plugin_pages',
-            items: pluginPageNavItems,
-          },
-        ]
-      : []),
-  ];
-  const navItems = navGroups.flatMap((group) => flattenNavItems(group.items));
-  const navOrder = navItems.map((item) => item.path);
-  const getRouteOrder = (pathname: string) => {
-    const trimmedPath =
-      pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-    const normalizedPath = trimmedPath === '/dashboard' ? '/' : trimmedPath;
-
-    const authFilesIndex = navOrder.indexOf('/auth-files');
-    if (authFilesIndex !== -1) {
-      if (normalizedPath === '/auth-files') return authFilesIndex;
-      if (normalizedPath.startsWith('/auth-files/')) {
-        if (normalizedPath.startsWith('/auth-files/oauth-excluded')) return authFilesIndex + 0.1;
-        if (normalizedPath.startsWith('/auth-files/oauth-model-alias')) return authFilesIndex + 0.2;
-        return authFilesIndex + 0.05;
-      }
-    }
-
-    const exactIndex = navOrder.indexOf(normalizedPath);
-    if (exactIndex !== -1) return exactIndex;
-    const nestedIndex = navOrder.findIndex(
-      (path) => path !== '/' && normalizedPath.startsWith(`${path}/`)
-    );
-    return nestedIndex === -1 ? null : nestedIndex;
-  };
-
-  const getTransitionVariant = useCallback((fromPathname: string, toPathname: string) => {
-    const normalize = (pathname: string) => {
-      const trimmed =
-        pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-      return trimmed === '/dashboard' ? '/' : trimmed;
-    };
-
-    const from = normalize(fromPathname);
-    const to = normalize(toPathname);
-    const isAuthFiles = (pathname: string) =>
-      pathname === '/auth-files' || pathname.startsWith('/auth-files/');
-    if (isAuthFiles(from) && isAuthFiles(to)) return 'ios';
-    return 'vertical';
-  }, []);
-
   const handleRefreshAll = async () => {
+    setRefreshing(true);
     clearCache();
     const results = await Promise.allSettled([
       fetchConfig(true),
@@ -721,9 +202,10 @@ export function MainLayout() {
       loadAuthFilesCount(),
       triggerHeaderRefresh(),
     ]);
+    setRefreshing(false);
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected && rejected.status === 'rejected') {
-      const reason = rejected.reason;
+      const reason: unknown = rejected.reason;
       const message =
         typeof reason === 'string' ? reason : reason instanceof Error ? reason.message : '';
       showNotification(
@@ -735,458 +217,443 @@ export function MainLayout() {
     showNotification(t('notification.data_refreshed'), 'success');
   };
 
-  const togglePluginResourceDrawer = useCallback((drawerID: string) => {
-    setExpandedPluginResourceIDs((current) => {
-      const next = new Set(current);
-      if (next.has(drawerID)) {
-        next.delete(drawerID);
+  // Rail groups in the order you work through them: overview, access, traffic, settings.
+  const groups: Destination[][] = [
+    [
+      {
+        id: 'dashboard',
+        path: '/',
+        label: t('nav.dashboard'),
+        icon: railIcon(DashboardSquare01Icon),
+        phone: true,
+      },
+    ],
+    [
+      {
+        id: 'api-keys',
+        path: '/api-keys',
+        label: t('nav.client_api_keys'),
+        icon: railIcon(Key01Icon),
+      },
+      {
+        id: 'auth-files',
+        path: '/auth-files',
+        label: t('nav.auth_files'),
+        icon: railIcon(FileKeyIcon),
+        phone: true,
+        count:
+          authFilesCount === null
+            ? undefined
+            : {
+                value: authFilesCount,
+                label: t('sidebar.auth_files_count', { count: authFilesCount }),
+              },
+      },
+      { id: 'oauth', path: '/oauth', label: t('nav.oauth'), icon: railIcon(Login03Icon) },
+    ],
+    [
+      {
+        id: 'usage',
+        path: '/usage',
+        label: t('nav.usage'),
+        icon: railIcon(Analytics01Icon),
+        phone: true,
+      },
+      {
+        id: 'quota',
+        path: '/quota',
+        label: t('nav.quota_management'),
+        icon: railIcon(DashboardSpeed01Icon),
+        phone: true,
+      },
+      { id: 'logs', path: '/logs', label: t('nav.logs'), icon: railIcon(File01Icon), phone: true },
+    ],
+    [
+      {
+        id: 'config',
+        path: '/config',
+        label: t('nav.config_management'),
+        icon: railIcon(Settings01Icon),
+      },
+      {
+        id: 'system',
+        path: '/system',
+        label: t('nav.system_info'),
+        icon: railIcon(InformationCircleIcon),
+      },
+      ...(supportsPlugin
+        ? [{ id: 'plugins', path: '/plugins', label: t('nav.plugins'), icon: railIcon(PuzzleIcon) }]
+        : []),
+    ],
+  ];
+  const destinations = groups.flat();
+
+  const pluginGroups: PluginGroup[] = [];
+  if (supportsPlugin) {
+    for (const resource of pluginResources) {
+      const group = pluginGroups.find((entry) => entry.id === resource.pluginID);
+      if (group) {
+        group.pages.push(resource);
       } else {
-        next.add(drawerID);
+        pluginGroups.push({
+          id: resource.pluginID,
+          label: resource.pluginTitle,
+          logo: resolvePluginAssetURL(resource.pluginLogo, apiBase),
+          pages: [resource],
+        });
       }
-      return next;
-    });
-  }, []);
-
-  const showRailTooltip = useCallback(
-    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const anchorTop = rect.top + rect.height / 2;
-      setRailTooltip({ targetID, label, meta, anchorTop, top: anchorTop });
-    },
-    []
-  );
-  const hideRailTooltip = useCallback(() => setRailTooltip(null), []);
-  const handleRailTooltipMouseEnter = useCallback(
-    (event: ReactMouseEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
-      const focusedItem = focusedRailItemRef.current;
-      if (focusedItem && focusedItem !== event.currentTarget) return;
-      showRailTooltip(event, targetID, label, meta);
-    },
-    [showRailTooltip]
-  );
-  const handleRailTooltipMouseLeave = useCallback(() => {
-    if (!focusedRailItemRef.current) hideRailTooltip();
-  }, [hideRailTooltip]);
-  const handleRailTooltipFocus = useCallback(
-    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
-      focusedRailItemRef.current = event.currentTarget;
-      showRailTooltip(event, targetID, label, meta);
-    },
-    [showRailTooltip]
-  );
-  const handleRailTooltipBlur = useCallback(
-    (event: SyntheticEvent<HTMLElement>, targetID: string, label: string, meta?: string) => {
-      if (focusedRailItemRef.current === event.currentTarget) {
-        focusedRailItemRef.current = null;
-      }
-      if (event.currentTarget.matches(':hover')) {
-        showRailTooltip(event, targetID, label, meta);
-      } else {
-        hideRailTooltip();
-      }
-    },
-    [hideRailTooltip, showRailTooltip]
-  );
-
-  const isMac = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    const platform =
-      (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
-      navigator.platform ||
-      navigator.userAgent ||
-      '';
-    return /(Mac|iPhone|iPod|iPad)/i.test(platform);
-  }, []);
-
-  const shortcutText = getSidebarShortcutLabel(isMac);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isSidebarToggleShortcut(event)) {
-        event.preventDefault();
-        hideRailTooltip();
-        setSidebarCollapsed((prev) => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hideRailTooltip]);
-
-  const renderNavBadge = (badge?: number, badgeLabel?: string) =>
-    typeof badge === 'number' ? (
-      <>
-        {badge > 0 ? (
-          <span className="nav-badge" aria-hidden="true">
-            {badge}
-          </span>
-        ) : null}
-        {badgeLabel ? <span className="nav-badge-sr-only">{badgeLabel}</span> : null}
-      </>
-    ) : null;
-
-  const renderNavLink = (item: SidebarNavLinkItem, className = 'nav-item') => {
-    const itemLabel = item.label ?? (item.labelKey ? t(item.labelKey) : '');
-    const itemMeta = item.meta ?? (item.metaKey ? t(item.metaKey) : '');
-    const accessibleLabel = item.badgeLabel ? `${itemLabel}, ${item.badgeLabel}` : itemLabel;
-
-    return (
-      <NavLink
-        key={item.path}
-        to={item.path}
-        className={({ isActive }) => `${className} ${isActive ? 'active' : ''}`}
-        onClick={() => {
-          focusedRailItemRef.current = null;
-          setSidebarOpen(false);
-          hideRailTooltip();
-        }}
-        aria-label={showSidebarLabels ? undefined : accessibleLabel}
-        aria-describedby={
-          !showSidebarLabels && itemMeta && railTooltip?.targetID === item.path
-            ? NAV_TOOLTIP_ID
-            : undefined
-        }
-        onMouseEnter={
-          showSidebarLabels
-            ? undefined
-            : (event) => handleRailTooltipMouseEnter(event, item.path, itemLabel, itemMeta)
-        }
-        onMouseLeave={showSidebarLabels ? undefined : handleRailTooltipMouseLeave}
-        onFocus={
-          showSidebarLabels
-            ? undefined
-            : (event) => handleRailTooltipFocus(event, item.path, itemLabel, itemMeta)
-        }
-        onBlur={
-          showSidebarLabels
-            ? undefined
-            : (event) => handleRailTooltipBlur(event, item.path, itemLabel, itemMeta)
-        }
-      >
-        <span className="nav-icon">{item.icon}</span>
-        {showSidebarLabels ? (
-          <>
-            <span className="nav-text">
-              <span className="nav-label">{itemLabel}</span>
-            </span>
-            {renderNavBadge(item.badge, item.badgeLabel)}
-          </>
-        ) : (
-          renderNavBadge(item.badge)
-        )}
-      </NavLink>
-    );
-  };
-
-  const renderNavItem = (item: SidebarNavItem) => {
-    if (item.kind !== 'drawer') {
-      return renderNavLink(item);
     }
+  }
 
-    const isActive = item.children.some((child) => child.path === location.pathname);
-    const isOpen = isActive || expandedPluginResourceIDs.has(item.id);
+  const pathname = location.pathname;
+  const currentDestination = destinations.find((entry) => isActivePath(entry.path, pathname));
+  const currentPluginPage = pluginResources.find((resource) => matchPath(resource.route, pathname));
+  const currentPluginGroup = pluginGroups.find((group) =>
+    group.pages.some((page) => page === currentPluginPage)
+  );
 
-    return (
-      <div className={`nav-drawer ${isOpen ? 'open' : ''}`} key={item.id}>
-        <button
-          type="button"
-          className={`nav-item nav-drawer-toggle ${isActive ? 'active' : ''} ${
-            isOpen ? 'open' : ''
-          }`}
-          onClick={() => togglePluginResourceDrawer(item.id)}
-          aria-label={showSidebarLabels ? undefined : item.label}
-          aria-describedby={
-            !showSidebarLabels && item.meta && railTooltip?.targetID === item.id
-              ? NAV_TOOLTIP_ID
-              : undefined
-          }
-          aria-expanded={isOpen}
-          onMouseEnter={
-            showSidebarLabels
-              ? undefined
-              : (event) => handleRailTooltipMouseEnter(event, item.id, item.label, item.meta)
-          }
-          onMouseLeave={showSidebarLabels ? undefined : handleRailTooltipMouseLeave}
-          onFocus={
-            showSidebarLabels
-              ? undefined
-              : (event) => handleRailTooltipFocus(event, item.id, item.label, item.meta)
-          }
-          onBlur={
-            showSidebarLabels
-              ? undefined
-              : (event) => handleRailTooltipBlur(event, item.id, item.label, item.meta)
-          }
-        >
-          <span className="nav-icon">{item.icon}</span>
-          {showSidebarLabels && (
-            <>
-              <span className="nav-text">
-                <span className="nav-label">{item.label}</span>
-              </span>
-              <span className="nav-drawer-caret" aria-hidden="true">
-                <IconChevronDown size={14} />
-              </span>
-            </>
-          )}
-        </button>
-        {isOpen ? (
-          <div className="nav-sub-list">
-            {item.children.map((child) => renderNavLink(child, 'nav-item nav-sub-item'))}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
+  const pageName =
+    currentDestination?.label ??
+    (currentPluginPage
+      ? currentPluginGroup && currentPluginGroup.pages.length > 1
+        ? `${currentPluginGroup.label} / ${currentPluginPage.label}`
+        : currentPluginPage.label
+      : pathname.startsWith('/plugin-store')
+        ? t('nav.plugin_store')
+        : pathname.startsWith('/ai-providers')
+          ? t('nav.ai_providers')
+          : pathname.startsWith('/quick-start')
+            ? t('nav.quick_start')
+            : '');
 
-  const mobileSidebarToggleLabel = sidebarOpen
-    ? t('sidebar.toggle_collapse', { defaultValue: 'Close navigation' })
-    : t('sidebar.toggle_expand', { defaultValue: 'Open navigation' });
+  // The rail item to highlight. On phones, anything outside the bottom bar lights up "More".
+  const railItem =
+    currentDestination?.id ??
+    (currentPluginGroup
+      ? `plugin:${currentPluginGroup.id}`
+      : pathname.startsWith('/plugin-store')
+        ? 'plugins'
+        : undefined);
+  const inBottomBar = destinations.some((entry) => entry.id === railItem && entry.phone);
+  const activeItem = phone && railItem && !inBottomBar ? 'more' : railItem;
 
-  const sidebarToggleLabel = sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse');
+  const live = connectionStatus === 'connected';
+  const statusLabel = live
+    ? t('common.connected_status')
+    : connectionStatus === 'connecting'
+      ? t('common.connecting_status')
+      : t('common.disconnected_status');
 
   return (
-    <div
-      className={`app-shell ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''} ${
-        isPluginResourcePage ? 'plugin-resource-shell' : ''
-      }`}
-    >
-      <div className="top-gradient-blur" aria-hidden="true" />
-
-      <header className="main-header" ref={headerRef}>
-        <button
-          type="button"
-          className="sidebar-toggle-floating"
-          onClick={() => {
-            hideRailTooltip();
-            setSidebarCollapsed((prev) => !prev);
-          }}
-          onMouseEnter={(event) =>
-            handleRailTooltipMouseEnter(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
-          }
-          onMouseLeave={handleRailTooltipMouseLeave}
-          onFocus={(event) =>
-            handleRailTooltipFocus(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
-          }
-          onBlur={(event) =>
-            handleRailTooltipBlur(event, 'sidebar-toggle', sidebarToggleLabel, shortcutText)
-          }
-          aria-label={`${sidebarToggleLabel} (${shortcutText})`}
-          aria-describedby={railTooltip?.targetID === 'sidebar-toggle' ? NAV_TOOLTIP_ID : undefined}
-        >
-          {sidebarCollapsed ? headerIcons.chevronRight : headerIcons.chevronLeft}
-        </button>
-
-        <div className="mobile-sidebar-actions">
-          <Button
-            className="mobile-menu-btn"
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            title={mobileSidebarToggleLabel}
-            aria-label={mobileSidebarToggleLabel}
-          >
-            {sidebarOpen ? headerIcons.close : headerIcons.menu}
-          </Button>
-        </div>
-
-        <div className="header-actions floating-actions">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefreshAll}
-            title={t('header.refresh_all')}
-          >
-            {headerIcons.refresh}
-          </Button>
-          <div className={`language-menu ${languageMenuOpen ? 'open' : ''}`} ref={languageMenuRef}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleLanguageMenu}
-              title={t('language.switch')}
-              aria-label={t('language.switch')}
-              aria-haspopup="menu"
-              aria-expanded={languageMenuOpen}
-            >
-              {headerIcons.language}
-            </Button>
-            {languageMenuOpen && (
-              <div
-                className="notification entering language-menu-popover"
-                role="menu"
-                aria-label={t('language.switch')}
+    <div className="flex h-dvh flex-col">
+      <header className="flex h-12 shrink-0 items-center gap-3 px-3 sm:px-4">
+        <Logo className="size-7" />
+        <span className="text-lg text-faint">/</span>
+        <nav className="flex min-w-0 items-center gap-2 text-sm">
+          <span className="truncate font-medium">{pageName}</span>
+        </nav>
+        <div className="ml-auto flex items-center gap-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('header.refresh_all')}
+                disabled={refreshing}
+                onClick={() => void handleRefreshAll()}
+                className="text-muted-foreground"
               >
-                {LANGUAGE_ORDER.map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    className={`language-menu-option ${language === lang ? 'active' : ''}`}
-                    onClick={() => handleLanguageSelect(lang)}
-                    role="menuitemradio"
-                    aria-checked={language === lang}
-                  >
-                    <span>{t(LANGUAGE_LABEL_KEYS[lang])}</span>
-                    {language === lang ? <span className="language-menu-check">✓</span> : null}
-                  </button>
-                ))}
-              </div>
+                <HugeiconsIcon icon={Refresh01Icon} strokeWidth={1.75} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('header.refresh_all')}</TooltipContent>
+          </Tooltip>
+          <div
+            className={cn(
+              'flex items-center gap-2 text-xs',
+              live ? 'text-muted-foreground' : 'text-warning'
             )}
+          >
+            <span className={cn('size-2 rounded-full', live ? 'bg-success' : 'bg-warning')} />
+            {statusLabel}
           </div>
-          <div className={`theme-menu ${themeMenuOpen ? 'open' : ''}`} ref={themeMenuRef}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleThemeMenu}
-              title={t('theme.switch')}
-              aria-label={t('theme.switch')}
-              aria-haspopup="menu"
-              aria-expanded={themeMenuOpen}
-            >
-              {theme === 'auto'
-                ? headerIcons.autoTheme
-                : theme === 'dark'
-                  ? headerIcons.moon
-                  : theme === 'white'
-                    ? headerIcons.whiteTheme
-                    : headerIcons.sun}
-            </Button>
-            {themeMenuOpen && (
-              <div
-                className="notification entering theme-menu-popover"
-                role="menu"
-                aria-label={t('theme.switch')}
-              >
-                {THEME_CARDS.map((tc) => (
-                  <button
-                    key={tc.key}
-                    type="button"
-                    className={`theme-card ${theme === tc.key ? 'active' : ''}`}
-                    onClick={() => handleThemeSelect(tc.key)}
-                    role="menuitemradio"
-                    aria-checked={theme === tc.key}
-                  >
-                    <div
-                      className="theme-card-preview"
-                      style={{
-                        background: tc.colors.bg,
-                        border: `1px solid ${tc.colors.border}`,
-                      }}
-                    >
-                      <div
-                        className="theme-card-header"
-                        style={{
-                          background: tc.colors.card,
-                          borderBottom: `1px solid ${tc.colors.border}`,
-                        }}
-                      />
-                      <div className="theme-card-body">
-                        <div
-                          className="theme-card-sidebar"
-                          style={{
-                            background: tc.colors.card,
-                            borderRight: `1px solid ${tc.colors.border}`,
-                          }}
-                        />
-                        <div className="theme-card-content" style={{ background: tc.colors.bg }}>
-                          <div
-                            className="theme-card-line"
-                            style={{ background: tc.colors.textMuted }}
-                          />
-                          <div
-                            className="theme-card-line short"
-                            style={{ background: tc.colors.textMuted }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <span className="theme-card-label">{t(tc.labelKey)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <Button variant="ghost" size="sm" onClick={logout} title={t('header.logout')}>
-            {headerIcons.logout}
-          </Button>
         </div>
       </header>
 
-      <div className="main-body">
-        <button
-          type="button"
-          className={`sidebar-backdrop ${sidebarOpen ? 'visible' : ''}`}
-          onClick={() => setSidebarOpen(false)}
-          aria-label={t('common.close')}
-          aria-hidden={!sidebarOpen}
-          tabIndex={sidebarOpen ? 0 : -1}
+      <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+        <Rail
+          groups={groups}
+          pluginGroups={pluginGroups}
+          activeItem={activeItem}
+          currentItem={railItem}
+          currentPluginPage={currentPluginPage}
+          onNavigate={(path) => navigate(path)}
+          onLogOut={logout}
         />
 
-        <aside
-          className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
+        <main
+          ref={mainRef}
+          className="relative mx-2 min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-xl border bg-background sm:mr-3 sm:mb-3 sm:ml-0"
         >
-          <div className="sidebar-header">
-            <div className="sidebar-brand" title={fullBrandName}>
-              <img src={vibeProxyLogo} alt="Vibe Proxy" className="sidebar-brand-logo" />
-              {showSidebarLabels && (
-                <span className="sidebar-brand-text">
-                  <span className="sidebar-brand-title">{abbrBrandName}</span>
-                  <span className="sidebar-brand-subtitle">{t('sidebar.subtitle')}</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="nav-section">
-            {navGroups.map((group, idx) => (
-              <div className="nav-group" key={group.id}>
-                {showSidebarLabels ? (
-                  <div className="nav-group-label">{t(group.labelKey)}</div>
-                ) : (
-                  idx > 0 && <div className="nav-group-divider" aria-hidden="true" />
-                )}
-                {group.items.map((item) => renderNavItem(item))}
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        {railTooltip && (
-          <div
-            ref={railTooltipRef}
-            id={NAV_TOOLTIP_ID}
-            className="nav-tooltip"
-            role="tooltip"
-            style={{ top: railTooltip.top }}
-          >
-            <span className="nav-tooltip-label" aria-hidden="true">
-              {railTooltip.label}
-            </span>
-            {railTooltip.meta ? <span className="nav-tooltip-meta">{railTooltip.meta}</span> : null}
-          </div>
-        )}
-
-        <div
-          className={`content${isLogsPage ? ' content-logs' : ''}${
-            isPluginResourcePage ? ' content-plugin-resource' : ''
-          }`}
-          ref={contentRef}
-        >
-          {!isPluginResourcePage && <SignalField className="content-signal" gap={6} clear={0.15} />}
-          <main
-            className={`main-content${isLogsPage ? ' main-content-logs' : ''}${
-              isPluginResourcePage ? ' main-content-plugin-resource' : ''
-            }`}
-          >
-            <PageTransition
-              render={(location) => <MainRoutes location={location} />}
-              getRouteOrder={getRouteOrder}
-              getTransitionVariant={getTransitionVariant}
-              scrollContainerRef={contentRef}
-            />
-          </main>
-        </div>
+          <MainRoutes />
+        </main>
       </div>
     </div>
+  );
+}
+
+const railButton =
+  'relative size-10 rounded-lg text-muted-foreground hover:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent dark:aria-expanded:bg-transparent';
+
+/**
+ * The icon rail on the left, a bottom bar on phones, like VM Bridge's sidebar. One hover highlight
+ * and one tooltip follow the pointer from icon to icon; the active highlight slides on navigation.
+ */
+function Rail({
+  groups,
+  pluginGroups,
+  activeItem,
+  currentItem,
+  currentPluginPage,
+  onNavigate,
+  onLogOut,
+}: {
+  groups: Destination[][];
+  pluginGroups: PluginGroup[];
+  /** The highlighted rail item: on phones, "more" stands in for what lives in that menu. */
+  activeItem?: string;
+  currentItem?: string;
+  currentPluginPage?: PluginResourceEntry;
+  onNavigate: (path: string) => void;
+  onLogOut: () => void;
+}) {
+  const { t } = useTranslation();
+  const language = useLanguageStore((state) => state.language);
+  const setLanguage = useLanguageStore((state) => state.setLanguage);
+  const { hover, current, hide, navProps, itemProps } = useSlidingNav(activeItem);
+
+  // Like the tooltip provider's delay: the first tooltip waits, then it follows the pointer at once.
+  // Keyboard focus shows it right away.
+  const [tipReady, setTipReady] = useState(false);
+  const shown = hover?.shown ?? false;
+  const focused = hover?.focused ?? false;
+  useEffect(() => {
+    setTipReady(shown && focused);
+    if (!shown || focused) return;
+    const timer = setTimeout(() => setTipReady(true), 300);
+    return () => clearTimeout(timer);
+  }, [shown, focused]);
+
+  const destinations = groups.flat();
+  const moreDestinations = destinations.filter((entry) => !entry.phone);
+  const separator = <span aria-hidden className="my-1 h-px w-6 shrink-0 bg-border max-sm:hidden" />;
+
+  const languageMenu = (
+    <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
+      {LANGUAGE_ORDER.map((lang) => (
+        <DropdownMenuRadioItem key={lang} value={lang}>
+          {t(LANGUAGE_LABEL_KEYS[lang])}
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
+  );
+
+  return (
+    <nav
+      {...navProps}
+      className="relative order-last flex shrink-0 items-center justify-around gap-1 px-2 py-1.5 sm:order-none sm:w-14 sm:flex-col sm:justify-start sm:px-0 sm:py-2"
+    >
+      {hover && (
+        <NavIndicator
+          box={hover.box}
+          shown={hover.shown}
+          slide={hover.slide}
+          className="rounded-lg bg-muted/50"
+        />
+      )}
+      {current && (
+        <NavIndicator box={current.box} slide={current.slide} className="rounded-lg bg-accent" />
+      )}
+
+      {groups.map((group, index) => (
+        <div key={group[0].id} className="contents">
+          {index > 0 && separator}
+          {group.map((entry) => {
+            return (
+              <Button
+                key={entry.id}
+                {...itemProps(
+                  entry.id,
+                  entry.count ? `${entry.label} · ${entry.count.value}` : entry.label
+                )}
+                variant="ghost"
+                size="icon-lg"
+                aria-label={entry.count ? `${entry.label}, ${entry.count.label}` : entry.label}
+                aria-current={activeItem === entry.id ? 'page' : undefined}
+                onClick={() => onNavigate(entry.path)}
+                className={cn(
+                  railButton,
+                  !entry.phone && 'max-sm:hidden',
+                  activeItem === entry.id && 'text-foreground'
+                )}
+              >
+                {entry.icon}
+              </Button>
+            );
+          })}
+        </div>
+      ))}
+
+      {pluginGroups.length > 0 && separator}
+      {pluginGroups.map((group) => {
+        const item = `plugin:${group.id}`;
+        const className = cn(railButton, 'max-sm:hidden', activeItem === item && 'text-foreground');
+        if (group.pages.length === 1) {
+          const page = group.pages[0];
+          return (
+            <Button
+              key={item}
+              {...itemProps(item, page.label)}
+              variant="ghost"
+              size="icon-lg"
+              aria-label={page.label}
+              aria-current={activeItem === item ? 'page' : undefined}
+              onClick={() => onNavigate(page.route)}
+              className={className}
+            >
+              <PluginIcon src={group.logo} />
+            </Button>
+          );
+        }
+        return (
+          <DropdownMenu key={item} onOpenChange={(open) => open && hide()}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                {...itemProps(item, group.label)}
+                variant="ghost"
+                size="icon-lg"
+                aria-label={group.label}
+                className={className}
+              >
+                <PluginIcon src={group.logo} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-56">
+              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              {group.pages.map((page) => (
+                <DropdownMenuItem
+                  key={page.route}
+                  onSelect={() => onNavigate(page.route)}
+                  className={cn(page === currentPluginPage && 'text-primary')}
+                >
+                  {page.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      })}
+
+      <DropdownMenu onOpenChange={(open) => open && hide()}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            {...itemProps('language', t('language.switch'))}
+            variant="ghost"
+            size="icon-lg"
+            aria-label={t('language.switch')}
+            className={cn(railButton, 'max-sm:hidden sm:mt-auto')}
+          >
+            {railIcon(GlobeIcon)}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="end" className="w-48">
+          {languageMenu}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button
+        {...itemProps('logout', t('header.logout'))}
+        variant="ghost"
+        size="icon-lg"
+        aria-label={t('header.logout')}
+        className={cn(railButton, 'max-sm:hidden')}
+        onClick={onLogOut}
+      >
+        {railIcon(Logout01Icon)}
+      </Button>
+
+      {/* Phones only: the destinations that don't fit the bottom bar, the language and log out. */}
+      <DropdownMenu onOpenChange={(open) => open && hide()}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            {...itemProps('more', t('common.more'))}
+            variant="ghost"
+            size="icon-lg"
+            aria-label={t('common.more')}
+            className={cn(railButton, 'sm:hidden', activeItem === 'more' && 'text-foreground')}
+          >
+            {railIcon(MoreHorizontalIcon)}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="end" className="w-60">
+          {moreDestinations.map((entry) => (
+            <DropdownMenuItem
+              key={entry.id}
+              onSelect={() => onNavigate(entry.path)}
+              className={cn('h-9', entry.id === currentItem && 'text-primary')}
+            >
+              {entry.icon}
+              {entry.label}
+            </DropdownMenuItem>
+          ))}
+          {pluginGroups.length > 0 && <DropdownMenuSeparator />}
+          {pluginGroups.flatMap((group) =>
+            group.pages.map((page) => (
+              <DropdownMenuItem
+                key={page.route}
+                onSelect={() => onNavigate(page.route)}
+                className={cn('h-9', page === currentPluginPage && 'text-primary')}
+              >
+                <PluginIcon src={group.logo} />
+                {group.pages.length > 1 ? `${group.label} / ${page.label}` : page.label}
+              </DropdownMenuItem>
+            ))
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="h-9">
+              {railIcon(GlobeIcon)}
+              {t('language.switch')}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-48">{languageMenu}</DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem className="h-9" onSelect={onLogOut}>
+            {railIcon(Logout01Icon)}
+            {t('header.logout')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {hover && (
+        // The buttons carry their names, so this label only repeats them for sighted users.
+        <span
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute top-0 left-0 z-50 ease-out motion-reduce:transition-none',
+            hover.slide && tipReady && 'transition-transform duration-200'
+          )}
+          style={boxStyle(hover.box)}
+        >
+          <span
+            className={cn(
+              'absolute bottom-full left-1/2 mb-2 w-max -translate-x-1/2 rounded-md bg-foreground px-3 py-1.5 text-xs text-background transition-opacity duration-150 motion-reduce:transition-none sm:top-1/2 sm:bottom-auto sm:left-full sm:mb-0 sm:ml-2 sm:translate-x-0 sm:-translate-y-1/2',
+              !(shown && tipReady) && 'opacity-0'
+            )}
+          >
+            {hover.label}
+            <span className="absolute bottom-0 left-1/2 size-2.5 -translate-x-1/2 translate-y-1/2 rotate-45 rounded-[2px] bg-foreground sm:top-1/2 sm:bottom-auto sm:left-0 sm:-translate-y-1/2" />
+          </span>
+        </span>
+      )}
+    </nav>
   );
 }

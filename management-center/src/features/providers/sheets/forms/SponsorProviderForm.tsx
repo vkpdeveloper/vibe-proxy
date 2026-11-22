@@ -1,19 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { Select } from '@/components/ui/Select';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  IconAlertTriangle,
-  IconChevronDown,
-  IconCheckCircle2,
-  IconDollarSign,
-  IconDownload,
-  IconEye,
-  IconEyeOff,
-  IconLoader2,
-  IconPlus,
-  IconX,
-} from '@/components/ui/icons';
+  Add01Icon,
+  Alert02Icon,
+  ArrowDown01Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  DollarCircleIcon,
+  Download04Icon,
+} from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 import { hasDisableAllModelsRule } from '@/components/providers/utils';
 import { maskApiKey } from '@/utils/format';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
@@ -42,7 +52,8 @@ import { ModelDiscoveryPanel } from './ModelDiscoveryPanel';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
 import { useModelDiscovery, type UseModelDiscoveryResult } from './useModelDiscovery';
 import { useSponsorUsageCheck, type SponsorUsageMessages } from './useSponsorUsageCheck';
-import styles from './sharedForm.module.scss';
+import { FormSection } from './FormSection';
+import { FormError, FormSelect, SecretInput, SwitchField } from './FormControls';
 import { readRuntimePolicy, validateRuntimePolicy } from '../../runtimePolicy';
 import { readModelOptions, validateModelOptions } from '../../modelOptions';
 import type { ModelAlias } from '@/types';
@@ -56,7 +67,6 @@ interface SponsorProviderFormProps {
   mode: 'create' | 'edit';
   mutating: boolean;
   formId: string;
-  variant?: 'quickStart';
   onSubmit: (input: ProviderEntryFormInput) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -249,20 +259,20 @@ function SponsorModelSection({
   };
 
   return (
-    <Collapsible label={label}>
-      <div className={styles.entriesList}>
-        <p className={styles.sectionDesc}>{description}</p>
-        <div className={styles.entriesToolbar}>
-          <button
-            type="button"
-            className={styles.connectivityBtn}
-            onClick={openDiscovery}
-            disabled={mutating}
-          >
-            <IconDownload size={14} />
-            <span>{t('providersPage.discovery.openButton')}</span>
-          </button>
-        </div>
+    <FormSection label={label}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={openDiscovery}
+          disabled={mutating}
+        >
+          <HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
+          {t('providersPage.discovery.openButton')}
+        </Button>
         {discoveryOpen ? (
           <ModelDiscoveryPanel
             loading={discovery.loading}
@@ -297,7 +307,7 @@ function SponsorModelSection({
           }}
         />
       </div>
-    </Collapsible>
+    </FormSection>
   );
 }
 
@@ -383,136 +393,142 @@ function SponsorKeyEntryCard({
     onChange({ ...entry, ...patch });
   };
 
+  const fieldId = (name: string) => `${formId}-group-${index}-${name}`;
+  const resolvedBaseUrl = definition.resolveBaseUrl(entry.baseUrl);
+
   return (
-    <div className={styles.entryCard}>
-      <div className={styles.entryCardHeader}>
+    <div className="rounded-xl border bg-card">
+      <div className="flex items-center gap-1 py-1.5 pr-1.5 pl-3.5">
         <button
           type="button"
-          className={styles.entryCardToggle}
+          className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-1 text-left outline-none focus-visible:underline"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
-          <span className={styles.sponsorGroupTitle}>
-            <span>{titleLabel}</span>
-            <strong>{protocolLabel}</strong>
+          <span className="flex max-w-full min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="whitespace-nowrap text-muted-foreground">{titleLabel}</span>
+            <span className="truncate font-medium">{protocolLabel}</span>
           </span>
-          <span className={styles.sponsorGroupSummary}>
-            <span className={styles.sponsorSummaryKey}>{summaryKeyLabel}</span>
-            <span className={styles.sponsorSummaryUrl}>{endpointUrl}</span>
+          <span className="flex max-w-full min-w-0 items-center gap-2 font-mono text-xs">
+            <span className="shrink-0 text-muted-foreground">{summaryKeyLabel}</span>
+            <span className="truncate text-faint">{endpointUrl}</span>
           </span>
         </button>
-        <div className={styles.entryCardHeaderRight}>
-          <button
-            type="button"
-            className={styles.entryCardIconBtn}
-            onClick={() => setExpanded((value) => !value)}
-            title={expanded ? t('common.collapse') : t('common.expand')}
-            aria-label={expanded ? t('common.collapse') : t('common.expand')}
-          >
-            <IconChevronDown
-              className={[styles.entryCardChevron, expanded ? styles.entryCardChevronOpen : '']
-                .filter(Boolean)
-                .join(' ')}
-              size={14}
-            />
-          </button>
-          <button
-            type="button"
-            className={styles.removeBtn}
-            onClick={onRemove}
-            disabled={mutating || !canRemove}
-            title={t('providersPage.sponsor.removeGroupedKey')}
-            aria-label={t('providersPage.sponsor.removeGroupedKey')}
-          >
-            <IconX size={12} />
-          </button>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setExpanded((value) => !value)}
+          title={expanded ? t('common.collapse') : t('common.expand')}
+          aria-label={expanded ? t('common.collapse') : t('common.expand')}
+        >
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            strokeWidth={1.75}
+            className={cn(
+              'transition-transform duration-200 ease-out motion-reduce:transition-none',
+              expanded && 'rotate-180'
+            )}
+          />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={onRemove}
+          disabled={mutating || !canRemove}
+          title={t('providersPage.sponsor.removeGroupedKey')}
+          aria-label={t('providersPage.sponsor.removeGroupedKey')}
+        >
+          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={1.75} />
+        </Button>
       </div>
 
       {expanded ? (
-        <div className={styles.entryCardBody}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${formId}-group-${index}-protocol`}>
-              {t('providersPage.sponsor.protocol')}
-            </label>
-            <Select
-              id={`${formId}-group-${index}-protocol`}
-              value={entry.protocol}
-              options={protocolOptions}
-              onChange={(value) =>
-                updateEntry({ protocol: value as SponsorProtocol, models: [emptyModel()] })
-              }
-              disabled={mutating}
-              ariaLabel={t('providersPage.sponsor.protocol')}
-            />
-            <span className={styles.labelHint}>{t('providersPage.sponsor.protocolHint')}</span>
-          </div>
+        <div className="flex flex-col gap-6 border-t p-3.5">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor={fieldId('protocol')}>
+                {t('providersPage.sponsor.protocol')}
+              </FieldLabel>
+              <FormSelect
+                id={fieldId('protocol')}
+                className="data-[size=default]:h-9"
+                value={entry.protocol}
+                options={protocolOptions}
+                onChange={(value) =>
+                  updateEntry({ protocol: value as SponsorProtocol, models: [emptyModel()] })
+                }
+                disabled={mutating}
+                ariaLabel={t('providersPage.sponsor.protocol')}
+                ariaDescribedBy={fieldId('protocol-hint')}
+              />
+              <FieldDescription id={fieldId('protocol-hint')}>
+                {t('providersPage.sponsor.protocolHint')}
+              </FieldDescription>
+            </Field>
 
-          {definition.baseUrlOptions.length > 1 ? (
-            <div className={styles.field}>
-              <span className={styles.label}>
-                {t('providersPage.sponsor.urlMode', { provider: definition.displayName })}
+            {definition.baseUrlOptions.length > 1 ? (
+              <FieldSet className="gap-3">
+                <FieldLegend variant="label" className="mb-0">
+                  {t('providersPage.sponsor.urlMode', { provider: definition.displayName })}
+                </FieldLegend>
+                <RadioGroup
+                  name={fieldId('base-url')}
+                  value={resolvedBaseUrl}
+                  onValueChange={(baseUrl) => updateEntry({ baseUrl })}
+                  disabled={mutating}
+                  aria-describedby={fieldId('base-url-hint')}
+                >
+                  {definition.baseUrlOptions.map((option) => (
+                    <FieldLabel key={option.id} htmlFor={fieldId(`base-url-${option.id}`)}>
+                      <Field orientation="horizontal">
+                        <FieldContent className="min-w-0">
+                          <FieldTitle>
+                            {t(`providersPage.sponsor.urlOptions.${option.id}`)}
+                          </FieldTitle>
+                          <FieldDescription className="font-mono text-xs break-all">
+                            {option.baseUrl}
+                          </FieldDescription>
+                          {option.descriptionKey ? (
+                            <FieldDescription className="text-xs">
+                              {t(
+                                `providersPage.sponsor.urlOptionDescriptions.${option.descriptionKey}`
+                              )}
+                            </FieldDescription>
+                          ) : null}
+                        </FieldContent>
+                        <RadioGroupItem
+                          value={option.baseUrl}
+                          id={fieldId(`base-url-${option.id}`)}
+                        />
+                      </Field>
+                    </FieldLabel>
+                  ))}
+                </RadioGroup>
+                <FieldDescription id={fieldId('base-url-hint')}>
+                  {t('providersPage.sponsor.urlHint')}
+                </FieldDescription>
+              </FieldSet>
+            ) : null}
+
+            <div className="flex flex-col gap-1 rounded-lg bg-muted/50 px-3 py-2">
+              <span className="text-xs text-muted-foreground">
+                {t('providersPage.sponsor.protocolEndpoint')}
               </span>
-              <div className={styles.sponsorUrlOptions} role="radiogroup">
-                {definition.baseUrlOptions.map((option) => {
-                  const checked = definition.resolveBaseUrl(entry.baseUrl) === option.baseUrl;
-                  const className = [
-                    styles.sponsorUrlOption,
-                    checked ? styles.sponsorUrlOptionActive : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-                  return (
-                    <label key={option.id} className={className}>
-                      <input
-                        type="radio"
-                        name={`${formId}-group-${index}-base-url`}
-                        value={option.baseUrl}
-                        checked={checked}
-                        onChange={() => updateEntry({ baseUrl: option.baseUrl })}
-                        disabled={mutating}
-                      />
-                      <span className={styles.sponsorUrlOptionText}>
-                        <span>{t(`providersPage.sponsor.urlOptions.${option.id}`)}</span>
-                        <small>{option.baseUrl}</small>
-                        {option.descriptionKey ? (
-                          <small className={styles.sponsorUrlOptionDescription}>
-                            {t(
-                              `providersPage.sponsor.urlOptionDescriptions.${option.descriptionKey}`
-                            )}
-                          </small>
-                        ) : null}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <span className={styles.labelHint}>{t('providersPage.sponsor.urlHint')}</span>
+              <span className="font-mono text-xs break-all">{endpointUrl}</span>
             </div>
-          ) : null}
 
-          <div className={styles.sponsorProtocolCard}>
-            <span className={styles.sponsorProtocolName}>
-              {t('providersPage.sponsor.protocolEndpoint')}
-            </span>
-            <span className={styles.sponsorProtocolUrl}>{endpointUrl}</span>
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${formId}-group-${index}-api-key`}>
-              {t('providersPage.form.apiKey')}
-            </label>
-            <div className={styles.passwordField}>
-              <input
-                id={`${formId}-group-${index}-api-key`}
-                className={styles.passwordInput}
-                type={showApiKey ? 'text' : 'password'}
+            <Field>
+              <FieldLabel htmlFor={fieldId('api-key')}>{t('providersPage.form.apiKey')}</FieldLabel>
+              <SecretInput
+                id={fieldId('api-key')}
+                className="h-9"
                 value={entry.apiKey}
-                onChange={(event) => updateEntry({ apiKey: event.target.value })}
-                autoComplete="new-password"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                data-bwignore="true"
+                onValueChange={(apiKey) => updateEntry({ apiKey })}
+                visible={showApiKey}
+                onVisibleChange={setShowApiKey}
                 placeholder={
                   mode === 'edit'
                     ? t('providersPage.form.apiKeyEditPlaceholder')
@@ -520,201 +536,172 @@ function SponsorKeyEntryCard({
                 }
                 disabled={mutating}
               />
-              <button
-                type="button"
-                className={styles.passwordToggle}
-                onClick={() => setShowApiKey((value) => !value)}
-                disabled={mutating}
-                aria-label={
-                  showApiKey
-                    ? t('providersPage.form.hideApiKey')
-                    : t('providersPage.form.showApiKey')
-                }
-                title={
-                  showApiKey
-                    ? t('providersPage.form.hideApiKey')
-                    : t('providersPage.form.showApiKey')
-                }
-              >
-                {showApiKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-              </button>
-            </div>
-            <span className={styles.labelHint}>{t('providersPage.sponsor.apiKeyHint')}</span>
-          </div>
+              <FieldDescription>{t('providersPage.sponsor.apiKeyHint')}</FieldDescription>
+            </Field>
 
-          {definition.supportsUsageCheck ? (
-            <div className={styles.sponsorUsageSection}>
-              <button
-                type="button"
-                className={styles.connectivityBtn}
-                onClick={() => void usageCheck.run()}
-                disabled={mutating || usageCheck.isLoading}
-              >
-                {usageCheck.isLoading ? (
-                  <IconLoader2 className={styles.statusIconLoading} size={14} />
-                ) : (
-                  <IconDollarSign size={14} />
-                )}
-                <span>
+            {definition.supportsUsageCheck ? (
+              <div className="flex flex-col items-start gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void usageCheck.run()}
+                  disabled={mutating || usageCheck.isLoading}
+                >
+                  <HugeiconsIcon icon={DollarCircleIcon} strokeWidth={1.75} />
                   {usageCheck.isLoading
                     ? t('providersPage.sponsor.usageChecking')
                     : t('providersPage.sponsor.usageCheck')}
-                </span>
-              </button>
-              {usageCheck.status.state === 'success' && usageSummary ? (
-                <div
-                  className={[
-                    styles.sponsorUsageResult,
-                    usageHealthy ? '' : styles.sponsorUsageResultWarning,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  <div className={styles.sponsorUsageMain}>
-                    {usageHealthy ? (
-                      <IconCheckCircle2
-                        className={`${styles.statusIcon} ${styles.statusIconSuccess}`}
-                        size={14}
-                      />
-                    ) : (
-                      <IconAlertTriangle
-                        className={`${styles.statusIcon} ${styles.statusIconError}`}
-                        size={14}
-                      />
+                </Button>
+                {usageCheck.status.state === 'success' && usageSummary ? (
+                  <div
+                    role="status"
+                    className={cn(
+                      'flex w-full flex-col gap-1 rounded-lg border px-3 py-2 text-sm',
+                      !usageHealthy && 'border-warning/40 bg-warning/10'
                     )}
-                    <span>
-                      {t('providersPage.sponsor.usageRemaining', {
-                        amount: usageRemaining,
-                        unit: usageSummary.unit,
-                      })}
-                    </span>
+                  >
+                    <div className="flex items-center gap-2">
+                      <HugeiconsIcon
+                        icon={usageHealthy ? CheckmarkCircle02Icon : Alert02Icon}
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                        className={cn(
+                          'size-4 shrink-0',
+                          usageHealthy ? 'text-success' : 'text-warning'
+                        )}
+                      />
+                      <span className="tabular-nums">
+                        {t('providersPage.sponsor.usageRemaining', {
+                          amount: usageRemaining,
+                          unit: usageSummary.unit,
+                        })}
+                      </span>
+                    </div>
+                    {usageSummary.used !== null || usageSummary.limit !== null ? (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {t('providersPage.sponsor.usageBreakdown', {
+                          used: usageUsed,
+                          limit: usageLimit,
+                        })}
+                      </span>
+                    ) : null}
+                    {!usageHealthy ? (
+                      <span className="text-xs text-muted-foreground">
+                        {t('providersPage.sponsor.usageStatus', {
+                          status: usageSummary.status || t('providersPage.sponsor.usageInvalid'),
+                        })}
+                      </span>
+                    ) : null}
                   </div>
-                  {usageSummary.used !== null || usageSummary.limit !== null ? (
-                    <span className={styles.sponsorUsageMeta}>
-                      {t('providersPage.sponsor.usageBreakdown', {
-                        used: usageUsed,
-                        limit: usageLimit,
-                      })}
-                    </span>
-                  ) : null}
-                  {!usageHealthy ? (
-                    <span className={styles.sponsorUsageMeta}>
-                      {t('providersPage.sponsor.usageStatus', {
-                        status: usageSummary.status || t('providersPage.sponsor.usageInvalid'),
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-              {usageCheck.status.state === 'error' ? (
-                <div className={styles.connectivityError}>{usageCheck.status.message}</div>
-              ) : null}
-            </div>
-          ) : null}
+                ) : null}
+                {usageCheck.status.state === 'error' ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {usageCheck.status.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${formId}-group-${index}-proxy`}>
-              {t('providersPage.form.proxyUrl')}
-            </label>
-            <input
-              id={`${formId}-group-${index}-proxy`}
-              className={styles.input}
-              value={entry.proxyUrl}
-              onChange={(event) => updateEntry({ proxyUrl: event.target.value })}
-              placeholder="http://127.0.0.1:7890"
-              disabled={mutating}
-            />
-          </div>
-
-          <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor={`${formId}-group-${index}-prefix`}>
-                {t('providersPage.form.prefix')}
-              </label>
-              <input
-                id={`${formId}-group-${index}-prefix`}
-                className={styles.input}
-                value={entry.prefix}
-                onChange={(event) => updateEntry({ prefix: event.target.value })}
+            <Field>
+              <FieldLabel htmlFor={fieldId('proxy')}>{t('providersPage.form.proxyUrl')}</FieldLabel>
+              <Input
+                id={fieldId('proxy')}
+                className="h-9 font-mono"
+                value={entry.proxyUrl}
+                onChange={(event) => updateEntry({ proxyUrl: event.target.value })}
+                placeholder="http://127.0.0.1:7890"
                 disabled={mutating}
               />
+            </Field>
+
+            <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
+              <Field>
+                <FieldLabel htmlFor={fieldId('prefix')}>
+                  {t('providersPage.form.prefix')}
+                </FieldLabel>
+                <Input
+                  id={fieldId('prefix')}
+                  className="h-9"
+                  value={entry.prefix}
+                  onChange={(event) => updateEntry({ prefix: event.target.value })}
+                  disabled={mutating}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={fieldId('priority')}>
+                  {t('providersPage.form.priority')}
+                </FieldLabel>
+                <Input
+                  id={fieldId('priority')}
+                  type="number"
+                  className="h-9"
+                  value={entry.priority ?? ''}
+                  onChange={(event) =>
+                    updateEntry({
+                      priority: event.target.value === '' ? undefined : Number(event.target.value),
+                    })
+                  }
+                  disabled={mutating}
+                />
+              </Field>
             </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor={`${formId}-group-${index}-priority`}>
-                {t('providersPage.form.priority')}
-              </label>
-              <input
-                id={`${formId}-group-${index}-priority`}
+
+            <Field>
+              <FieldLabel htmlFor={fieldId('weight')}>{t('providersPage.form.weight')}</FieldLabel>
+              <Input
+                id={fieldId('weight')}
                 type="number"
-                className={styles.input}
-                value={entry.priority ?? ''}
+                step="1"
+                max={MAX_CREDENTIAL_WEIGHT}
+                className="h-9"
+                value={entry.weight ?? ''}
+                placeholder="1"
+                aria-describedby={fieldId('weight-hint')}
                 onChange={(event) =>
                   updateEntry({
-                    priority: event.target.value === '' ? undefined : Number(event.target.value),
+                    weight: event.target.value === '' ? undefined : Number(event.target.value),
                   })
                 }
                 disabled={mutating}
               />
-            </div>
-          </div>
+              <FieldDescription id={fieldId('weight-hint')}>
+                {t('providersPage.form.weightHint')}
+              </FieldDescription>
+            </Field>
 
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor={`${formId}-group-${index}-weight`}>
-              {t('providersPage.form.weight')}
-            </label>
-            <input
-              id={`${formId}-group-${index}-weight`}
-              type="number"
-              step="1"
-              max={MAX_CREDENTIAL_WEIGHT}
-              className={styles.input}
-              value={entry.weight ?? ''}
-              placeholder="1"
-              onChange={(event) =>
-                updateEntry({
-                  weight: event.target.value === '' ? undefined : Number(event.target.value),
-                })
-              }
-              disabled={mutating}
-            />
-            <span className={styles.labelHint}>{t('providersPage.form.weightHint')}</span>
-          </div>
-
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkboxBox}
+            <SwitchField
+              id={fieldId('disabled')}
+              label={t('providersPage.form.disabled')}
+              description={t('providersPage.form.disabledHint')}
               checked={entry.disabled}
               disabled={mutating}
-              onChange={(event) => updateEntry({ disabled: event.target.checked })}
+              onCheckedChange={(disabled) => updateEntry({ disabled })}
             />
-            <span className={styles.checkboxText}>
-              <span>{t('providersPage.form.disabled')}</span>
-              <small>{t('providersPage.form.disabledHint')}</small>
-            </span>
-          </label>
+          </FieldGroup>
 
-          <ProviderBehaviorEditor
-            brand={entry.protocol === 'openai' ? 'openaiCompatibility' : entry.protocol}
-            value={entry}
-            onChange={updateEntry}
-            disabled={mutating}
-          />
-          <RuntimePolicyEditor
-            value={entry.runtimePolicy ?? readRuntimePolicy()}
-            onChange={(runtimePolicy) => updateEntry({ runtimePolicy })}
-            disabled={mutating}
-          />
-
-          <SponsorModelSection
-            label={t(`providersPage.sponsor.protocolModels.${modelKey}`)}
-            description={t(`providersPage.sponsor.protocolModelHints.${modelKey}`)}
-            protocol={entry.protocol}
-            models={entry.models}
-            discovery={discovery}
-            mutating={mutating}
-            onChange={(models) => updateEntry({ models })}
-          />
+          <div className="flex flex-col gap-3">
+            <ProviderBehaviorEditor
+              brand={entry.protocol === 'openai' ? 'openaiCompatibility' : entry.protocol}
+              value={entry}
+              onChange={updateEntry}
+              disabled={mutating}
+            />
+            <RuntimePolicyEditor
+              value={entry.runtimePolicy ?? readRuntimePolicy()}
+              onChange={(runtimePolicy) => updateEntry({ runtimePolicy })}
+              disabled={mutating}
+            />
+            <SponsorModelSection
+              label={t(`providersPage.sponsor.protocolModels.${modelKey}`)}
+              description={t(`providersPage.sponsor.protocolModelHints.${modelKey}`)}
+              protocol={entry.protocol}
+              models={entry.models}
+              discovery={discovery}
+              mutating={mutating}
+              onChange={(models) => updateEntry({ models })}
+            />
+          </div>
         </div>
       ) : null}
     </div>
@@ -740,7 +727,6 @@ export function SponsorProviderForm({
   mode,
   mutating,
   formId,
-  variant,
   onSubmit,
   onDirtyChange,
 }: SponsorProviderFormProps) {
@@ -846,9 +832,6 @@ export function SponsorProviderForm({
     }
   };
 
-  const formClassName = [styles.form, variant === 'quickStart' ? styles.quickStartForm : '']
-    .filter(Boolean)
-    .join(' ');
   const aggregationConflict =
     mode === 'edit'
       ? getSponsorAggregationConflict(getSponsorRaw(resource, definition.brand))
@@ -856,16 +839,20 @@ export function SponsorProviderForm({
 
   if (aggregationConflict) {
     return (
-      <form id={formId} className={formClassName} onSubmit={(event) => event.preventDefault()}>
-        <div className={styles.errorBox}>{t('providersPage.sponsor.aggregationConflict')}</div>
+      <form
+        id={formId}
+        className="flex flex-col gap-6"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <FormError>{t('providersPage.sponsor.aggregationConflict')}</FormError>
       </form>
     );
   }
 
   return (
-    <form id={formId} className={formClassName} onSubmit={handleSubmit} noValidate>
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t('providersPage.sponsor.groupedKeysTitle')}</h3>
+    <form id={formId} className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-medium">{t('providersPage.sponsor.groupedKeysTitle')}</h3>
         {entries.map((entry, index) => (
           <SponsorKeyEntryCard
             key={`${entry.protocol}-${index}`}
@@ -881,18 +868,20 @@ export function SponsorProviderForm({
             onRemove={() => removeEntry(index)}
           />
         ))}
-        <button
+        <Button
           type="button"
-          className={styles.addBtn}
+          variant="outline"
+          size="sm"
+          className="self-start"
           disabled={mutating || !missingProtocols.length}
           onClick={addEntry}
         >
-          <IconPlus size={12} />
-          <span>{t('providersPage.sponsor.addGroupedKey')}</span>
-        </button>
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
+          {t('providersPage.sponsor.addGroupedKey')}
+        </Button>
       </div>
 
-      {error ? <div className={styles.errorBox}>{error}</div> : null}
+      {error ? <FormError>{error}</FormError> : null}
     </form>
   );
 }

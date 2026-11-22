@@ -1,22 +1,74 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Sheet } from '@/components/ui/Sheet';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  IconGithub,
-  IconPlug,
-  IconRefreshCw,
-  IconSearch,
-  IconSettings,
-  IconSidebarStore,
-  IconTrash2,
-} from '@/components/ui/icons';
+  Delete02Icon,
+  GithubIcon,
+  PlugSocketIcon,
+  RefreshIcon,
+  Search01Icon,
+  Settings02Icon,
+  Store01Icon,
+} from '@hugeicons/core-free-icons';
+import { Page, Section } from '@/components/layout/Page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from '@/components/ui/item';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { cn } from '@/lib/utils';
 import { pluginsApi, pluginStoreApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
@@ -39,20 +91,9 @@ import {
 } from './pluginResources';
 import { waitForPluginState } from './pluginPolling';
 import { getPluginLogo } from './pluginLogo';
-import styles from './PluginsPage.module.scss';
+import { Notice, PluginLogo } from './components/PluginParts';
 
 type PluginRuntimeWaitStatus = 'ready' | 'globalDisabled' | 'timeout';
-
-function PluginCardLogo({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
-
-  return showImage ? (
-    <img src={src} alt="" onError={() => setFailed(true)} />
-  ) : (
-    <IconPlug size={18} />
-  );
-}
 
 const hasStatus = (error: unknown, status: number) => isRecord(error) && error.status === status;
 
@@ -161,9 +202,7 @@ export function PluginsPage() {
   const pluginStats = useMemo(() => {
     const plugins = data?.plugins ?? [];
     return {
-      discovered: plugins.length,
       registered: plugins.filter((plugin) => plugin.registered).length,
-      configured: plugins.filter((plugin) => plugin.configured).length,
       effective: plugins.filter((plugin) => plugin.effectiveEnabled).length,
     };
   }, [data?.plugins]);
@@ -407,386 +446,401 @@ export function PluginsPage() {
     const value = draft.values[field.name];
     const textValue = typeof value === 'string' ? value : '';
     const errorText = draft.errors[field.name];
+    const fieldId = `plugin-field-${field.name}`;
 
     if (fieldType === 'boolean') {
       return (
-        <div key={field.name} className={styles.fieldRow}>
-          <div className={styles.fieldText}>
-            <div className={styles.fieldLabel}>{field.name}</div>
-            {field.description ? (
-              <div className={styles.fieldDescription}>{field.description}</div>
-            ) : null}
-          </div>
-          <ToggleSwitch
+        <Field key={field.name} orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor={fieldId} className="font-mono">
+              {field.name}
+            </FieldLabel>
+            {field.description ? <FieldDescription>{field.description}</FieldDescription> : null}
+          </FieldContent>
+          <Switch
+            id={fieldId}
             checked={value === true}
-            onChange={(nextValue) => handleFieldBooleanChange(field.name, nextValue)}
-            ariaLabel={field.name}
+            onCheckedChange={(nextValue) => handleFieldBooleanChange(field.name, nextValue)}
           />
-        </div>
+        </Field>
       );
     }
 
+    let control: ReactNode;
     if (fieldType === 'enum' && field.enumValues.length > 0) {
-      return (
-        <div key={field.name} className={styles.formField}>
-          <label htmlFor={`plugin-field-${field.name}`}>{field.name}</label>
-          <Select
-            id={`plugin-field-${field.name}`}
-            value={textValue}
-            options={field.enumValues.map((item) => ({ value: item, label: item }))}
-            onChange={(nextValue) =>
-              updateDraft((current) => ({
-                ...current,
-                values: { ...current.values, [field.name]: nextValue },
-                errors: { ...current.errors, [field.name]: '' },
-                touchedFields: { ...current.touchedFields, [field.name]: true },
-              }))
-            }
-            placeholder={t('plugin_management.select_placeholder')}
-          />
-          {field.description ? <div className={styles.fieldHint}>{field.description}</div> : null}
-          {errorText ? <div className={styles.fieldError}>{errorText}</div> : null}
-        </div>
+      control = (
+        <Select
+          value={textValue}
+          onValueChange={(nextValue) =>
+            updateDraft((current) => ({
+              ...current,
+              values: { ...current.values, [field.name]: nextValue },
+              errors: { ...current.errors, [field.name]: '' },
+              touchedFields: { ...current.touchedFields, [field.name]: true },
+            }))
+          }
+        >
+          <SelectTrigger id={fieldId} className="w-full data-[size=default]:h-9">
+            <SelectValue placeholder={t('plugin_management.select_placeholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            {field.enumValues.map((item) => (
+              <SelectItem key={item} value={item}>
+                {item}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       );
-    }
-
-    if (fieldType === 'array' || fieldType === 'object') {
-      return (
-        <div key={field.name} className={styles.formField}>
-          <label htmlFor={`plugin-field-${field.name}`}>{field.name}</label>
-          <textarea
-            id={`plugin-field-${field.name}`}
-            className={styles.textarea}
-            value={textValue}
-            onChange={handleFieldTextChange(field.name)}
-            placeholder={fieldType === 'array' ? '[]' : '{}'}
-            spellCheck={false}
-          />
-          {field.description ? <div className={styles.fieldHint}>{field.description}</div> : null}
-          {errorText ? <div className={styles.fieldError}>{errorText}</div> : null}
-        </div>
+    } else if (fieldType === 'array' || fieldType === 'object') {
+      control = (
+        <Textarea
+          id={fieldId}
+          className="min-h-28 font-mono text-[12.5px] md:text-[12.5px]"
+          value={textValue}
+          onChange={handleFieldTextChange(field.name)}
+          placeholder={fieldType === 'array' ? '[]' : '{}'}
+          spellCheck={false}
+          aria-invalid={Boolean(errorText) || undefined}
+        />
+      );
+    } else {
+      control = (
+        <Input
+          id={fieldId}
+          className="h-9"
+          value={textValue}
+          onChange={handleFieldTextChange(field.name)}
+          inputMode={fieldType === 'integer' || fieldType === 'number' ? 'decimal' : undefined}
+          aria-invalid={Boolean(errorText) || undefined}
+        />
       );
     }
 
     return (
-      <Input
-        key={field.name}
-        id={`plugin-field-${field.name}`}
-        label={field.name}
-        value={textValue}
-        onChange={handleFieldTextChange(field.name)}
-        inputMode={fieldType === 'integer' || fieldType === 'number' ? 'decimal' : undefined}
-        hint={field.description || undefined}
-        error={errorText || undefined}
-      />
+      <Field key={field.name} data-invalid={Boolean(errorText) || undefined}>
+        <FieldLabel htmlFor={fieldId} className="font-mono">
+          {field.name}
+        </FieldLabel>
+        {control}
+        {field.description ? <FieldDescription>{field.description}</FieldDescription> : null}
+        {errorText ? <FieldError>{errorText}</FieldError> : null}
+      </Field>
     );
   };
 
   const savingConfig = Boolean(editingPlugin && mutatingID === editingPlugin.id);
+  const plugins = data?.plugins ?? [];
+  const busy = Boolean(mutatingID || deletingID);
 
   return (
-    <div className={styles.page}>
-      {/* ── Page Header ── */}
-      <div className={styles.pageHeader}>
-        <h1 className={styles.title}>{t('plugin_management.title')}</h1>
-        <p className={styles.description}>{t('plugin_management.description')}</p>
-      </div>
-
-      {/* ── Alerts ── */}
-      {error ? <div className={styles.errorBox}>{error}</div> : null}
-
-      {data && !data.pluginsEnabled ? (
-        <div className={styles.warningBox}>{t('plugin_management.global_disabled_hint')}</div>
-      ) : null}
-
-      {/* ── Status Bar ── */}
-      {data ? (
-        <div className={styles.statusBar}>
-          <div className={styles.statusPill}>
-            <span
-              className={`${styles.statusDot} ${
-                data.pluginsEnabled ? styles.statusDotOn : styles.statusDotOff
-              }`}
-            />
-            <span className={styles.statusLabel}>{t('plugin_management.global_status')}</span>
-            <span className={styles.statusValue}>
-              {data.pluginsEnabled
-                ? t('plugin_management.global_enabled')
-                : t('plugin_management.global_disabled')}
-            </span>
-          </div>
-
-          <span className={styles.statusDivider} />
-
-          <div className={styles.statusPill}>
-            <span className={styles.statusLabel}>{t('plugin_management.plugins_dir')}</span>
-            <span
-              className={`${styles.statusValue} ${styles.statusPathValue}`}
-              title={data.pluginsDir || 'plugins'}
+    <>
+      <Page
+        title={t('plugin_management.title')}
+        actions={
+          <div className="flex items-center gap-2">
+            {data ? (
+              <Badge variant="secondary" className="gap-1.5 max-sm:hidden">
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    data.pluginsEnabled ? 'bg-success' : 'bg-faint'
+                  )}
+                />
+                {data.pluginsEnabled
+                  ? t('plugin_management.global_enabled')
+                  : t('plugin_management.global_disabled')}
+              </Badge>
+            ) : null}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-lg"
+                  aria-label={t('plugin_management.refresh')}
+                  onClick={loadPlugins}
+                  disabled={!connected || loading || busy}
+                >
+                  <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t('plugin_management.refresh')}</TooltipContent>
+            </Tooltip>
+            <Button
+              size="lg"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              onClick={() => navigate('/plugin-store')}
             >
-              {data.pluginsDir || 'plugins'}
-            </span>
-          </div>
-
-          <span className={styles.statusDivider} />
-
-          <div className={styles.statusPill}>
-            <span className={styles.statusLabel}>{t('plugin_management.discovered')}</span>
-            <span className={styles.statusValue}>{pluginStats.discovered}</span>
-          </div>
-
-          <span className={styles.statusDivider} />
-
-          <div className={styles.statusPill}>
-            <span className={styles.statusLabel}>{t('plugin_management.effective')}</span>
-            <span className={styles.statusValue}>
-              {pluginStats.effective}/{pluginStats.registered}
-            </span>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ── Toolbar ── */}
-      <div className={styles.toolbar}>
-        <Input
-          type="search"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-          placeholder={t('plugin_management.search_placeholder')}
-          aria-label={t('plugin_management.search_label')}
-          rightElement={<IconSearch size={16} />}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={loadPlugins}
-          disabled={!connected || loading || Boolean(mutatingID || deletingID)}
-          loading={loading}
-        >
-          <IconRefreshCw size={16} />
-          {t('plugin_management.refresh')}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/plugin-store')}>
-          <IconSidebarStore size={16} />
-          {t('plugin_store.title')}
-        </Button>
-      </div>
-
-      {/* ── Plugin List ── */}
-      {loading ? (
-        <div className={styles.pluginList}>
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className={styles.skeletonRow}>
-              <div className={styles.skeletonAvatar} />
-              <div className={styles.skeletonText}>
-                <div className={styles.skeletonLine} />
-                <div className={styles.skeletonLine} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : visiblePlugins.length === 0 ? (
-        <EmptyState
-          title={t('plugin_management.no_plugins')}
-          description={t('plugin_management.no_plugins_desc')}
-          action={
-            <Button variant="secondary" size="sm" onClick={loadPlugins} disabled={!connected}>
-              <IconRefreshCw size={16} />
-              {t('plugin_management.refresh')}
-            </Button>
-          }
-        />
-      ) : (
-        <div className={styles.pluginList}>
-          {visiblePlugins.map((plugin) => {
-            const logo = resolvePluginAsset(getPluginLogo(plugin, logoEntries));
-            const github = plugin.metadata?.githubRepository.trim();
-            const openingConfig = openingConfigID === plugin.id;
-            const deletingPlugin = deletingID === plugin.id;
-            const actionBusy = Boolean(mutatingID || openingConfigID || deletingID);
-            const version = plugin.metadata?.version;
-            const author = plugin.metadata?.author;
-
-            return (
-              <article key={plugin.id} className={styles.pluginRow}>
-                {/* Logo */}
-                <div className={styles.logoBox} aria-hidden="true">
-                  <PluginCardLogo key={logo} src={logo} />
-                </div>
-
-                {/* Info */}
-                <div className={styles.pluginInfo}>
-                  <div className={styles.pluginName}>
-                    <h2>{getPluginTitle(plugin)}</h2>
-                    <div className={styles.badgeRow}>
-                      <span
-                        className={
-                          plugin.effectiveEnabled ? styles.badgeSuccess : styles.badgeMuted
-                        }
-                      >
-                        {plugin.effectiveEnabled
-                          ? t('plugin_management.status_effective')
-                          : t('plugin_management.status_inactive')}
-                      </span>
-                      <span className={plugin.registered ? styles.badge : styles.badgeWarning}>
-                        {plugin.registered
-                          ? t('plugin_management.registered')
-                          : t('plugin_management.not_registered')}
-                      </span>
-                      <span className={plugin.configured ? styles.badge : styles.badgeMuted}>
-                        {plugin.configured
-                          ? t('plugin_management.configured')
-                          : t('plugin_management.not_configured')}
-                      </span>
-                      {plugin.supportsOAuth ? (
-                        <span className={styles.badge}>{t('plugin_management.oauth')}</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <span className={styles.pluginId}>{plugin.id}</span>
-
-                  {version || author || plugin.path ? (
-                    <div className={styles.pluginMeta}>
-                      {version ? (
-                        <span className={styles.metaItem}>
-                          <strong>{version}</strong>
-                        </span>
-                      ) : null}
-                      {version && author ? (
-                        <span className={styles.metaDot} aria-hidden="true" />
-                      ) : null}
-                      {author ? <span className={styles.metaItem}>{author}</span> : null}
-                      {(version || author) && plugin.path ? (
-                        <span className={styles.metaDot} aria-hidden="true" />
-                      ) : null}
-                      {plugin.path ? (
-                        <span
-                          className={`${styles.metaItem} ${styles.metaPath}`}
-                          title={plugin.path}
-                        >
-                          {plugin.path}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Actions */}
-                <div className={styles.rowActions}>
-                  <ToggleSwitch
-                    checked={plugin.enabled}
-                    onChange={(enabled) => handleTogglePlugin(plugin, enabled)}
-                    disabled={!connected || actionBusy}
-                    ariaLabel={t('plugin_management.enabled')}
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => openConfigSheet(plugin)}
-                    disabled={!connected || actionBusy}
-                    loading={openingConfig}
-                  >
-                    <IconSettings size={14} />
-                    {t('plugin_management.edit_config')}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleDeletePlugin(plugin)}
-                    disabled={!connected || actionBusy}
-                    loading={deletingPlugin}
-                    title={t('plugin_management.delete_plugin')}
-                    aria-label={t('plugin_management.delete_plugin')}
-                  >
-                    <IconTrash2 size={14} />
-                    {t('plugin_management.delete_plugin')}
-                  </Button>
-                  {github ? (
-                    <a
-                      className={styles.iconLink}
-                      href={github}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={t('plugin_management.open_repository')}
-                      aria-label={t('plugin_management.open_repository')}
-                    >
-                      <IconGithub size={14} />
-                    </a>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Config Sheet ── */}
-      <Sheet
-        open={Boolean(editingPlugin && draft)}
-        onClose={closeConfigSheet}
-        size="lg"
-        title={
-          editingPlugin
-            ? t('plugin_management.config_title', { name: getPluginTitle(editingPlugin) })
-            : t('plugin_management.edit_config')
-        }
-        description={editingPlugin?.id}
-        closeDisabled={savingConfig}
-        footer={
-          <div className={styles.sheetFooter}>
-            <Button variant="secondary" onClick={closeConfigSheet} disabled={savingConfig}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSaveConfig} loading={savingConfig}>
-              {t('common.save')}
+              <HugeiconsIcon icon={Store01Icon} data-icon="inline-start" strokeWidth={1.75} />
+              <span className="max-sm:sr-only">{t('plugin_store.title')}</span>
             </Button>
           </div>
         }
       >
-        {draft && editingPlugin ? (
-          <div className={styles.configForm}>
-            <section className={styles.formSection}>
-              <h3>{t('plugin_management.base_settings')}</h3>
-              <div className={styles.fieldRow}>
-                <div className={styles.fieldText}>
-                  <div className={styles.fieldLabel}>{t('plugin_management.enabled')}</div>
-                  <div className={styles.fieldDescription}>
-                    {t('plugin_management.enabled_hint')}
-                  </div>
-                </div>
-                <ToggleSwitch
-                  checked={draft.enabled}
-                  onChange={(enabled) =>
-                    updateDraft((current) => ({
-                      ...current,
-                      enabled,
-                      enabledTouched: true,
-                    }))
-                  }
-                  ariaLabel={t('plugin_management.enabled')}
-                />
-              </div>
-              <Input
-                label={t('plugin_management.priority')}
-                value={draft.priority}
-                onChange={handlePriorityChange}
-                inputMode="numeric"
-                error={draft.errors.priority || undefined}
-              />
-            </section>
+        <Section
+          title={t('plugin_management.discovered')}
+          actions={
+            data && plugins.length > 0 ? (
+              <Badge variant="secondary" className="tabular-nums">
+                {t('plugin_management.effective')} {pluginStats.effective}/{pluginStats.registered}
+              </Badge>
+            ) : null
+          }
+        >
+          {error ? <Notice tone="error">{error}</Notice> : null}
+          {data && !data.pluginsEnabled ? (
+            <Notice tone="warning">{t('plugin_management.global_disabled_hint')}</Notice>
+          ) : null}
 
-            <section className={styles.formSection}>
-              <h3>{t('plugin_management.config_fields')}</h3>
-              {editingPlugin.configFields.length > 0 ? (
-                editingPlugin.configFields.map((field) => renderFieldEditor(field))
-              ) : (
-                <div className={styles.emptyConfig}>{t('plugin_management.no_config_fields')}</div>
-              )}
-            </section>
-          </div>
-        ) : null}
+          {plugins.length > 0 || filter ? (
+            <InputGroup className="h-9">
+              <InputGroupAddon>
+                <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
+              </InputGroupAddon>
+              <InputGroupInput
+                type="search"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t('plugin_management.search_placeholder')}
+                aria-label={t('plugin_management.search_label')}
+              />
+            </InputGroup>
+          ) : null}
+
+          {loading && !data ? (
+            <ItemGroup className="gap-2">
+              {Array.from({ length: 3 }, (_, index) => (
+                <Item key={index} variant="outline" size="sm" aria-hidden="true">
+                  <div className="size-9 rounded-lg bg-muted" />
+                  <ItemContent className="gap-2">
+                    <div className="h-3.5 w-40 rounded bg-muted" />
+                    <div className="h-3 w-24 rounded bg-muted/60" />
+                  </ItemContent>
+                </Item>
+              ))}
+            </ItemGroup>
+          ) : visiblePlugins.length === 0 ? (
+            error ? null : (
+              <Empty className="border border-dashed">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <HugeiconsIcon icon={PlugSocketIcon} strokeWidth={1.75} />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('plugin_management.no_plugins')}</EmptyTitle>
+                  <EmptyDescription>{t('plugin_management.no_plugins_desc')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )
+          ) : (
+            <ItemGroup className="gap-2">
+              {visiblePlugins.map((plugin) => {
+                const logo = resolvePluginAsset(getPluginLogo(plugin, logoEntries));
+                const github = plugin.metadata?.githubRepository.trim();
+                const actionBusy = Boolean(mutatingID || openingConfigID || deletingID);
+                const version = plugin.metadata?.version;
+                const author = plugin.metadata?.author;
+                const meta = [version, author, plugin.path].filter(Boolean).join(' · ');
+                const title = getPluginTitle(plugin);
+
+                return (
+                  <Item key={plugin.id} variant="outline" size="sm" className="bg-card">
+                    <PluginLogo key={logo} src={logo} />
+                    <ItemContent className="min-w-0">
+                      <ItemTitle className="max-w-full flex-wrap">
+                        <span className="min-w-0 truncate">{title}</span>
+                        <span
+                          className={cn(
+                            'size-2 shrink-0 rounded-full',
+                            plugin.effectiveEnabled ? 'bg-success' : 'bg-faint'
+                          )}
+                          title={
+                            plugin.effectiveEnabled
+                              ? t('plugin_management.status_effective')
+                              : t('plugin_management.status_inactive')
+                          }
+                        />
+                        {!plugin.registered ? (
+                          <Badge variant="outline" className="text-warning">
+                            {t('plugin_management.not_registered')}
+                          </Badge>
+                        ) : null}
+                        {!plugin.configured ? (
+                          <Badge variant="secondary">{t('plugin_management.not_configured')}</Badge>
+                        ) : null}
+                        {plugin.supportsOAuth ? (
+                          <Badge variant="secondary">{t('plugin_management.oauth')}</Badge>
+                        ) : null}
+                      </ItemTitle>
+                      <ItemDescription className="truncate font-mono text-xs" title={meta}>
+                        {plugin.id}
+                        {meta ? <span className="text-faint"> · {meta}</span> : null}
+                      </ItemDescription>
+                    </ItemContent>
+                    <ItemActions className="gap-0.5">
+                      {github ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              aria-label={t('plugin_management.open_repository')}
+                            >
+                              <a href={github} target="_blank" rel="noreferrer">
+                                <HugeiconsIcon icon={GithubIcon} strokeWidth={1.75} />
+                              </a>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t('plugin_management.open_repository')}</TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t('plugin_management.edit_config')}
+                            onClick={() => openConfigSheet(plugin)}
+                            disabled={!connected || actionBusy}
+                          >
+                            <HugeiconsIcon icon={Settings02Icon} strokeWidth={1.75} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('plugin_management.edit_config')}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t('plugin_management.delete_plugin')}
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeletePlugin(plugin)}
+                            disabled={!connected || actionBusy}
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('plugin_management.delete_plugin')}</TooltipContent>
+                      </Tooltip>
+                      <Switch
+                        className="ml-2"
+                        checked={plugin.enabled}
+                        onCheckedChange={(enabled) => handleTogglePlugin(plugin, enabled)}
+                        disabled={!connected || actionBusy}
+                        aria-label={`${t('plugin_management.enabled')}: ${title}`}
+                      />
+                    </ItemActions>
+                  </Item>
+                );
+              })}
+            </ItemGroup>
+          )}
+
+          {data ? (
+            <p className="text-[13px] text-muted-foreground">
+              {t('plugin_management.plugins_dir')}:{' '}
+              <span className="font-mono text-xs text-foreground">
+                {data.pluginsDir || 'plugins'}
+              </span>
+            </p>
+          ) : null}
+        </Section>
+      </Page>
+
+      <Sheet
+        open={Boolean(editingPlugin && draft)}
+        onOpenChange={(open) => {
+          if (!open) closeConfigSheet();
+        }}
+      >
+        <SheetContent
+          className="w-full gap-0 sm:max-w-lg"
+          showCloseButton={!savingConfig}
+          onEscapeKeyDown={(event) => savingConfig && event.preventDefault()}
+          onInteractOutside={(event) => savingConfig && event.preventDefault()}
+        >
+          <SheetHeader className="border-b px-5 py-4 pr-12">
+            <SheetTitle>
+              {editingPlugin
+                ? t('plugin_management.config_title', { name: getPluginTitle(editingPlugin) })
+                : t('plugin_management.edit_config')}
+            </SheetTitle>
+            <SheetDescription className="truncate font-mono text-xs">
+              {editingPlugin?.id}
+            </SheetDescription>
+          </SheetHeader>
+          {draft && editingPlugin ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-5 py-5">
+              <FieldSet>
+                <FieldLegend>{t('plugin_management.base_settings')}</FieldLegend>
+                <FieldGroup>
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor="plugin-enabled">
+                        {t('plugin_management.enabled')}
+                      </FieldLabel>
+                      <FieldDescription>{t('plugin_management.enabled_hint')}</FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id="plugin-enabled"
+                      checked={draft.enabled}
+                      onCheckedChange={(enabled) =>
+                        updateDraft((current) => ({
+                          ...current,
+                          enabled,
+                          enabledTouched: true,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field data-invalid={Boolean(draft.errors.priority) || undefined}>
+                    <FieldLabel htmlFor="plugin-priority">
+                      {t('plugin_management.priority')}
+                    </FieldLabel>
+                    <Input
+                      id="plugin-priority"
+                      className="h-9"
+                      value={draft.priority}
+                      onChange={handlePriorityChange}
+                      inputMode="numeric"
+                      aria-invalid={Boolean(draft.errors.priority) || undefined}
+                    />
+                    {draft.errors.priority ? (
+                      <FieldError>{draft.errors.priority}</FieldError>
+                    ) : null}
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+
+              <FieldSet>
+                <FieldLegend>{t('plugin_management.config_fields')}</FieldLegend>
+                {editingPlugin.configFields.length > 0 ? (
+                  <FieldGroup>
+                    {editingPlugin.configFields.map((field) => renderFieldEditor(field))}
+                  </FieldGroup>
+                ) : (
+                  <FieldDescription>{t('plugin_management.no_config_fields')}</FieldDescription>
+                )}
+              </FieldSet>
+            </div>
+          ) : null}
+          <SheetFooter className="flex-row justify-end border-t px-5 py-3">
+            <Button
+              variant="outline"
+              size="lg"
+              className="px-4"
+              onClick={closeConfigSheet}
+              disabled={savingConfig}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button size="lg" className="px-4" onClick={handleSaveConfig} disabled={savingConfig}>
+              {t('common.save')}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
       </Sheet>
-    </div>
+    </>
   );
 }

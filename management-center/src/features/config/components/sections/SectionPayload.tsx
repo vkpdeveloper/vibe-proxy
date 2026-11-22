@@ -1,15 +1,12 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { SettingGroup } from '../fields/SettingGroup';
 import type { PayloadFilterRule, PayloadRule } from '@/types/visualConfig';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
+import { Section } from '@/components/layout/Page';
 import { FieldAnchor, FieldStack } from '../fields/FieldPrimitives';
 import { PayloadFilterRulesEditor } from '../blocks/PayloadFilterRulesEditor';
 import { PayloadRulesEditor } from '../blocks/PayloadRulesEditor';
-
-const Icon = CONFIG_TAB_ICONS.payload;
 
 export type SectionPayloadProps = ConfigSectionProps & {
   /** 有载荷校验错误时折叠组带 key 重挂载并强制展开，把错误带到眼前。 */
@@ -20,7 +17,6 @@ export type SectionPayloadProps = ConfigSectionProps & {
 export function SectionPayload({
   values,
   disabled,
-  animateIn,
   hasPayloadValidationErrors,
   onChange,
 }: SectionPayloadProps) {
@@ -49,16 +45,10 @@ export function SectionPayload({
   );
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.payload}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.payload.title')}
-      description={t('config_management.visual.sections.payload.description')}
-      animateIn={animateIn}
-    >
+    <Section title={t('config_management.visual.sections.payload.title')}>
       <FieldStack>
         <FieldAnchor fieldId="payloadDefaultRules">
-          <Collapsible
+          <SettingGroup
             key={`payloadDefaultRules-${payloadValidationKey}`}
             label={t('config_management.visual.sections.payload.default_rules')}
             hint={t('config_management.visual.sections.payload.default_rules_desc')}
@@ -69,11 +59,11 @@ export function SectionPayload({
               disabled={disabled}
               onChange={handlePayloadDefaultRulesChange}
             />
-          </Collapsible>
+          </SettingGroup>
         </FieldAnchor>
 
         <FieldAnchor fieldId="payloadDefaultRawRules">
-          <Collapsible
+          <SettingGroup
             key={`payloadDefaultRawRules-${payloadValidationKey}`}
             label={t('config_management.visual.sections.payload.default_raw_rules')}
             hint={t('config_management.visual.sections.payload.default_raw_rules_desc')}
@@ -85,11 +75,11 @@ export function SectionPayload({
               rawJsonValues
               onChange={handlePayloadDefaultRawRulesChange}
             />
-          </Collapsible>
+          </SettingGroup>
         </FieldAnchor>
 
         <FieldAnchor fieldId="payloadOverrideRules">
-          <Collapsible
+          <SettingGroup
             key={`payloadOverrideRules-${payloadValidationKey}`}
             label={t('config_management.visual.sections.payload.override_rules')}
             hint={t('config_management.visual.sections.payload.override_rules_desc')}
@@ -101,11 +91,11 @@ export function SectionPayload({
               protocolFirst
               onChange={handlePayloadOverrideRulesChange}
             />
-          </Collapsible>
+          </SettingGroup>
         </FieldAnchor>
 
         <FieldAnchor fieldId="payloadOverrideRawRules">
-          <Collapsible
+          <SettingGroup
             key={`payloadOverrideRawRules-${payloadValidationKey}`}
             label={t('config_management.visual.sections.payload.override_raw_rules')}
             hint={t('config_management.visual.sections.payload.override_raw_rules_desc')}
@@ -118,11 +108,11 @@ export function SectionPayload({
               rawJsonValues
               onChange={handlePayloadOverrideRawRulesChange}
             />
-          </Collapsible>
+          </SettingGroup>
         </FieldAnchor>
 
         <FieldAnchor fieldId="payloadFilterRules">
-          <Collapsible
+          <SettingGroup
             key={`payloadFilterRules-${payloadValidationKey}`}
             label={t('config_management.visual.sections.payload.filter_rules')}
             hint={t('config_management.visual.sections.payload.filter_rules_desc')}
@@ -133,9 +123,9 @@ export function SectionPayload({
               disabled={disabled}
               onChange={handlePayloadFilterRulesChange}
             />
-          </Collapsible>
+          </SettingGroup>
         </FieldAnchor>
       </FieldStack>
-    </SectionCard>
+    </Section>
   );
 }

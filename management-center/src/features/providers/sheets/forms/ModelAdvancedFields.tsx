@@ -1,11 +1,12 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select } from '@/components/ui/Select';
-import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { getProviderModelCapabilities } from '../../descriptors';
 import { THINKING_LEVELS } from '../../thinkingLevels';
 import type { ModelEntryInput, ProviderBrand } from '../../types';
-import styles from './sharedForm.module.scss';
+import { FormSelect, SwitchField } from './FormControls';
 
 interface ModelAdvancedFieldsProps {
   entry: ModelEntryInput;
@@ -38,10 +39,11 @@ export function ModelAdvancedFields({
     numeric = false,
     budget = false
   ) => (
-    <label className={styles.field}>
-      <span className={styles.label}>{t(`providersPage.modelOptions.${key}`)}</span>
-      <input
-        className={styles.input}
+    <Field>
+      <FieldLabel htmlFor={`${id}-${key}`}>{t(`providersPage.modelOptions.${key}`)}</FieldLabel>
+      <Input
+        id={`${id}-${key}`}
+        className={numeric ? 'font-mono' : undefined}
         value={entry[key] ?? ''}
         inputMode={numeric ? 'numeric' : undefined}
         disabled={disabled || (budget && !enabled)}
@@ -55,11 +57,13 @@ export function ModelAdvancedFields({
         }
       />
       {key === 'maxContextLength' ? (
-        <small>{t('providersPage.modelOptions.contextHint')}</small>
+        <FieldDescription className="text-xs">
+          {t('providersPage.modelOptions.contextHint')}
+        </FieldDescription>
       ) : null}
-    </label>
+    </Field>
   );
-  const checkbox = (
+  const toggle = (
     key:
       | 'forceMapping'
       | 'isCompat'
@@ -69,47 +73,46 @@ export function ModelAdvancedFields({
       | 'thinkingDynamicAllowed',
     budget = false
   ) => (
-    <label className={styles.checkboxRow}>
-      <input
-        type="checkbox"
-        className={styles.checkboxBox}
-        checked={entry[key] === true}
-        disabled={disabled || (budget && !enabled)}
-        onChange={(event) =>
-          onUpdate({
-            [key]: event.target.checked,
-            ...(budget ? { thinkingBudgetTouched: true } : {}),
-          })
-        }
-      />
-      <span className={styles.checkboxText}>{t(`providersPage.modelOptions.${key}`)}</span>
-    </label>
+    <SwitchField
+      id={`${id}-${key}`}
+      label={t(`providersPage.modelOptions.${key}`)}
+      checked={entry[key] === true}
+      disabled={disabled || (budget && !enabled)}
+      onCheckedChange={(checked) =>
+        onUpdate({
+          [key]: checked,
+          ...(budget ? { thinkingBudgetTouched: true } : {}),
+        })
+      }
+    />
   );
   return (
     <>
       {textField('displayName')}
       {capabilities.maxContextLength ? textField('maxContextLength', true) : null}
-      {checkbox('forceMapping')}
-      {capabilities.isCompat ? checkbox('isCompat') : null}
-      {capabilities.configurationUpdate ? checkbox('supportConfigurationUpdate') : null}
+      {toggle('forceMapping')}
+      {capabilities.isCompat ? toggle('isCompat') : null}
+      {capabilities.configurationUpdate ? toggle('supportConfigurationUpdate') : null}
       {capabilities.modalities ? (
         <>
           {textField('inputModalitiesText')}
           {textField('outputModalitiesText')}
-          <p className={styles.thinkingExistingHint}>
+          <p className="-mt-2 text-xs text-muted-foreground">
             {t('providersPage.modelOptions.modalitiesHint')}
           </p>
-          {checkbox('useMaxCompletionTokens')}
+          {toggle('useMaxCompletionTokens')}
         </>
       ) : null}
       {supportsThinking ? (
-        <fieldset className={styles.thinkingFieldset}>
-          <legend className={styles.label}>{t('providersPage.form.thinkingConfig')}</legend>
-          <div className={styles.field}>
-            <label htmlFor={`${id}-thinking-mode`} className={styles.label}>
+        <FieldSet className="gap-4 rounded-lg border p-3">
+          <FieldLegend variant="label" className="float-left mb-0">
+            {t('providersPage.form.thinkingConfig')}
+          </FieldLegend>
+          <Field>
+            <FieldLabel htmlFor={`${id}-thinking-mode`}>
               {t('providersPage.modelOptions.thinkingMode')}
-            </label>
-            <Select
+            </FieldLabel>
+            <FormSelect
               id={`${id}-thinking-mode`}
               ariaLabel={t('providersPage.modelOptions.thinkingMode')}
               value={enabled ? 'custom' : 'default'}
@@ -120,50 +123,58 @@ export function ModelAdvancedFields({
               ]}
               onChange={(mode) => onUpdate({ thinkingEnabled: mode === 'custom' })}
             />
-          </div>
-          <p className={styles.thinkingExistingHint}>
-            {t('providersPage.modelOptions.thinkingHint')}
-          </p>
-          <div className={styles.fieldRow}>
+            <FieldDescription className="text-xs">
+              {t('providersPage.modelOptions.thinkingHint')}
+            </FieldDescription>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
             {textField('thinkingMin', true, true)}
             {textField('thinkingMax', true, true)}
           </div>
-          {checkbox('thinkingZeroAllowed', true)}
-          {checkbox('thinkingDynamicAllowed', true)}
-          <div className={styles.thinkingLevelGrid}>
-            {THINKING_LEVELS.map((level) => (
-              <SelectionCheckbox
-                key={level}
-                checked={levels.includes(level)}
-                disabled={disabled || !enabled}
-                onChange={() =>
-                  onUpdate({
-                    thinkingEnabled: true,
-                    thinkingLevelsTouched: true,
-                    thinkingLevels: levels.includes(level)
-                      ? levels.filter((item) => item !== level)
-                      : THINKING_LEVELS.filter((item) => item === level || levels.includes(item)),
-                  })
-                }
-                className={`${styles.thinkingLevelOption} ${
-                  levels.includes(level) ? styles.thinkingLevelOptionSelected : ''
-                }`}
-                labelClassName={styles.thinkingLevelLabel}
-                label={
-                  <>
-                    <span>{t(`providersPage.form.thinkingLevels.${level}`)}</span>
-                    <code>{level}</code>
-                  </>
-                }
-              />
-            ))}
+          {toggle('thinkingZeroAllowed', true)}
+          {toggle('thinkingDynamicAllowed', true)}
+          <div className="grid grid-cols-2 gap-2">
+            {THINKING_LEVELS.map((level) => {
+              const checked = levels.includes(level);
+              const levelId = `${id}-level-${level}`;
+              return (
+                <label
+                  key={level}
+                  htmlFor={levelId}
+                  className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors hover:bg-muted/50 has-data-checked:border-primary/30 has-data-checked:bg-primary/10 has-disabled:cursor-not-allowed has-disabled:opacity-50"
+                >
+                  <Checkbox
+                    id={levelId}
+                    checked={checked}
+                    disabled={disabled || !enabled}
+                    onCheckedChange={() =>
+                      onUpdate({
+                        thinkingEnabled: true,
+                        thinkingLevelsTouched: true,
+                        thinkingLevels: checked
+                          ? levels.filter((item) => item !== level)
+                          : THINKING_LEVELS.filter(
+                              (item) => item === level || levels.includes(item)
+                            ),
+                      })
+                    }
+                  />
+                  <span className="min-w-0 truncate">
+                    {t(`providersPage.form.thinkingLevels.${level}`)}
+                  </span>
+                  <code className="ml-auto hidden font-mono text-xs text-muted-foreground sm:inline">
+                    {level}
+                  </code>
+                </label>
+              );
+            })}
           </div>
           {entry.thinkingJson?.trim() ? (
-            <p className={styles.thinkingExistingHint}>
+            <p className="text-xs text-muted-foreground">
               {t('providersPage.form.thinkingExistingHint')}
             </p>
           ) : null}
-        </fieldset>
+        </FieldSet>
       ) : null}
     </>
   );

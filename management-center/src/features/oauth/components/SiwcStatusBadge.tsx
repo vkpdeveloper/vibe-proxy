@@ -1,10 +1,17 @@
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { SiwcBindingStatus } from '../siwcBinding';
-import styles from './SiwcStatusBadge.module.scss';
+
+const DOT: Record<SiwcBindingStatus, string> = {
+  active: 'bg-success',
+  bound: 'bg-warning',
+  unbound: 'bg-faint',
+};
 
 /**
- * SIWC 绑定状态药丸：状态点 + 简短状态词，mono 小字，与卡片元数据行同一语汇。
- * `withLabel` 在上下文不言自明时（SIWC 对话框内）去掉 “SIWC” 前缀。
+ * SIWC binding status: a dot and a short word. `withLabel` drops the "SIWC" prefix where the
+ * context already says it (inside the SIWC dialog).
  */
 export function SiwcStatusBadge({
   status,
@@ -15,10 +22,10 @@ export function SiwcStatusBadge({
 }) {
   const { t } = useTranslation();
   return (
-    <span className={styles.badge} data-status={status}>
-      <span className={styles.dot} aria-hidden="true" />
-      {withLabel && <span className={styles.label}>SIWC</span>}
+    <Badge variant="outline" className="gap-1.5 text-muted-foreground" data-status={status}>
+      <span className={cn('size-1.5 rounded-full', DOT[status])} aria-hidden="true" />
+      {withLabel && <span className="text-foreground">SIWC</span>}
       <span>{t(`siwc.${status}`)}</span>
-    </span>
+    </Badge>
   );
 }

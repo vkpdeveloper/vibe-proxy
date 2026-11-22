@@ -1,9 +1,10 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
 import { makeClientId } from '@/types/visualConfig';
 import { ExpandableInput } from './ExpandableInput';
-import styles from './Blocks.module.scss';
 
 export const StringListEditor = memo(function StringListEditor({
   value,
@@ -42,9 +43,9 @@ export const StringListEditor = memo(function StringListEditor({
   };
 
   return (
-    <div className={styles.stringList}>
+    <div className="flex flex-col gap-2">
       {items.map((item, index) => (
-        <div key={renderItemIds[index] ?? `item-${index}`} className={styles.stringListRow}>
+        <div key={renderItemIds[index] ?? `item-${index}`} className="flex items-start gap-2">
           <ExpandableInput
             placeholder={placeholder}
             ariaLabel={inputAriaLabel ?? placeholder}
@@ -52,13 +53,22 @@ export const StringListEditor = memo(function StringListEditor({
             onChange={(nextValue) => updateItem(index, nextValue)}
             disabled={disabled}
           />
-          <Button variant="ghost" size="sm" onClick={() => removeItem(index)} disabled={disabled}>
-            {t('config_management.visual.common.delete')}
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => removeItem(index)}
+            disabled={disabled}
+            aria-label={t('config_management.visual.common.delete')}
+            title={t('config_management.visual.common.delete')}
+          >
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
           </Button>
         </div>
       ))}
-      <div className={styles.actionRow}>
-        <Button variant="secondary" size="sm" onClick={addItem} disabled={disabled}>
+      <div>
+        <Button variant="outline" onClick={addItem} disabled={disabled}>
+          <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
           {t('config_management.visual.common.add')}
         </Button>
       </div>

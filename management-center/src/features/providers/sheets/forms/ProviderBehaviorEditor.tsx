@@ -1,11 +1,11 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { Select } from '@/components/ui/Select';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import type { ProviderBehaviorOptions } from '@/types/provider';
 import { getProviderBehaviorCapabilities } from '../../descriptors';
 import type { ProviderBrand } from '../../types';
-import styles from './sharedForm.module.scss';
+import { FormSection } from './FormSection';
+import { FormSelect, SwitchField } from './FormControls';
 
 interface ProviderBehaviorEditorProps {
   brand: ProviderBrand;
@@ -24,32 +24,26 @@ export function ProviderBehaviorEditor({
   const id = useId();
   const capabilities = getProviderBehaviorCapabilities(brand);
   if (!Object.values(capabilities).some(Boolean)) return null;
-  const checkbox = (key: 'alphaSearch' | 'rebuildMidSystemMessage' | 'supportPromptCacheKey') => (
-    <label className={styles.checkboxRow}>
-      <input
-        type="checkbox"
-        className={styles.checkboxBox}
-        checked={value[key] === true}
-        disabled={disabled}
-        aria-describedby={`${id}-${key}-hint`}
-        onChange={(event) => onChange({ [key]: event.target.checked })}
-      />
-      <span className={styles.checkboxText}>
-        <span>{t(`providersPage.behavior.${key}`)}</span>
-        <small id={`${id}-${key}-hint`}>{t(`providersPage.behavior.${key}Hint`)}</small>
-      </span>
-    </label>
+  const toggle = (key: 'alphaSearch' | 'rebuildMidSystemMessage' | 'supportPromptCacheKey') => (
+    <SwitchField
+      id={`${id}-${key}`}
+      label={t(`providersPage.behavior.${key}`)}
+      description={t(`providersPage.behavior.${key}Hint`)}
+      checked={value[key] === true}
+      disabled={disabled}
+      onCheckedChange={(checked) => onChange({ [key]: checked })}
+    />
   );
   return (
-    <Collapsible label={t('providersPage.behavior.title')}>
-      <div className={styles.section}>
-        {capabilities.alphaSearch ? checkbox('alphaSearch') : null}
+    <FormSection label={t('providersPage.behavior.title')}>
+      <FieldGroup className="gap-5">
+        {capabilities.alphaSearch ? toggle('alphaSearch') : null}
         {capabilities.disableCodexCloaking ? (
-          <div className={styles.field}>
-            <label htmlFor={`${id}-cloak`} className={styles.label}>
+          <Field>
+            <FieldLabel htmlFor={`${id}-cloak`}>
               {t('providersPage.behavior.codexCloaking')}
-            </label>
-            <Select
+            </FieldLabel>
+            <FormSelect
               id={`${id}-cloak`}
               ariaLabel={t('providersPage.behavior.codexCloaking')}
               value={
@@ -72,14 +66,14 @@ export function ProviderBehaviorEditor({
                 })
               }
             />
-            <small id={`${id}-cloak-hint`} className={styles.labelHint}>
+            <FieldDescription id={`${id}-cloak-hint`}>
               {t('providersPage.behavior.codexCloakingHint')}
-            </small>
-          </div>
+            </FieldDescription>
+          </Field>
         ) : null}
-        {capabilities.rebuildMidSystemMessage ? checkbox('rebuildMidSystemMessage') : null}
-        {capabilities.supportPromptCacheKey ? checkbox('supportPromptCacheKey') : null}
-      </div>
-    </Collapsible>
+        {capabilities.rebuildMidSystemMessage ? toggle('rebuildMidSystemMessage') : null}
+        {capabilities.supportPromptCacheKey ? toggle('supportPromptCacheKey') : null}
+      </FieldGroup>
+    </FormSection>
   );
 }

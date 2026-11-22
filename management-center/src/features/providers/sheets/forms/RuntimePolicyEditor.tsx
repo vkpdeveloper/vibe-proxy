@@ -1,10 +1,11 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
-import { Select } from '@/components/ui/Select';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import type { RuntimePolicyDraft } from '../../runtimePolicy';
 import { ErrorRulesEditor } from './ErrorRulesEditor';
-import styles from './sharedForm.module.scss';
+import { FormSection } from './FormSection';
+import { FormSelect } from './FormControls';
 
 export interface RuntimePolicyEditorProps {
   value: RuntimePolicyDraft;
@@ -24,16 +25,12 @@ export function RuntimePolicyEditor({
   const key = 'providersPage.runtimePolicy';
 
   return (
-    <Collapsible label={t(`${key}.title`)} aria-describedby={`${id}-description`}>
-      <div className={styles.section}>
-        <p id={`${id}-description`} className={styles.sectionDesc}>
-          {t(`${key}.description`)}
-        </p>
-        <div className={styles.field}>
-          <label htmlFor={`${id}-cooling`} className={styles.label}>
-            {t(`${key}.cooling`)}
-          </label>
-          <Select
+    <FormSection label={t(`${key}.title`)} aria-describedby={`${id}-description`}>
+      <FieldGroup className="gap-5">
+        <FieldDescription id={`${id}-description`}>{t(`${key}.description`)}</FieldDescription>
+        <Field>
+          <FieldLabel htmlFor={`${id}-cooling`}>{t(`${key}.cooling`)}</FieldLabel>
+          <FormSelect
             id={`${id}-cooling`}
             ariaLabel={t(`${key}.cooling`)}
             value={value.cooling}
@@ -47,14 +44,11 @@ export function RuntimePolicyEditor({
               onChange({ ...value, cooling: cooling as RuntimePolicyDraft['cooling'] })
             }
           />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor={`${id}-retry`} className={styles.label}>
-            {t(`${key}.retry`)}
-          </label>
-          <input
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-retry`}>{t(`${key}.retry`)}</FieldLabel>
+          <Input
             id={`${id}-retry`}
-            className={styles.input}
             type="text"
             value={value.retry}
             disabled={disabled}
@@ -62,17 +56,13 @@ export function RuntimePolicyEditor({
             aria-describedby={`${id}-retry-hint`}
             onChange={(event) => onChange({ ...value, retry: event.target.value })}
           />
-          <span id={`${id}-retry-hint`} className={styles.labelHint}>
-            {t(`${key}.retryHint`)}
-          </span>
-        </div>
+          <FieldDescription id={`${id}-retry-hint`}>{t(`${key}.retryHint`)}</FieldDescription>
+        </Field>
         {supportsErrors && (
           <>
-            <div className={styles.field}>
-              <label htmlFor={`${id}-errors-mode`} className={styles.label}>
-                {t(`${key}.errorsMode`)}
-              </label>
-              <Select
+            <Field>
+              <FieldLabel htmlFor={`${id}-errors-mode`}>{t(`${key}.errorsMode`)}</FieldLabel>
+              <FormSelect
                 id={`${id}-errors-mode`}
                 ariaLabel={t(`${key}.errorsMode`)}
                 value={value.errorsMode}
@@ -86,10 +76,8 @@ export function RuntimePolicyEditor({
                   onChange({ ...value, errorsMode: errorsMode as RuntimePolicyDraft['errorsMode'] })
                 }
               />
-              <span id={`${id}-errors-hint`} className={styles.labelHint}>
-                {t(`${key}.errorsHint`)}
-              </span>
-            </div>
+              <FieldDescription id={`${id}-errors-hint`}>{t(`${key}.errorsHint`)}</FieldDescription>
+            </Field>
             {value.errorsMode === 'override' && (
               <ErrorRulesEditor
                 rules={value.errorRules}
@@ -99,7 +87,7 @@ export function RuntimePolicyEditor({
             )}
           </>
         )}
-      </div>
-    </Collapsible>
+      </FieldGroup>
+    </FormSection>
   );
 }

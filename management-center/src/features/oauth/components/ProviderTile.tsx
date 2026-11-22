@@ -1,77 +1,100 @@
-import { useId, useState, type CSSProperties } from 'react';
-import { IconPlus } from '@/components/ui/icons';
+import { useId, type ReactNode } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon } from '@hugeicons/core-free-icons';
+import { cn } from '@/lib/utils';
+import { ProviderLogo } from '@/features/providers/components/ProviderLogo';
 import type { ProviderFlowState } from '../hooks/useOAuthFlows';
-import { BrandGlyph } from './BrandGlyph';
-import styles from './ProviderTile.module.scss';
 
-/** 首屏磁贴级联：起点让位给头部（140ms），级差 30ms，整组封顶 360ms。 */
-const TILE_BASE_DELAY_MS = 140;
-const TILE_STAGGER_MS = 30;
-const TILE_MAX_DELAY_MS = 360;
+type FlowStatus = NonNullable<ProviderFlowState['status']>;
+
+const STATUS_DOT: Record<FlowStatus, string> = {
+  waiting: 'bg-primary',
+  success: 'bg-success',
+  error: 'bg-destructive',
+};
 
 export interface ProviderTileProps {
   label: string;
-  caption: string;
-  icon: string;
-  index: number;
-  status?: ProviderFlowState['status'];
+  /** Accessible name when it differs from the visible label (must contain it). */
+  name?: string;
+  caption: ReactNode;
+  icon?: string;
+  /** The icon already carries its own rounded tile. */
+  flush?: boolean;
+  /** Its dialog is open or a sign-in is waiting. */
+  active?: boolean;
+  status?: FlowStatus;
   statusLabel?: string;
+  /** Extra control before the plus, kept above the stretched click target. */
+  aside?: ReactNode;
   onOpen: () => void;
 }
 
 /**
- * 提供商磁贴：整块可点（stretched button），点击即开始登录并打开授权对话框。
- * 副行平时说明登录方式，登录进行中改为实时状态 —— 对话框关着也能看到后台进度。
- * 赞助商不走磁贴，见 SponsorCard。
+ * A provider tile: the whole tile opens its sign-in dialog. The caption names the sign-in
+ * method and switches to the live status while a sign-in runs, so progress stays visible
+ * after the dialog closes.
  */
 export function ProviderTile({
   label,
+  name,
   caption,
   icon,
-  index,
+  flush,
+  active = false,
   status,
   statusLabel,
+  aside,
   onOpen,
 }: ProviderTileProps) {
   const captionId = useId();
-  // 挂载时捕获延迟：之后的重渲染（状态轮询）不重播入场
-  const [enterDelay] = useState(
-    () => `${Math.min(TILE_BASE_DELAY_MS + index * TILE_STAGGER_MS, TILE_MAX_DELAY_MS)}ms`
-  );
 
   return (
     <div
-      className={styles.tile}
-      data-status={status ?? 'idle'}
-      style={{ '--tile-delay': enterDelay } as CSSProperties}
+      className={cn(
+        'relative flex min-w-0 items-center gap-3 rounded-xl border p-2.5 transition-colors duration-150 ease-out hover:bg-muted/50',
+        'has-[[aria-haspopup]:focus-visible]:border-ring has-[[aria-haspopup]:focus-visible]:ring-3 has-[[aria-haspopup]:focus-visible]:ring-ring/50',
+        active && 'border-primary/20 bg-primary/10 hover:bg-primary/10',
+        icon === undefined && 'pl-3.5'
+      )}
     >
-      <span className={styles.glyph}>
-        <BrandGlyph src={icon} size={20} className={styles.glyphImage} />
-      </span>
-      <span className={styles.text}>
+      {icon !== undefined && (
+        <ProviderLogo src={icon} flush={flush} className="size-9 rounded-lg" />
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <button
           type="button"
-          className={styles.main}
+          className="truncate text-left text-sm font-medium outline-none after:absolute after:inset-0 after:rounded-xl"
           onClick={onOpen}
+          aria-label={name}
           aria-haspopup="dialog"
           aria-describedby={captionId}
         >
           {label}
         </button>
-        <span className={styles.caption} id={captionId}>
+        <span id={captionId} className="truncate text-sm text-muted-foreground">
           {status && statusLabel ? (
-            <span className={styles.status}>
-              <span className={styles.statusDot} aria-hidden="true" />
-              {statusLabel}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span
+                className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[status])}
+                aria-hidden="true"
+              />
+              <span className={cn('truncate', status === 'error' && 'text-destructive')}>
+                {statusLabel}
+              </span>
             </span>
           ) : (
-            <span className={styles.captionText}>{caption}</span>
+            caption
           )}
         </span>
-      </span>
-      <span className={styles.trail} aria-hidden="true">
-        <IconPlus size={15} />
-      </span>
+      </div>
+      {aside && <div className="relative z-10 shrink-0">{aside}</div>}
+      <HugeiconsIcon
+        icon={Add01Icon}
+        strokeWidth={1.75}
+        className="size-4 shrink-0 text-muted-foreground"
+        aria-hidden="true"
+      />
     </div>
   );
 }

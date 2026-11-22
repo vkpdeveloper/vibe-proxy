@@ -1,10 +1,9 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { SettingGroup } from '../fields/SettingGroup';
 import type { PluginStoreAuthRule } from '@/types/visualConfig';
-import { CONFIG_TAB_ICONS, SECTION_INDEX_LABELS } from '../../constants';
 import type { ConfigSectionProps } from '../../types';
-import { SectionCard } from '../SectionCard';
+import { Section } from '@/components/layout/Page';
 import {
   BlockSetting,
   FieldHint,
@@ -19,14 +18,11 @@ import { StringListEditor } from '../blocks/StringListEditor';
 import { getValidationMessage } from '../blocks/shared';
 import { SectionOAuthBehavior } from './SectionOAuthBehavior';
 
-const Icon = CONFIG_TAB_ICONS.advanced;
-
 /** 05 高级与实验：插件源、供应商敏感词、签名缓存与请求头默认值。 */
 export function SectionAdvanced({
   values,
   validationErrors,
   disabled,
-  animateIn,
   onChange,
 }: ConfigSectionProps) {
   const { t } = useTranslation();
@@ -49,13 +45,7 @@ export function SectionAdvanced({
   );
 
   return (
-    <SectionCard
-      indexLabel={SECTION_INDEX_LABELS.advanced}
-      icon={<Icon size={16} />}
-      title={t('config_management.visual.sections.advanced.title')}
-      description={t('config_management.visual.sections.advanced.description')}
-      animateIn={animateIn}
-    >
+    <Section title={t('config_management.visual.sections.advanced.title')}>
       <SectionOAuthBehavior
         values={values}
         validationErrors={validationErrors}
@@ -63,10 +53,7 @@ export function SectionAdvanced({
         onChange={onChange}
       />
 
-      <Collapsible
-        label={t('config_management.visual.sections.advanced.plugins_title')}
-        defaultOpen={false}
-      >
+      <SettingGroup label={t('config_management.visual.sections.advanced.plugins_title')}>
         <FieldStack>
           <SettingList>
             <ToggleSetting
@@ -120,12 +107,9 @@ export function SectionAdvanced({
             </SettingCell>
           </SettingList>
         </FieldStack>
-      </Collapsible>
+      </SettingGroup>
 
-      <Collapsible
-        label={t('config_management.visual.sections.advanced.antigravity_title')}
-        defaultOpen={false}
-      >
+      <SettingGroup label={t('config_management.visual.sections.advanced.antigravity_title')}>
         <FieldStack>
           <SettingList>
             <ToggleSetting
@@ -192,12 +176,9 @@ export function SectionAdvanced({
             />
           </SettingList>
         </FieldStack>
-      </Collapsible>
+      </SettingGroup>
 
-      <Collapsible
-        label={t('config_management.visual.sections.advanced.devin_title')}
-        defaultOpen={false}
-      >
+      <SettingGroup label={t('config_management.visual.sections.advanced.devin_title')}>
         <SettingList
           title={t('config_management.visual.sections.system.devin_sensitive_words')}
           description={t('config_management.visual.sections.system.devin_sensitive_words_desc')}
@@ -220,12 +201,11 @@ export function SectionAdvanced({
             />
           </BlockSetting>
         </SettingList>
-      </Collapsible>
+      </SettingGroup>
 
-      <Collapsible
+      <SettingGroup
         label={t('config_management.visual.sections.headers.title')}
         hint={t('config_management.visual.sections.headers.description')}
-        defaultOpen={false}
       >
         <FieldStack>
           <SettingList title={t('config_management.visual.sections.headers.claude_title')}>
@@ -324,7 +304,7 @@ export function SectionAdvanced({
             />
           </SettingList>
         </FieldStack>
-      </Collapsible>
-    </SectionCard>
+      </SettingGroup>
+    </Section>
   );
 }

@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { IconEyeOff, IconNetwork } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Page } from '@/components/layout/Page';
 import { OAuthEditorProviderCard } from '@/features/authFiles/components/OAuthEditorProviderCard';
 import {
   ExcludedModelsPicker,
   normalizeExcludedRules,
   type ExcludedModelsCatalogState,
 } from '@/components/excludedModels';
-import { SecondaryScreenShell } from '@/components/common/SecondaryScreenShell';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useAuthStore, useNotificationStore } from '@/stores';
@@ -20,7 +26,6 @@ import { buildOAuthProviderOptions, normalizeProviderKey } from '@/features/auth
 import { getStringSetSignature, isOAuthEditorDirty } from '@/features/authFiles/oauthEditorState';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { getErrorMessage } from '@/utils/helpers';
-import styles from '@/features/authFiles/components/OAuthEditor.module.scss';
 
 type AuthFileModelItem = { id: string; display_name?: string; type?: string; owned_by?: string };
 
@@ -332,81 +337,73 @@ export function AuthFilesOAuthExcludedEditPage() {
     initialLoadError === null;
 
   return (
-    <SecondaryScreenShell
-      ref={swipeRef}
-      title={title}
-      onBack={handleBack}
-      backLabel={t('common.back')}
-      backAriaLabel={t('common.back')}
-      contentClassName={styles.pageContent}
-      topBarClassName={styles.topBar}
-      rightAction={
-        <Button size="sm" onClick={handleSave} loading={saving} disabled={!canSave}>
-          {t('oauth_excluded.save')}
-        </Button>
-      }
-      isLoading={initialLoading}
-      loadingLabel={t('common.loading')}
-    >
-      {excludedUnsupported ? (
-        <Card>
-          <EmptyState
-            title={t('oauth_excluded.upgrade_required_title')}
-            description={t('oauth_excluded.upgrade_required_desc')}
-          />
-        </Card>
-      ) : initialLoadError !== null ? (
-        <Card>
-          <EmptyState
-            title={t('notification.refresh_failed')}
-            description={initialLoadError || t('notification.refresh_failed')}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => void loadInitialData()}>
+    <div ref={swipeRef} className="h-full">
+      <Page
+        title={title}
+        actions={
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              onClick={handleBack}
+              aria-label={t('common.back')}
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={1.75} data-icon="inline-start" />
+              <span className="max-sm:hidden">{t('common.back')}</span>
+            </Button>
+            <Button size="lg" className="h-9 px-4" onClick={handleSave} disabled={!canSave}>
+              {t('oauth_excluded.save')}
+            </Button>
+          </div>
+        }
+      >
+        {initialLoading ? (
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        ) : excludedUnsupported ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>{t('oauth_excluded.upgrade_required_title')}</EmptyTitle>
+              <EmptyDescription>{t('oauth_excluded.upgrade_required_desc')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : initialLoadError !== null ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>{t('notification.refresh_failed')}</EmptyTitle>
+              <EmptyDescription>
+                {initialLoadError || t('notification.refresh_failed')}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button variant="outline" onClick={() => void loadInitialData()}>
                 {t('common.refresh')}
               </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <>
-          <div className={styles.intro}>
-            <span className={styles.introIcon}>
-              <IconEyeOff size={22} aria-hidden="true" />
-            </span>
-            <div>
-              <h1 className={styles.introTitle}>{t('oauth_excluded.title')}</h1>
-              <p className={styles.description}>{t('oauth_excluded.editor_description')}</p>
-            </div>
-          </div>
-
-          <OAuthEditorProviderCard
-            provider={provider}
-            options={providerOptions}
-            onChange={updateProvider}
-            disabled={disableControls || saving}
-            translationPrefix="oauth_excluded"
-          />
-
-          <Card className={styles.settingsCard}>
-            <div className={styles.editorHeader}>
-              <div className={styles.sectionHeading}>
-                <span className={styles.stepNumber} aria-hidden="true">
-                  02
-                </span>
-                <div className={styles.headingCopy}>
-                  <h2 className={styles.sectionTitle} id="oauth-excluded-models-label">
-                    {t('oauth_excluded.models_label')}
-                  </h2>
-                  <p className={styles.description}>{t('oauth_excluded.models_hint')}</p>
-                </div>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <>
+            <OAuthEditorProviderCard
+              provider={provider}
+              options={providerOptions}
+              onChange={updateProvider}
+              disabled={disableControls || saving}
+              translationPrefix="oauth_excluded"
+            />
+            <section className="flex flex-col gap-5">
+              <div className="flex min-h-9 items-center justify-between gap-3">
+                <h2
+                  className="text-lg font-semibold tracking-tight"
+                  id="oauth-excluded-models-label"
+                >
+                  {t('oauth_excluded.models_label')}
+                </h2>
+                {resolvedProviderKey && (
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                    {t('excluded_models.trigger_summary_rules', { n: effectiveRules.length })}
+                  </span>
+                )}
               </div>
-              {resolvedProviderKey && (
-                <span className={styles.countBadge}>
-                  {t('excluded_models.trigger_summary_rules', { n: effectiveRules.length })}
-                </span>
-              )}
-            </div>
-            <div className={styles.editorBody}>
               {resolvedProviderKey ? (
                 <ExcludedModelsPicker
                   value={effectiveRules}
@@ -417,15 +414,16 @@ export function AuthFilesOAuthExcludedEditPage() {
                   labelledBy="oauth-excluded-models-label"
                 />
               ) : (
-                <div className={styles.emptyModels}>
-                  <IconNetwork size={24} aria-hidden="true" />
-                  {t('oauth_excluded.provider_required')}
-                </div>
+                <Empty className="border border-dashed p-6 md:p-6">
+                  <EmptyHeader>
+                    <EmptyDescription>{t('oauth_excluded.provider_required')}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               )}
-            </div>
-          </Card>
-        </>
-      )}
-    </SecondaryScreenShell>
+            </section>
+          </>
+        )}
+      </Page>
+    </div>
   );
 }

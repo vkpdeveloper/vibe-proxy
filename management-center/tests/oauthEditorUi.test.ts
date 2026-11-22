@@ -5,7 +5,6 @@ import { I18nextProvider } from 'react-i18next';
 import { createInstance } from 'i18next';
 import { OAuthEditorProviderCard } from '../src/features/authFiles/components/OAuthEditorProviderCard';
 import { OAuthAliasMappingRow } from '../src/features/authFiles/components/OAuthAliasMappingRow';
-import { SecondaryScreenShell } from '../src/components/common/SecondaryScreenShell';
 import en from '../src/i18n/locales/en.json';
 import zhCN from '../src/i18n/locales/zh-CN.json';
 import zhTW from '../src/i18n/locales/zh-TW.json';
@@ -33,21 +32,6 @@ function renderMapping(overrides: { disabled?: boolean; canRemove?: boolean } = 
 }
 
 describe('OAuth editor UI', () => {
-  test('allows scoped toolbar styling without losing the full title or actions', () => {
-    const markup = render(
-      createElement(SecondaryScreenShell, {
-        title: 'Edit model aliases for a-long-provider-name',
-        onBack: noop,
-        topBarClassName: 'oauth-toolbar',
-        rightAction: createElement('button', null, 'Save'),
-      })
-    );
-    expect(markup).toContain('class="oauth-toolbar"');
-    expect(markup).toContain('title="Edit model aliases for a-long-provider-name"');
-    expect(markup).toContain('<button>Save</button>');
-    expect(markup).toContain('aria-label="Back"');
-  });
-
   test('provider shortcuts expose normalized selection and an associated input label', () => {
     const markup = render(
       createElement(OAuthEditorProviderCard, {
@@ -60,7 +44,7 @@ describe('OAuth editor UI', () => {
     );
     expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1);
     expect(markup.match(/aria-pressed="false"/g)).toHaveLength(2);
-    const inputId = markup.match(/<input id="([^"]+)"/)?.[1];
+    const inputId = markup.match(/<input[^>]*\sid="([^"]+)"/)?.[1];
     expect(inputId).toBeDefined();
     expect(markup).toContain(`for="${inputId}"`);
     expect(markup).toContain('Custom-provider');
@@ -76,36 +60,44 @@ describe('OAuth editor UI', () => {
         translationPrefix: 'oauth_model_alias',
       })
     );
-    expect(markup.match(/disabled=""/g)).toHaveLength(3);
+    expect(markup.match(/\sdisabled=""/g)).toHaveLength(3);
   });
 
-  test('mapping fields have persistent associated labels and a contextual delete name', () => {
+  test('mapping fields have persistent accessible names and a contextual delete name', () => {
     const markup = renderMapping();
     expect(markup).toContain('aria-label="Alias mapping 2"');
     expect(markup).toContain('aria-label="Delete alias mapping 2"');
-    expect(markup).toContain('value="source-model"');
-    expect(markup).toContain('value="client-model"');
-    for (const suffix of ['source', 'alias']) {
-      const id = markup.match(new RegExp(`<input id="([^"]+-${suffix})"`))?.[1];
-      expect(id).toBeDefined();
-      expect(markup).toContain(`for="${id}"`);
+    for (const [value, label] of [
+      ['source-model', en.oauth_model_alias.alias_name_placeholder],
+      ['client-model', en.oauth_model_alias.alias_placeholder],
+    ]) {
+      const input = markup.match(new RegExp(`<input[^>]*value="${value}"[^>]*>`))?.[0];
+      expect(input).toBeDefined();
+      expect(input).toContain(`aria-label="${label}"`);
     }
-    expect(markup).toContain('checked=""');
+    // The fork switch is labelled by visible text, not only by its position.
+    const forkId = markup.match(/<button[^>]*role="switch"[^>]*\sid="([^"]+)"/)?.[1];
+    expect(forkId).toBeDefined();
+    expect(markup).toContain(`for="${forkId}"`);
+    expect(markup).toContain('aria-checked="true"');
   });
 
   test('preserves the last-row delete guard and disabled editing state', () => {
     const lastRow = renderMapping({ canRemove: false });
-    expect(lastRow.match(/disabled=""/g)).toHaveLength(1);
+    expect(lastRow.match(/\sdisabled=""/g)).toHaveLength(1);
     const disabledRow = renderMapping({ disabled: true });
-    expect(disabledRow.match(/disabled=""/g)).toHaveLength(4);
+    // Both model fields, the fork switch and the delete button are all locked.
+    const controls = [
+      ...(disabledRow.match(/<input[^>]*value="(source|client)-model"[^>]*>/g) ?? []),
+      ...(disabledRow.match(/<button[^>]*role="switch"[^>]*>/g) ?? []),
+      ...(disabledRow.match(/<button[^>]*aria-label="Delete alias mapping 2"[^>]*>/g) ?? []),
+    ];
+    expect(controls).toHaveLength(4);
+    for (const tag of controls) expect(tag).toMatch(/\sdisabled=""/);
   });
 
-  test('all four locales include editor guidance and accessible row labels', () => {
+  test('all four locales include the editor title and accessible row labels', () => {
     for (const locale of [en, zhCN, zhTW, ru]) {
-      expect(locale.oauth_excluded.editor_description.length).toBeGreaterThan(0);
-      expect(locale.oauth_excluded.models_hint.length).toBeGreaterThan(0);
-      expect(locale.oauth_model_alias.editor_description.length).toBeGreaterThan(0);
-      expect(locale.oauth_model_alias.mapping_hint.length).toBeGreaterThan(0);
       expect(locale.oauth_model_alias.edit_title).toContain('{{provider}}');
       expect(locale.oauth_model_alias.mapping_row).toContain('{{number}}');
       expect(locale.oauth_model_alias.remove_mapping).toContain('{{number}}');

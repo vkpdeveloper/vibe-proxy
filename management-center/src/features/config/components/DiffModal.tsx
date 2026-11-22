@@ -2,9 +2,18 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@codemirror/state';
 import { Chunk } from '@codemirror/merge';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import styles from './DiffModal.module.scss';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { File01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 type DiffModalProps = {
   open: boolean;
@@ -188,16 +197,28 @@ function StatBar({ additions, deletions }: { additions: number; deletions: numbe
   if (total === 0) return null;
   const addBlocks = Math.round((additions / total) * STAT_BLOCKS);
   return (
-    <span className={styles.statBar}>
+    <span className="flex gap-0.5" aria-hidden="true">
       {Array.from({ length: STAT_BLOCKS }, (_, i) => (
         <span
           key={i}
-          className={`${styles.statBlock} ${i < addBlocks ? styles.statBlockAdd : styles.statBlockDel}`}
+          className={cn('size-2 rounded-[2px]', i < addBlocks ? 'bg-success' : 'bg-destructive')}
         />
       ))}
     </span>
   );
 }
+
+const lineTone: Record<UnifiedLineType, string> = {
+  context: 'text-muted-foreground',
+  addition: 'bg-success/10 text-foreground',
+  deletion: 'bg-destructive/10 text-foreground',
+};
+
+const prefixTone: Record<UnifiedLineType, string> = {
+  context: 'text-faint',
+  addition: 'text-success',
+  deletion: 'text-destructive',
+};
 
 export function DiffModal({
   open,
@@ -215,87 +236,65 @@ export function DiffModal({
   );
 
   return (
-    <Modal
+    <Dialog
       open={open}
-      title={t('config_management.diff.title')}
-      onClose={onCancel}
-      width="min(1200px, 90vw)"
-      className={styles.diffModal}
-      closeDisabled={loading}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel} disabled={loading}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={onConfirm} loading={loading} disabled={loading}>
-            {t('config_management.diff.confirm')}
-          </Button>
-        </>
-      }
+      onOpenChange={(next) => {
+        if (!next && !loading) onCancel();
+      }}
     >
-      <div className={styles.content}>
+      <DialogContent
+        showCloseButton={!loading}
+        className="flex max-h-[min(52rem,calc(100dvh-2rem))] flex-col sm:max-w-5xl"
+      >
+        <DialogHeader>
+          <DialogTitle>{t('config_management.diff.title')}</DialogTitle>
+          <DialogDescription className="sr-only">config.yaml</DialogDescription>
+        </DialogHeader>
+
         {diff.hunks.length === 0 ? (
-          <div className={styles.emptyState}>{t('config_management.diff.no_changes')}</div>
+          <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+            {t('config_management.diff.no_changes')}
+          </div>
         ) : (
-          <div className={styles.diffContainer}>
-            <div className={styles.fileHeader}>
-              <svg className={styles.fileIcon} viewBox="0 0 16 16" width="16" height="16">
-                <path
-                  fillRule="evenodd"
-                  d="M3.75 1.5a.25.25 0 00-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25V6H9.75A1.75 1.75 0 018 4.25V1.5H3.75zm5.75.56v2.19c0 .138.112.25.25.25h2.19L9.5 2.06zM2 1.75C2 .784 2.784 0 3.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0112.25 15h-8.5A1.75 1.75 0 012 13.25V1.75z"
-                  fill="currentColor"
-                />
-              </svg>
-              <span className={styles.fileName}>config.yaml</span>
-              <span className={styles.fileStats}>
-                <span className={styles.statAdditions}>+{diff.additions}</span>
-                <span className={styles.statDeletions}>-{diff.deletions}</span>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background">
+            <div className="flex items-center gap-2 border-b px-3 py-2">
+              <HugeiconsIcon
+                icon={File01Icon}
+                strokeWidth={1.75}
+                className="size-4 text-muted-foreground"
+              />
+              <span className="font-mono text-[13px]">config.yaml</span>
+              <span className="ml-auto flex items-center gap-2 font-mono text-xs tabular-nums">
+                <span className="text-success">+{diff.additions}</span>
+                <span className="text-destructive">-{diff.deletions}</span>
                 <StatBar additions={diff.additions} deletions={diff.deletions} />
               </span>
             </div>
 
-            <div className={styles.diffBody}>
+            <div className="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-5">
               {diff.hunks.map((hunk, hunkIdx) => (
-                <div key={hunkIdx} className={styles.hunk}>
-                  <div className={styles.hunkHeader}>
-                    <span className={styles.hunkGutter}>
-                      <svg
-                        className={styles.hunkExpandIcon}
-                        viewBox="0 0 16 16"
-                        width="12"
-                        height="12"
-                      >
-                        <path
-                          d="M8.177 1.677l2.896 2.896a.25.25 0 01-.177.427H8.75v1.25a.75.75 0 01-1.5 0V5H5.104a.25.25 0 01-.177-.427l2.896-2.896a.25.25 0 01.354 0zM7.25 11.75a.75.75 0 011.5 0V13h2.146a.25.25 0 01.177.427l-2.896 2.896a.25.25 0 01-.354 0l-2.896-2.896A.25.25 0 015.104 13H7.25v-1.25z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </span>
-                    <span className={styles.hunkGutter} />
-                    <span className={styles.hunkText}>
-                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-                    </span>
+                <div key={hunkIdx} className="min-w-fit">
+                  <div className="bg-primary/8 px-3 py-1 text-primary/90">
+                    @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
                   </div>
-
                   {hunk.lines.map((line, lineIdx) => (
                     <div
                       key={`${hunkIdx}-${lineIdx}`}
-                      className={`${styles.diffLine} ${styles[line.type]}`}
+                      className={cn(
+                        'grid grid-cols-[2.75rem_2.75rem_1.25rem_1fr]',
+                        lineTone[line.type]
+                      )}
                     >
-                      <span
-                        className={`${styles.lineNum} ${line.oldNum === null ? styles.lineNumEmpty : ''}`}
-                      >
+                      <span className="pr-2 text-right text-faint select-none tabular-nums">
                         {line.oldNum ?? ''}
                       </span>
-                      <span
-                        className={`${styles.lineNum} ${line.newNum === null ? styles.lineNumEmpty : ''}`}
-                      >
+                      <span className="pr-2 text-right text-faint select-none tabular-nums">
                         {line.newNum ?? ''}
                       </span>
-                      <span className={styles.linePrefix}>
+                      <span className={cn('select-none', prefixTone[line.type])}>
                         {line.type === 'deletion' ? '-' : line.type === 'addition' ? '+' : ' '}
                       </span>
-                      <code className={styles.lineText}>{line.text || ' '}</code>
+                      <code className="pr-3 whitespace-pre">{line.text || ' '}</code>
                     </div>
                   ))}
                 </div>
@@ -303,7 +302,24 @@ export function DiffModal({
             </div>
           </div>
         )}
-      </div>
-    </Modal>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={onConfirm} disabled={loading} aria-busy={loading || undefined}>
+            {loading ? (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                data-icon="inline-start"
+                strokeWidth={2}
+                className="animate-spin motion-reduce:animate-none"
+              />
+            ) : null}
+            {t('config_management.diff.confirm')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
