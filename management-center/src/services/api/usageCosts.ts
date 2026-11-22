@@ -59,6 +59,8 @@ export interface UsageCostReport {
   pricing_as_of: string;
   pricing_rules: number;
   generated_at: string;
+  /** Set when the report is limited to one client key. */
+  client_key_id?: string;
   totals: UsageTotals;
   by_provider: UsageBreakdown[];
   by_account: UsageBreakdown[];
@@ -98,7 +100,7 @@ function normalizeReport(report: UsageCostReport): UsageCostReport {
 }
 
 export const usageCostsApi = {
-  getReport: async (params?: { from?: string; to?: string }) => {
+  getReport: async (params?: { from?: string; to?: string; client_key_id?: string }) => {
     const report = await apiClient.get<UsageCostReport>('/usage-costs', { params });
     return normalizeReport(report);
   },

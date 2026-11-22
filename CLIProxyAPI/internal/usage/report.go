@@ -50,6 +50,7 @@ type Report struct {
 	PricingRules    int                `json:"pricing_rules"`
 	From            *time.Time         `json:"from,omitempty"`
 	To              *time.Time         `json:"to,omitempty"`
+	ClientKeyID     string             `json:"client_key_id,omitempty"`
 	GeneratedAt     time.Time          `json:"generated_at"`
 	Totals          Totals             `json:"totals"`
 	ByProvider      []Breakdown        `json:"by_provider"`
@@ -64,7 +65,9 @@ type Report struct {
 	Historical      HistoricalCoverage `json:"historical"`
 }
 
-func (s *Store) Report(from, to *time.Time) Report {
+// Report aggregates events in [from, to). A non-empty clientKeyID limits every total,
+// breakdown and daily row to that client key.
+func (s *Store) Report(from, to *time.Time, clientKeyID string) Report {
 	currency, asOf, rules := s.CatalogInfo()
 	report := Report{
 		Currency:        normalizedLabel(currency, "USD"),
@@ -72,6 +75,7 @@ func (s *Store) Report(from, to *time.Time) Report {
 		PricingRules:    rules,
 		From:            from,
 		To:              to,
+		ClientKeyID:     clientKeyID,
 		GeneratedAt:     time.Now(),
 		ByProvider:      make([]Breakdown, 0),
 		ByAccount:       make([]Breakdown, 0),
@@ -98,6 +102,9 @@ func (s *Store) Report(from, to *time.Time) Report {
 			continue
 		}
 		if to != nil && !event.Timestamp.Before(*to) {
+			continue
+		}
+		if clientKeyID != "" && event.ClientKeyID != clientKeyID {
 			continue
 		}
 		addEventTotals(&report.Totals, event)
@@ -128,10 +135,9 @@ func (s *Store) Report(from, to *time.Time) Report {
 		authRow.AuthType = authKey
 		addEventTotals(&authRow.Totals, event)
 
-		clientKeyID := event.ClientKeyID
-		clientKeyRow := ensureBreakdown(clientKey, normalizedLabel(clientKeyID, "unattributed"))
-		clientKeyRow.ClientKeyID = clientKeyID
-		clientKeyRow.ClientKey = s.clientKeyLabel(clientKeyID)
+		clientKeyRow := ensureBreakdown(clientKey, normalizedLabel(event.ClientKeyID, "unattributed"))
+		clientKeyRow.ClientKeyID = event.ClientKeyID
+		clientKeyRow.ClientKey = s.clientKeyLabel(event.ClientKeyID)
 		clientKeyRow.Key = clientKeyRow.ClientKey
 		addEventTotals(&clientKeyRow.Totals, event)
 

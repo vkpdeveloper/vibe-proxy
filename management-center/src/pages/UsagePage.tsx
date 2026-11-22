@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouteError } from 'react-router-dom';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -27,6 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Page, Section } from '@/components/layout/Page';
@@ -44,6 +51,7 @@ const DIMENSIONS: Dimension[] = ['client', 'provider', 'account', 'model', 'auth
 /** Keep the date axis legible: at most this many labels regardless of range. */
 const MAX_DATE_LABELS = 6;
 const DASH = '-';
+const ALL_KEYS = 'all';
 
 const TONE_TEXT: Record<MeterTone, string> = {
   good: 'text-success',
@@ -141,22 +149,37 @@ export function UsagePage() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const [range, setRange] = useState<Range>('30d');
   const [dimension, setDimension] = useState<Dimension>('client');
+  const [clientKey, setClientKey] = useState(ALL_KEYS);
+  const [keyOptions, setKeyOptions] = useState<UsageBreakdown[]>([]);
   const [report, setReport] = useState<UsageCostReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Drops responses that arrive after a newer range or key was picked.
+  const latestRequest = useRef(0);
 
   const load = useCallback(async () => {
     if (connectionStatus !== 'connected') return;
+    const request = ++latestRequest.current;
     setLoading(true);
     setError('');
     try {
-      setReport(await usageCostsApi.getReport(dateParams(range)));
+      const next = await usageCostsApi.getReport({
+        ...dateParams(range),
+        ...(clientKey === ALL_KEYS ? {} : { client_key_id: clientKey }),
+      });
+      if (request !== latestRequest.current) return;
+      setReport(next);
+      // A filtered report only lists the chosen key, so the picker keeps the last full list.
+      if (clientKey === ALL_KEYS) {
+        setKeyOptions(next.by_client_key.filter((row) => row.client_key_id));
+      }
     } catch (loadError) {
+      if (request !== latestRequest.current) return;
       setError(loadError instanceof Error ? loadError.message : 'Unable to load usage accounting.');
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
-  }, [connectionStatus, range]);
+  }, [clientKey, connectionStatus, range]);
 
   useEffect(() => {
     void load();
@@ -204,24 +227,39 @@ export function UsagePage() {
       >
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              spacing={0}
-              value={range}
-              onValueChange={(value) => value && setRange(value as Range)}
-              aria-label="Usage date range"
-            >
-              {RANGES.map((value) => (
-                <ToggleGroupItem key={value} value={value} className="h-9 px-3">
-                  {value === 'month'
-                    ? t('usage.month', { defaultValue: 'Month' })
-                    : value === 'all'
-                      ? 'All'
-                      : value.toUpperCase()}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                spacing={0}
+                value={range}
+                onValueChange={(value) => value && setRange(value as Range)}
+                aria-label="Usage date range"
+              >
+                {RANGES.map((value) => (
+                  <ToggleGroupItem key={value} value={value} className="h-9 px-3">
+                    {value === 'month'
+                      ? t('usage.month', { defaultValue: 'Month' })
+                      : value === 'all'
+                        ? 'All'
+                        : value.toUpperCase()}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <Select value={clientKey} onValueChange={setClientKey}>
+                <SelectTrigger aria-label="Client key" className="min-w-40 data-[size=default]:h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start">
+                  <SelectItem value={ALL_KEYS}>All keys</SelectItem>
+                  {keyOptions.map((row) => (
+                    <SelectItem key={row.client_key_id} value={row.client_key_id!}>
+                      {row.client_key || row.key}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-muted-foreground">
               <span>{RANGE_META[range]}</span>
               <span className="text-faint" aria-hidden="true">

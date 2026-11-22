@@ -30,7 +30,7 @@ func (h *Handler) GetUsageCosts(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "from must be earlier than to"})
 		return
 	}
-	c.JSON(http.StatusOK, h.usageStore.Report(from, to))
+	c.JSON(http.StatusOK, h.usageStore.Report(from, to, strings.TrimSpace(c.Query("client_key_id"))))
 }
 
 func parseUsageTime(value string, endExclusive bool) (*time.Time, error) {

@@ -36,7 +36,7 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 		},
 	})
 
-	report := store.Report(nil, nil)
+	report := store.Report(nil, nil, "")
 	if report.Totals.Requests != 1 || report.Totals.TotalTokens != 200_000 {
 		t.Fatalf("unexpected totals: %+v", report.Totals)
 	}
@@ -62,7 +62,7 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 	if errReload != nil {
 		t.Fatalf("reloaded NewStore() error = %v", errReload)
 	}
-	if got := reloaded.Report(nil, nil).Totals.Requests; got != 1 {
+	if got := reloaded.Report(nil, nil, "").Totals.Requests; got != 1 {
 		t.Fatalf("persisted request count = %d, want 1", got)
 	}
 	// Replaying the same request ID/model/tokens is idempotent.
@@ -70,7 +70,7 @@ func TestStorePersistsPricesAndGroupsUsage(t *testing.T) {
 		Provider: "codex", Model: "gpt-5.4", APIKey: "client-secret", Source: "person@example.com", AuthType: "oauth", RequestedAt: requestedAt,
 		Detail: coreusage.Detail{InputTokens: 100_000, OutputTokens: 100_000, CachedTokens: 20_000, TotalTokens: 200_000},
 	})
-	if got := reloaded.Report(nil, nil).Totals.Requests; got != 1 {
+	if got := reloaded.Report(nil, nil, "").Totals.Requests; got != 1 {
 		t.Fatalf("deduplicated request count = %d, want 1", got)
 	}
 }
@@ -184,7 +184,7 @@ Status: 200
 	if errStore != nil {
 		t.Fatalf("NewStore() error = %v", errStore)
 	}
-	report := store.Report(nil, nil)
+	report := store.Report(nil, nil, "")
 	if report.Totals.Requests != 1 || report.Totals.TotalTokens != 120 {
 		t.Fatalf("imported totals = %+v", report.Totals)
 	}
@@ -199,7 +199,7 @@ Status: 200
 	if errReload != nil {
 		t.Fatal(errReload)
 	}
-	if got := reloaded.Report(nil, nil).Totals.Requests; got != 1 {
+	if got := reloaded.Report(nil, nil, "").Totals.Requests; got != 1 {
 		t.Fatalf("reimported totals request count = %d, want 1", got)
 	}
 }
@@ -241,7 +241,7 @@ func TestStoreRepricesHistoryOnLoad(t *testing.T) {
 	if errStore != nil {
 		t.Fatalf("NewStore() error = %v", errStore)
 	}
-	report := store.Report(nil, nil)
+	report := store.Report(nil, nil, "")
 	if report.Totals.PricedRequests != 2 || report.Totals.UnpricedRequests != 1 {
 		t.Fatalf("priced/unpriced = %d/%d, want 2/1", report.Totals.PricedRequests, report.Totals.UnpricedRequests)
 	}
@@ -300,11 +300,54 @@ func TestEmptyReportUsesEmptyCollections(t *testing.T) {
 	if errStore != nil {
 		t.Fatal(errStore)
 	}
-	report := store.Report(nil, nil)
+	report := store.Report(nil, nil, "")
 	if report.ByProvider == nil || report.ByAccount == nil || report.ByModel == nil || report.ByProviderModel == nil || report.ByAuthType == nil || report.ByClientKey == nil {
 		t.Fatal("empty report breakdowns must be JSON arrays, not null")
 	}
 	if report.Daily == nil || report.UnpricedModels == nil || report.Recent == nil {
 		t.Fatal("empty report collections must be JSON arrays, not null")
+	}
+}
+
+func TestReportFiltersByClientKey(t *testing.T) {
+	dir := t.TempDir()
+	store, errStore := NewStore(filepath.Join(dir, "usage"), filepath.Join(dir, "logs"), true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	day := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	for i, key := range []string{"key-a", "key-b", "key-b"} {
+		ctx := internallogging.WithRequestID(context.Background(), "request-"+key+string(rune('0'+i)))
+		store.HandleUsage(ctx, coreusage.Record{
+			Provider:    "codex",
+			Model:       "gpt-5.4",
+			APIKey:      key,
+			Source:      "person@example.com",
+			AuthType:    "oauth",
+			RequestedAt: day.AddDate(0, 0, i),
+			Detail:      coreusage.Detail{InputTokens: 1000, OutputTokens: 1000, TotalTokens: 2000},
+		})
+	}
+
+	all := store.Report(nil, nil, "")
+	if all.Totals.Requests != 3 || len(all.ByClientKey) != 2 {
+		t.Fatalf("unfiltered report: totals %+v, keys %+v", all.Totals, all.ByClientKey)
+	}
+	var keyB string
+	for _, row := range all.ByClientKey {
+		if row.Requests == 2 {
+			keyB = row.ClientKeyID
+		}
+	}
+
+	filtered := store.Report(nil, nil, keyB)
+	if filtered.ClientKeyID != keyB || filtered.Totals.Requests != 2 || filtered.Totals.TotalTokens != 4000 {
+		t.Fatalf("filtered totals = %+v", filtered.Totals)
+	}
+	if len(filtered.ByClientKey) != 1 || filtered.ByClientKey[0].ClientKeyID != keyB {
+		t.Fatalf("filtered client keys = %+v", filtered.ByClientKey)
+	}
+	if len(filtered.Daily) != 2 || filtered.Daily[0].Date != "2026-09-03" {
+		t.Fatalf("filtered daily = %+v", filtered.Daily)
 	}
 }
