@@ -187,6 +187,7 @@ export function UsagePage() {
   return (
     <>
       <Page
+        wide
         title={t('usage.title', { defaultValue: 'Usage & spend' })}
         actions={
           <Button
@@ -546,7 +547,7 @@ export function UsagePageError() {
   useRouteError();
 
   return (
-    <Page title="Usage & spend">
+    <Page wide title="Usage & spend">
       <Empty className="border border-dashed" role="alert">
         <EmptyHeader>
           <EmptyMedia variant="icon">

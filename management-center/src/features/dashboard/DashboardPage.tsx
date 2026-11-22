@@ -170,7 +170,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <Page title={t('nav.dashboard')}>
+      <Page wide title={t('nav.dashboard')}>
         <section
           aria-label={t('dashboard.stats_aria')}
           className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4"

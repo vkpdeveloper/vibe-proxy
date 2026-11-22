@@ -70,7 +70,7 @@ import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
-const SKELETON_CARD_COUNT = 3;
+const SKELETON_CARD_COUNT = 4;
 
 /** How often the open page reloads credentials to pick up the server's quota poll. */
 const QUOTA_POLL_RELOAD_MS = 60_000;
@@ -367,6 +367,7 @@ export function QuotaPage() {
 
   return (
     <Page
+      wide
       title={t('nav.quota_management')}
       actions={
         <div className="flex items-center gap-2">
@@ -430,7 +431,7 @@ export function QuotaPage() {
         )}
 
         {loading ? (
-          <div className="flex flex-col gap-3" aria-hidden="true">
+          <div className="grid gap-3 xl:grid-cols-2" aria-hidden="true">
             {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
               <div key={index} className="h-36 rounded-xl border bg-card" />
             ))}
@@ -456,7 +457,7 @@ export function QuotaPage() {
             )}
           </Empty>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid items-start gap-3 xl:grid-cols-2">
             {pageItems.map((entry) => (
               <QuotaCard
                 key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}

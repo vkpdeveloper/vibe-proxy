@@ -21,6 +21,7 @@ export function Page<T extends string>({
   tabs,
   tab,
   onTab,
+  wide = false,
   children,
 }: {
   title: string;
@@ -29,6 +30,8 @@ export function Page<T extends string>({
   tabs?: Tab<T>[];
   tab?: T;
   onTab?: (tab: T) => void;
+  /** Use the full width, for dashboards and card grids. Forms and lists read better narrow. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -40,7 +43,9 @@ export function Page<T extends string>({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-6 px-5 py-6 sm:px-10 sm:py-8 md:flex-row md:gap-12">
           {tabs && <Tabs tabs={tabs} tab={tab} onTab={onTab} />}
-          <div className="flex min-w-0 max-w-2xl flex-1 flex-col gap-10">{children}</div>
+          <div className={cn('flex min-w-0 flex-1 flex-col gap-10', !wide && 'max-w-2xl')}>
+            {children}
+          </div>
         </div>
       </div>
     </div>
