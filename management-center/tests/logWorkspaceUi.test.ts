@@ -23,6 +23,7 @@ describe('log workspace layout contract', () => {
     expect(page).toMatch(/<Dialog\s+open=\{structuredFiltersExpanded\}/);
     expect(page).toContain("'logsPage.showRawLogs'");
     expect(page).toContain("'logsPage.hideManagementLogs'");
+    expect(page).toContain("useLocalStorage('logsPage.showLineDetails', false)");
     expect(page).not.toContain('!fullscreenLogs &&');
   });
 
@@ -53,12 +54,13 @@ describe('log workspace layout contract', () => {
   });
 
   test('all supported locales describe both filtering and display settings', () => {
-    for (const locale of ['en', 'zh-CN', 'zh-TW', 'ru']) {
+    for (const locale of ['en', 'zh-CN', 'zh-TW', 'ru', 'vi', 'ko']) {
       const messages = JSON.parse(readSource(`src/i18n/locales/${locale}.json`));
       expect(messages.logs.filter_panel_title).toBeTruthy();
       expect(messages.logs.show_raw_logs).toBeTruthy();
       expect(messages.logs.wrap_lines).toBeTruthy();
       expect(messages.logs.hide_management_logs).toBeTruthy();
+      expect(messages.logs.show_line_details).toBeTruthy();
     }
   });
 });

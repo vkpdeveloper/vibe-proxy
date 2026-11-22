@@ -4,10 +4,11 @@ import {
   createLogParserCache,
   filterLogEntries,
   searchLogEntries,
+  withDateDividers,
 } from '../src/features/logs/model/logSelectors';
 
-const access = (path: string, status = 200) =>
-  `[2026-06-15 10:00:00] [abcd1234] [info ] [gin_logger.go:1] ${status} | 1ms | ::1 | POST "${path}"`;
+const access = (path: string, status = 200, time = '2026-06-15 10:00:00') =>
+  `[${time}] [abcd1234] [info ] [gin_logger.go:1] ${status} | 1ms | ::1 | POST "${path}"`;
 const noFilters = () => ({
   methods: new Set<never>(),
   statuses: new Set<never>(),
@@ -31,7 +32,12 @@ describe('log selectors use the whole retained buffer', () => {
       '[2026-06-15 10:00:00] [--------] [info ] Registered /v8/management/config endpoint';
     const entries = parse(
       applyLogPage(emptyLogBuffer(), {
-        lines: [access('/v8/management/logs?limit=10'), text, access('/v8/management-other')],
+        lines: [
+          access('/v8/management/logs?limit=10'),
+          access('/v0/management/api-call'),
+          text,
+          access('/v8/management-other'),
+        ],
       })
     );
     expect(searchLogEntries(entries, '', true).map((entry) => entry.raw)).toEqual([
@@ -64,5 +70,25 @@ describe('log selectors use the whole retained buffer', () => {
       filterLogEntries(entries, { ...noFilters(), statuses: new Set(['5xx']), level: 'info' })
     ).toEqual([entries[1]]);
     expect(entries).toHaveLength(2);
+  });
+});
+
+describe('date dividers', () => {
+  test('open the list and mark each date change, keeping untimed lines in place', () => {
+    const entries = createLogParserCache()(
+      applyLogPage(emptyLogBuffer(), {
+        lines: [
+          access('/a', 200, '2026-11-21 23:59:59'),
+          'continuation without a timestamp',
+          access('/b', 200, '2026-11-22 00:00:01'),
+          access('/c', 200, '2026-11-22 00:00:02'),
+        ],
+      })
+    );
+    expect(
+      withDateDividers(entries).map((item) =>
+        item.kind === 'date' ? item.date : (item.entry.path ?? item.entry.raw)
+      )
+    ).toEqual(['2026-11-21', '/a', 'continuation without a timestamp', '2026-11-22', '/b', '/c']);
   });
 });

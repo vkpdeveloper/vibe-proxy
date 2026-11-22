@@ -63,11 +63,12 @@ import {
   createLogParserCache,
   searchLogEntries,
   filterLogEntries,
+  splitLogTimestamp,
+  withDateDividers,
   type LogEntry,
 } from '@/features/logs/model/logSelectors';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { formatUnixTimestamp } from '@/utils/format';
-import { MANAGEMENT_API_PREFIX } from '@/utils/constants';
 import { HTTP_METHODS, STATUS_GROUPS, type LogState } from './model/logTypes';
 import { createLogRequestGuard } from './model/logRequests';
 import { errorLogViewerReducer } from './model/errorLogViewer';
@@ -109,19 +110,6 @@ function statusTone(code: number) {
   if (code >= 400) return 'text-warning';
   if (code >= 300) return 'text-muted-foreground';
   return 'text-success';
-}
-
-/** "2026-11-22 17:39:57": the date drops away on phones, the time stays. */
-function Timestamp({ value }: { value?: string }) {
-  if (!value) return null;
-  const split = value.lastIndexOf(' ');
-  if (split < 0) return <>{value}</>;
-  return (
-    <>
-      <span className="max-sm:hidden">{value.slice(0, split + 1)}</span>
-      {value.slice(split + 1)}
-    </>
-  );
 }
 
 function IconAction({
@@ -266,6 +254,7 @@ export function LogsPage() {
   );
   const [showRawLogs, setShowRawLogs] = useLocalStorage('logsPage.showRawLogs', false);
   const [wrapLogs, setWrapLogs] = useLocalStorage('logsPage.wrapLogs', false);
+  const [showLineDetails, setShowLineDetails] = useLocalStorage('logsPage.showLineDetails', false);
   const [structuredFiltersExpanded, setStructuredFiltersExpanded] = useState(false);
   const [errorLogs, setErrorLogs] = useState<ErrorLogFile[]>([]);
   const [loadingErrors, setLoadingErrors] = useState(false);
@@ -669,8 +658,8 @@ export function LogsPage() {
           aria-hidden="true"
           className={cn('mt-0.5 h-4 w-[3px] shrink-0 rounded-full', rowTone(line))}
         />
-        <span className="w-[4.25rem] shrink-0 whitespace-nowrap text-faint tabular-nums sm:w-[10.25rem]">
-          <Timestamp value={line.timestamp} />
+        <span className="w-[4.25rem] shrink-0 whitespace-nowrap text-faint tabular-nums">
+          {line.timestamp && splitLogTimestamp(line.timestamp).time}
         </span>
         <span
           className={cn(
@@ -700,26 +689,22 @@ export function LogsPage() {
           )}
           {line.requestId && (
             <Hint label={t('logs.view_request', { id: line.requestId })}>
-              <Badge
-                variant="secondary"
-                asChild
-                className="shrink-0 font-mono font-normal max-sm:hidden"
+              <button
+                type="button"
+                aria-label={t('logs.view_request', { id: line.requestId })}
+                onClick={() =>
+                  void openErrorLog({ name: `request-${line.requestId}.log` }, line.requestId)
+                }
+                className="-mx-1 shrink-0 cursor-pointer rounded-sm px-1 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 max-sm:hidden"
               >
-                <button
-                  type="button"
-                  aria-label={t('logs.view_request', { id: line.requestId })}
-                  onClick={() =>
-                    void openErrorLog({ name: `request-${line.requestId}.log` }, line.requestId)
-                  }
-                  className="cursor-pointer hover:text-foreground"
-                >
-                  {line.requestId}
-                </button>
-              </Badge>
+                {line.requestId}
+              </button>
             </Hint>
           )}
-          {line.ip && <span className="shrink-0 text-faint max-lg:hidden">{line.ip}</span>}
-          {line.source && (
+          {showLineDetails && line.ip && (
+            <span className="shrink-0 text-faint max-lg:hidden">{line.ip}</span>
+          )}
+          {showLineDetails && line.source && (
             <span className="shrink-0 text-faint max-xl:hidden" title={line.source}>
               {line.source}
             </span>
@@ -911,9 +896,7 @@ export function LogsPage() {
                 className="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground"
               >
                 <span className="w-[3px] shrink-0" />
-                <span className="w-[4.25rem] shrink-0 sm:w-[10.25rem]">
-                  {t('logs.column_time')}
-                </span>
+                <span className="w-[4.25rem] shrink-0">{t('logs.column_time')}</span>
                 <span className="w-11 shrink-0 max-sm:hidden">{t('logs.column_level')}</span>
                 <span className="flex-1">{t('logs.column_request')}</span>
                 <span className="w-8 shrink-0 text-right">{t('logs.filter_status')}</span>
@@ -976,7 +959,19 @@ export function LogsPage() {
                       ))}
                     </pre>
                   ) : (
-                    parsedVisibleLines.map(renderRow)
+                    withDateDividers(parsedVisibleLines).map((item) =>
+                      item.kind === 'entry' ? (
+                        renderRow(item.entry)
+                      ) : (
+                        <div
+                          key={item.key}
+                          className="flex items-center gap-3 px-4 pt-3 pb-1 font-sans text-[11px] text-faint tabular-nums"
+                        >
+                          <span>{item.date}</span>
+                          <span aria-hidden="true" className="h-px flex-1 bg-border" />
+                        </div>
+                      )
+                    )
                   )}
                 </div>
               ) : logBuffer.buffer.length > 0 ? (
@@ -1206,9 +1201,15 @@ export function LogsPage() {
                   />
                   <SwitchRow
                     id="logs-hide-management"
-                    label={t('logs.hide_management_logs', { prefix: MANAGEMENT_API_PREFIX })}
+                    label={t('logs.hide_management_logs')}
                     checked={hideManagementLogs}
                     onChange={setHideManagementLogs}
+                  />
+                  <SwitchRow
+                    id="logs-show-line-details"
+                    label={t('logs.show_line_details')}
+                    checked={showLineDetails}
+                    onChange={setShowLineDetails}
                   />
                   <SwitchRow
                     id="logs-show-raw"
