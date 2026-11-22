@@ -98,6 +98,12 @@ export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualC
  * 与搜索索引一一对应；三方对账由 tests/configFieldParity.test.ts 守护 ——
  * 增删字段时漏改任何一边（索引 / 本表 / 分区 JSX）都会红。
  */
+/**
+ * Values kept in the model so they round-trip through YAML, but only editable in Source mode.
+ * The plugin store screens were removed, so its sources and auth rules have no visual field.
+ */
+export const SOURCE_ONLY_VALUE_KEYS: readonly string[] = ['pluginStoreSources', 'pluginStoreAuth'];
+
 export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   routingSessionAffinitySubagents: ['routingSessionAffinitySubagents'],
   saveCooldownStatus: ['saveCooldownStatus'],
@@ -181,8 +187,6 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   // ── advanced ──────────────────────────────────────────────────────────────
   quotaAntigravityCredits: ['quotaAntigravityCredits'],
   pluginsEnabled: ['pluginsEnabled'],
-  pluginStoreSources: ['pluginStoreSources'],
-  pluginStoreAuth: ['pluginStoreAuth'],
   antigravitySensitiveWords: ['antigravitySensitiveWords'],
   devinSensitiveWords: ['devinSensitiveWords'],
   antigravitySignatureCacheEnabled: ['antigravitySignatureCacheEnabled'],

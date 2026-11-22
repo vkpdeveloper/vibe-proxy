@@ -32,3 +32,13 @@ export const detectApiBaseFromLocation = (): string => {
     return normalizeApiBase(`http://localhost:${DEFAULT_API_PORT}`);
   }
 };
+
+/** Plugin logos may be absolute, data URLs, or paths served by the proxy. */
+export const resolvePluginAssetURL = (value: string, apiBase: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^(https?:|data:|blob:)/i.test(trimmed)) return trimmed;
+  if (!trimmed.startsWith('/')) return trimmed;
+  const base = normalizeApiBase(apiBase);
+  return base ? `${base}${trimmed}` : trimmed;
+};

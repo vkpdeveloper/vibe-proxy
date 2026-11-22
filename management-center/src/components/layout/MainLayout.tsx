@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { matchPath, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
@@ -14,7 +14,6 @@ import {
   Login03Icon,
   Logout01Icon,
   MoreHorizontalIcon,
-  PuzzleIcon,
   Refresh01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons';
@@ -24,7 +23,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -37,15 +35,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { boxStyle, NavIndicator, useSlidingNav } from '@/components/layout/nav';
 import { cn } from '@/lib/utils';
 import { MainRoutes } from '@/router/MainRoutes';
-import { authFilesApi, pluginsApi } from '@/services/api';
+import { authFilesApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { AUTH_FILES_CHANGED_EVENT } from '@/features/authFiles/authFilesEvents';
-import {
-  collectPluginResourceEntries,
-  PLUGIN_RESOURCES_REFRESH_EVENT,
-  resolvePluginAssetURL,
-  type PluginResourceEntry,
-} from '@/features/plugins/pluginResources';
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 
@@ -60,14 +52,6 @@ interface Destination {
   count?: { value: number; label: string };
 }
 
-/** One rail button per plugin: a single page links straight to it, several open a menu. */
-interface PluginGroup {
-  id: string;
-  label: string;
-  logo: string;
-  pages: PluginResourceEntry[];
-}
-
 const railIcon = (icon: IconSvgElement) => (
   <HugeiconsIcon icon={icon} className="size-5" strokeWidth={1.75} />
 );
@@ -76,19 +60,6 @@ const isActivePath = (path: string, pathname: string) =>
   path === '/'
     ? pathname === '/' || pathname === '/dashboard'
     : pathname === path || pathname.startsWith(`${path}/`);
-
-function PluginIcon({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) return railIcon(PuzzleIcon);
-  return (
-    <img
-      src={src}
-      alt=""
-      className="size-5 rounded object-contain"
-      onError={() => setFailed(true)}
-    />
-  );
-}
 
 /** Phones get the bottom bar, so a few destinations move into a menu there. */
 function usePhone() {
@@ -112,12 +83,10 @@ export function MainLayout() {
   const logout = useAuthStore((state) => state.logout);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const apiBase = useAuthStore((state) => state.apiBase);
-  const supportsPlugin = useAuthStore((state) => state.supportsPlugin);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
 
   const [authFilesCount, setAuthFilesCount] = useState<number | null>(null);
-  const [pluginResources, setPluginResources] = useState<PluginResourceEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const authFilesCountRequestRef = useRef(0);
   const mainRef = useRef<HTMLElement>(null);
@@ -149,19 +118,6 @@ export function MainLayout() {
     });
   }, [fetchConfig]);
 
-  const loadPluginResources = useCallback(async () => {
-    if (connectionStatus !== 'connected' || !supportsPlugin) {
-      setPluginResources([]);
-      return;
-    }
-    try {
-      const plugins = await pluginsApi.list();
-      setPluginResources(collectPluginResourceEntries(plugins.plugins));
-    } catch {
-      setPluginResources([]);
-    }
-  }, [connectionStatus, supportsPlugin]);
-
   const loadAuthFilesCount = useCallback(async () => {
     const requestID = ++authFilesCountRequestRef.current;
     if (connectionStatus !== 'connected') {
@@ -180,25 +136,21 @@ export function MainLayout() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadPluginResources();
       void loadAuthFilesCount();
     }, 0);
-    window.addEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadPluginResources);
     window.addEventListener(AUTH_FILES_CHANGED_EVENT, loadAuthFilesCount);
     return () => {
       authFilesCountRequestRef.current += 1;
       window.clearTimeout(timer);
-      window.removeEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadPluginResources);
       window.removeEventListener(AUTH_FILES_CHANGED_EVENT, loadAuthFilesCount);
     };
-  }, [apiBase, loadPluginResources, loadAuthFilesCount]);
+  }, [apiBase, loadAuthFilesCount]);
 
   const handleRefreshAll = async () => {
     setRefreshing(true);
     clearCache();
     const results = await Promise.allSettled([
       fetchConfig(true),
-      loadPluginResources(),
       loadAuthFilesCount(),
       triggerHeaderRefresh(),
     ]);
@@ -281,59 +233,22 @@ export function MainLayout() {
         label: t('nav.system_info'),
         icon: railIcon(InformationCircleIcon),
       },
-      ...(supportsPlugin
-        ? [{ id: 'plugins', path: '/plugins', label: t('nav.plugins'), icon: railIcon(PuzzleIcon) }]
-        : []),
     ],
   ];
   const destinations = groups.flat();
 
-  const pluginGroups: PluginGroup[] = [];
-  if (supportsPlugin) {
-    for (const resource of pluginResources) {
-      const group = pluginGroups.find((entry) => entry.id === resource.pluginID);
-      if (group) {
-        group.pages.push(resource);
-      } else {
-        pluginGroups.push({
-          id: resource.pluginID,
-          label: resource.pluginTitle,
-          logo: resolvePluginAssetURL(resource.pluginLogo, apiBase),
-          pages: [resource],
-        });
-      }
-    }
-  }
-
   const pathname = location.pathname;
   const currentDestination = destinations.find((entry) => isActivePath(entry.path, pathname));
-  const currentPluginPage = pluginResources.find((resource) => matchPath(resource.route, pathname));
-  const currentPluginGroup = pluginGroups.find((group) =>
-    group.pages.some((page) => page === currentPluginPage)
-  );
-
   const pageName =
     currentDestination?.label ??
-    (currentPluginPage
-      ? currentPluginGroup && currentPluginGroup.pages.length > 1
-        ? `${currentPluginGroup.label} / ${currentPluginPage.label}`
-        : currentPluginPage.label
-      : pathname.startsWith('/plugin-store')
-        ? t('nav.plugin_store')
-        : pathname.startsWith('/ai-providers')
-          ? t('nav.ai_providers')
-          : pathname.startsWith('/quick-start')
-            ? t('nav.quick_start')
-            : '');
+    (pathname.startsWith('/ai-providers')
+      ? t('nav.ai_providers')
+      : pathname.startsWith('/quick-start')
+        ? t('nav.quick_start')
+        : '');
 
   // The rail item to highlight. On phones, anything outside the bottom bar lights up "More".
-  const railItem =
-    currentDestination?.id ??
-    (currentPluginGroup
-      ? `plugin:${currentPluginGroup.id}`
-      : pathname.startsWith('/plugin-store')
-        ? 'plugins'
-        : undefined);
+  const railItem = currentDestination?.id;
   const inBottomBar = destinations.some((entry) => entry.id === railItem && entry.phone);
   const activeItem = phone && railItem && !inBottomBar ? 'more' : railItem;
 
@@ -383,10 +298,8 @@ export function MainLayout() {
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <Rail
           groups={groups}
-          pluginGroups={pluginGroups}
           activeItem={activeItem}
           currentItem={railItem}
-          currentPluginPage={currentPluginPage}
           onNavigate={(path) => navigate(path)}
           onLogOut={logout}
         />
@@ -411,19 +324,15 @@ const railButton =
  */
 function Rail({
   groups,
-  pluginGroups,
   activeItem,
   currentItem,
-  currentPluginPage,
   onNavigate,
   onLogOut,
 }: {
   groups: Destination[][];
-  pluginGroups: PluginGroup[];
   /** The highlighted rail item: on phones, "more" stands in for what lives in that menu. */
   activeItem?: string;
   currentItem?: string;
-  currentPluginPage?: PluginResourceEntry;
   onNavigate: (path: string) => void;
   onLogOut: () => void;
 }) {
@@ -504,56 +413,6 @@ function Rail({
         </div>
       ))}
 
-      {pluginGroups.length > 0 && separator}
-      {pluginGroups.map((group) => {
-        const item = `plugin:${group.id}`;
-        const className = cn(railButton, 'max-sm:hidden', activeItem === item && 'text-foreground');
-        if (group.pages.length === 1) {
-          const page = group.pages[0];
-          return (
-            <Button
-              key={item}
-              {...itemProps(item, page.label)}
-              variant="ghost"
-              size="icon-lg"
-              aria-label={page.label}
-              aria-current={activeItem === item ? 'page' : undefined}
-              onClick={() => onNavigate(page.route)}
-              className={className}
-            >
-              <PluginIcon src={group.logo} />
-            </Button>
-          );
-        }
-        return (
-          <DropdownMenu key={item} onOpenChange={(open) => open && hide()}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                {...itemProps(item, group.label)}
-                variant="ghost"
-                size="icon-lg"
-                aria-label={group.label}
-                className={className}
-              >
-                <PluginIcon src={group.logo} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start" className="w-56">
-              <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-              {group.pages.map((page) => (
-                <DropdownMenuItem
-                  key={page.route}
-                  onSelect={() => onNavigate(page.route)}
-                  className={cn(page === currentPluginPage && 'text-primary')}
-                >
-                  {page.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      })}
-
       <DropdownMenu onOpenChange={(open) => open && hide()}>
         <DropdownMenuTrigger asChild>
           <Button
@@ -605,19 +464,6 @@ function Rail({
               {entry.label}
             </DropdownMenuItem>
           ))}
-          {pluginGroups.length > 0 && <DropdownMenuSeparator />}
-          {pluginGroups.flatMap((group) =>
-            group.pages.map((page) => (
-              <DropdownMenuItem
-                key={page.route}
-                onSelect={() => onNavigate(page.route)}
-                className={cn('h-9', page === currentPluginPage && 'text-primary')}
-              >
-                <PluginIcon src={group.logo} />
-                {group.pages.length > 1 ? `${group.label} / ${page.label}` : page.label}
-              </DropdownMenuItem>
-            ))
-          )}
           <DropdownMenuSeparator />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="h-9">

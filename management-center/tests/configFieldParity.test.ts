@@ -13,6 +13,7 @@ import {
   CONFIG_TAB_IDS,
   FIELD_VALUE_KEYS,
   SECTION_VALIDATION_FIELDS,
+  SOURCE_ONLY_VALUE_KEYS,
 } from '@/features/config/constants';
 import {
   CONFIG_FIELD_SEARCH_INDEX,
@@ -80,7 +81,8 @@ describe('value-key coverage (index ↔ VisualConfigValues)', () => {
   test('the union of mapped value keys is exactly the VisualConfigValues leaf keys', () => {
     const mapped = new Set(Object.values(FIELD_VALUE_KEYS).flat());
     // 双向：漏映射的表单键 / 指向不存在键的映射，都在这里现形
-    expect(sorted(mapped)).toEqual(sorted(LEAF_VALUE_KEYS));
+    const editable = [...LEAF_VALUE_KEYS].filter((key) => !SOURCE_ONLY_VALUE_KEYS.includes(key));
+    expect(sorted(mapped)).toEqual(sorted(editable));
   });
 });
 
@@ -160,7 +162,6 @@ describe('v8 YAML search paths', () => {
     ['xaiInjectXSearch', 'upstream.xai.inject-x-search'],
     ['streamingNonstreamKeepalive', 'requests.nonstream-keepalive-interval'],
     ['payloadDefaultRules', 'requests.payload.default'],
-    ['pluginStoreAuth', 'plugins.store-auth'],
   ]) {
     test(`indexes ${path}`, () => {
       expect(findConfigFieldById(fieldId)?.yamlKeys?.join('.')).toBe(path);

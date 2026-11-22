@@ -6,17 +6,13 @@ import { AuthFilesOAuthExcludedEditPage } from '@/pages/AuthFilesOAuthExcludedEd
 import { AuthFilesOAuthModelAliasEditPage } from '@/pages/AuthFilesOAuthModelAliasEditPage';
 import { OAuthPage } from '@/features/oauth/OAuthPage';
 import { QuotaPage } from '@/features/quota/QuotaPage';
-import { PluginResourcePage } from '@/features/plugins/PluginResourcePage';
-import { PluginsPage } from '@/features/plugins/PluginsPage';
-import { PluginStorePage } from '@/features/plugins/PluginStorePage';
 import { ConfigPage } from '@/features/config/ConfigPage';
 import { LogsPage } from '@/features/logs/LogsPage';
 import { SystemPage } from '@/pages/SystemPage';
 import { UsagePage, UsagePageError } from '@/pages/UsagePage';
 import { ApiKeysPage } from '@/pages/ApiKeysPage';
-import { useAuthStore } from '@/stores';
 
-const createMainRoutes = (supportsPlugin: boolean) => [
+const mainRoutes = [
   { path: '/', element: <DashboardPage /> },
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/settings', element: <Navigate to="/config" replace /> },
@@ -31,18 +27,6 @@ const createMainRoutes = (supportsPlugin: boolean) => [
   { path: '/oauth', element: <OAuthPage /> },
   { path: '/quota', element: <QuotaPage /> },
   { path: '/usage', element: <UsagePage />, errorElement: <UsagePageError /> },
-  ...(supportsPlugin
-    ? [
-        { path: '/plugin-pages/:pluginId/:menuIndex', element: <PluginResourcePage /> },
-        { path: '/plugins', element: <PluginsPage /> },
-        { path: '/plugin-store', element: <PluginStorePage /> },
-        { path: '/plugins/*', element: <Navigate to="/plugins" replace /> },
-      ]
-    : [
-        { path: '/plugin-pages/*', element: <Navigate to="/" replace /> },
-        { path: '/plugins/*', element: <Navigate to="/" replace /> },
-        { path: '/plugin-store', element: <Navigate to="/" replace /> },
-      ]),
   { path: '/config', element: <ConfigPage /> },
   { path: '/logs', element: <LogsPage /> },
   { path: '/system', element: <SystemPage /> },
@@ -50,6 +34,5 @@ const createMainRoutes = (supportsPlugin: boolean) => [
 ];
 
 export function MainRoutes({ location }: { location?: Location }) {
-  const supportsPlugin = useAuthStore((state) => state.supportsPlugin);
-  return useRoutes(createMainRoutes(supportsPlugin), location);
+  return useRoutes(mainRoutes, location);
 }

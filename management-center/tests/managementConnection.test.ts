@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { computeApiUrl, normalizeApiBase } from '../src/utils/connection';
-import { resolvePluginAssetURL } from '../src/features/plugins/pluginResources';
+import { computeApiUrl, normalizeApiBase, resolvePluginAssetURL } from '../src/utils/connection';
 
 describe('v8-only management connections', () => {
   test.each([

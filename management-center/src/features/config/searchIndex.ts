@@ -412,7 +412,15 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     labelKey: L('sections.network.routing_strategy'),
     hintKey: L('sections.network.routing_strategy_hint'),
     yamlKeys: ['routing', 'strategy'],
-    keywords: ['round-robin', 'weighted-round-robin', 'wrr', 'fill-first', 'quota-drain', 'quota', 'usage limit'],
+    keywords: [
+      'round-robin',
+      'weighted-round-robin',
+      'wrr',
+      'fill-first',
+      'quota-drain',
+      'quota',
+      'usage limit',
+    ],
   },
   {
     fieldId: 'routingQuotaDrainRefreshInterval',
@@ -569,20 +577,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     labelKey: L('sections.system.plugins_enabled'),
     hintKey: L('sections.system.plugins_enabled_desc'),
     yamlKeys: ['plugins'],
-  },
-  {
-    fieldId: 'pluginStoreSources',
-    sectionId: 'advanced',
-    labelKey: L('sections.system.plugin_store_sources'),
-    hintKey: L('sections.system.plugin_store_sources_hint'),
-    yamlKeys: ['plugins', 'store-sources'],
-  },
-  {
-    fieldId: 'pluginStoreAuth',
-    sectionId: 'advanced',
-    labelKey: L('sections.system.plugin_store_auth'),
-    hintKey: L('sections.system.plugin_store_auth_hint'),
-    yamlKeys: ['plugins', 'store-auth'],
   },
   {
     fieldId: 'antigravitySensitiveWords',

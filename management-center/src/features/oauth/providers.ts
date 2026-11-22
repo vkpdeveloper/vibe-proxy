@@ -1,10 +1,10 @@
 import type { BuiltInOAuthProvider } from '@/services/api';
-import { getPluginTitle, resolvePluginAssetURL } from '@/features/plugins/pluginResources';
 import {
   KIMI_CHINESE_AFFILIATE_URL,
   KIMI_INTERNATIONAL_AFFILIATE_URL,
 } from '@/features/providers/kimi';
 import type { PluginListEntry } from '@/types';
+import { resolvePluginAssetURL } from '@/utils/connection';
 import iconMeta from '@/assets/icons/meta.svg';
 import iconCodex from '@/assets/icons/codex.svg';
 import iconClaude from '@/assets/icons/claude.svg';
@@ -155,6 +155,8 @@ export const isSponsor = (
 
 export const resolveThemedIcon = (icon: ThemedIcon, theme: 'light' | 'dark'): string =>
   typeof icon === 'string' ? icon : icon[theme];
+
+const getPluginTitle = (plugin: PluginListEntry) => plugin.metadata?.name.trim() || plugin.id;
 
 export const buildPluginOAuthProviderCards = (
   plugins: PluginListEntry[],
