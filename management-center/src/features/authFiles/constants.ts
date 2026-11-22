@@ -13,8 +13,6 @@ import iconGemini from '@/assets/icons/gemini.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconIflow from '@/assets/icons/iflow.svg';
-import iconKimiDark from '@/assets/icons/kimi-dark.svg';
-import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconOpenCodeGoDark from '@/assets/icons/opencode-go-dark.svg';
 import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
@@ -41,7 +39,6 @@ export type QuotaProviderType =
   | 'cursor'
   | 'devin-cli'
   | 'devin'
-  | 'kimi'
   | 'meta'
   | 'opencode-go'
   | 'plugin'
@@ -57,7 +54,6 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'cursor',
   'devin-cli',
   'devin',
-  'kimi',
   'opencode-go',
   'plugin',
   'xai',
@@ -72,7 +68,6 @@ export const OAUTH_PROVIDER_PRESETS = [
   'claude',
   'codex',
   'devin',
-  'kimi',
 ];
 
 const OAUTH_PROVIDER_EXCLUDES = new Set(['all', 'unknown', 'empty']);
@@ -89,7 +84,6 @@ export const AUTH_FILE_MANUAL_REFRESH_PROVIDERS = new Set([
   'codex',
   'cursor',
   'devin-cli',
-  'kimi',
   'opencode-go',
   'xai',
 ]);
@@ -109,7 +103,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   gemini: iconGemini,
   xai: { light: iconGrok, dark: iconGrokDark },
   iflow: iconIflow,
-  kimi: { light: iconKimiDark, dark: iconKimiLight },
   'opencode-go': { light: iconOpenCodeGoDark, dark: iconOpenCodeGoLight },
   qwen: iconQwen,
   vertex: iconVertex,
@@ -240,13 +233,6 @@ export const getAuthFileIcon = (type: string, resolvedTheme: ResolvedTheme): str
       ? iconEntry.dark
       : iconEntry.light;
 };
-
-// 与 AI 提供商界面（PROVIDER_LOGOS 的 themeSurface）保持一致：
-// 这些提供商的图标底座颜色随主题切换（浅色主题黑底，深色主题白底）
-export const THEME_SURFACE_ICON_PROVIDERS = new Set(['kimi']);
-
-export const isThemeSurfaceIconProvider = (type: string): boolean =>
-  THEME_SURFACE_ICON_PROVIDERS.has(normalizeProviderKey(type));
 
 export const getThemeSurfaceIconBackground = (resolvedTheme: ResolvedTheme): string =>
   resolvedTheme === 'dark' ? '#ffffff' : '#000000';

@@ -33,7 +33,6 @@ import {
   Plug01Icon,
   RefreshIcon,
   Robot01Icon,
-  Rocket01Icon,
   SatelliteIcon,
   Search01Icon,
   SecurityCheckIcon,
@@ -115,7 +114,6 @@ export const IconExternalLink = hugeicon(LinkSquare02Icon);
 export const IconBookOpen = hugeicon(BookOpen01Icon);
 export const IconCode = hugeicon(SourceCodeIcon);
 export const IconSidebarDashboard = hugeicon(DashboardSquare02Icon);
-export const IconSidebarQuickStart = hugeicon(Rocket01Icon);
 export const IconSidebarConfig = IconSlidersHorizontal;
 export const IconSidebarPlugins = IconPlug;
 export const IconSidebarStore = hugeicon(Store01Icon);

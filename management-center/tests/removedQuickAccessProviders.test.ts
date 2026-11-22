@@ -14,11 +14,14 @@ const retiredEndpoints = [
 describe('removed quick-access providers', () => {
   test('removes retired brand groups', () => {
     const ids = buildProviderGroups({}).map((group) => group.id);
-    for (const [brand] of retiredEndpoints) {
+    for (const brand of [
+      ...retiredEndpoints.map(([name]) => name),
+      'apikeyFun',
+      'fennoAI',
+      'qiniuCloud',
+      'kimi',
+    ]) {
       expect(ids).not.toContain(brand);
-    }
-    for (const brand of ['apikeyFun', 'fennoAI', 'qiniuCloud', 'kimi']) {
-      expect(ids).toContain(brand);
     }
   });
 

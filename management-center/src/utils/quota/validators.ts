@@ -8,8 +8,6 @@ export function resolveAuthProvider(file: AuthFileItem): string {
   const raw = file.provider ?? file.type ?? '';
   const key = String(raw).trim().toLowerCase().replace(/_/g, '-');
   if (key === 'x-ai' || key === 'grok') return 'xai';
-  // Kimi International (kimi.ai) accounts share Kimi's quota API on another host.
-  if (key === 'kimi-ai') return 'kimi';
   return key;
 }
 
@@ -37,10 +35,6 @@ export function isDevinCliFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'devin-cli';
 }
 
-export function isKimiFile(file: AuthFileItem): boolean {
-  return resolveAuthProvider(file) === 'kimi';
-}
-
 export function isOpenCodeGoFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'opencode-go';
 }
@@ -57,7 +51,6 @@ export const BUILT_IN_QUOTA_PROVIDERS: ReadonlySet<string> = new Set([
   'cursor',
   'devin-cli',
   'devin',
-  'kimi',
   'meta',
   'opencode-go',
   'xai',

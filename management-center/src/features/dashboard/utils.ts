@@ -14,7 +14,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI Compatible',
   'openai-compatibility': 'OpenAI Compatible',
   qwen: 'Qwen',
-  kimi: 'Kimi',
   iflow: 'iFlow',
   antigravity: 'Antigravity',
 };

@@ -166,20 +166,6 @@ export function mergePolledQuota(
       };
       return merged;
     }
-    case 'kimi': {
-      const state = card.state as QuotaCardState & {
-        rows?: { id: string; used: number; limit: number; resetAtMs?: number | null }[];
-      };
-      const merged: typeof state = {
-        ...state,
-        rows: mergeRows(state.rows, polled, (row, window) => ({
-          ...row,
-          used: row.limit > 0 ? Math.round((window.usedPercent / 100) * row.limit) : row.used,
-          resetAtMs: window.resetAtMs ?? row.resetAtMs,
-        })),
-      };
-      return merged;
-    }
     case 'antigravity': {
       const state = card.state as QuotaCardState & {
         groups?: {

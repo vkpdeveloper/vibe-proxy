@@ -1,7 +1,5 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { LinkSquare02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -34,8 +32,6 @@ export interface OAuthFlowDialogProps {
   /** Provider copy: `auth_login.<id>_<suffix>` or the plugin template. */
   text: (suffix: string) => string;
   supportsCallback: boolean;
-  /** Sponsor: adds the sign-up link to the hint. */
-  sponsor?: { url: string; label: string };
   onStart: () => void;
   onCancel: () => void;
   onCallbackChange: (value: string) => void;
@@ -68,37 +64,13 @@ export function OAuthFlowContent(props: OAuthFlowDialogProps) {
   );
 }
 
-function ProviderHint({
-  text,
-  sponsor,
-  state,
-}: Pick<OAuthFlowDialogProps, 'text' | 'sponsor' | 'state'>) {
+function ProviderHint({ text, state }: Pick<OAuthFlowDialogProps, 'text' | 'state'>) {
   const { t } = useTranslation();
   return (
     <p className="text-sm text-muted-foreground">
       {state.reconnect
         ? t('auth_login.anthropic_reconnect_hint', { name: state.reconnect.label })
         : text('oauth_hint')}
-      {sponsor && (
-        <>
-          {' '}
-          {t('auth_login.sign_up_prompt')}{' '}
-          <a
-            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
-            href={sponsor.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {sponsor.label}
-            <HugeiconsIcon
-              icon={LinkSquare02Icon}
-              strokeWidth={1.75}
-              className="size-3.5"
-              aria-hidden="true"
-            />
-          </a>
-        </>
-      )}
     </p>
   );
 }
@@ -111,7 +83,7 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowViewKind, 's
   if (view !== 'flow') {
     return (
       <>
-        <ProviderHint text={text} sponsor={props.sponsor} state={state} />
+        <ProviderHint text={text} state={state} />
         {props.onAccountNameChange && !state.reconnect && (
           <AccountNameField
             value={state.accountName ?? ''}
@@ -133,7 +105,7 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowViewKind, 's
 
   return (
     <>
-      <ProviderHint text={text} sponsor={props.sponsor} state={state} />
+      <ProviderHint text={text} state={state} />
       {isDevin && state.state && state.status === 'error' && (
         <FlowAlert>{t('auth_login.devin_oauth_retry_hint')}</FlowAlert>
       )}

@@ -126,11 +126,6 @@ describe('collectQuotaRowInstants', () => {
     expect(collectQuotaRowInstants('antigravity', quota).map((i) => i.rowId)).toEqual(['b1', 'b2']);
   });
 
-  test('collects Kimi rows', () => {
-    const quota = { status: 'success', rows: [{ id: 'r1', resetAtMs: NOW + HOUR_MS }] };
-    expect(collectQuotaRowInstants('kimi', quota).map((i) => i.rowId)).toEqual(['r1']);
-  });
-
   test('collects Cursor billing-cycle resets', () => {
     const quota = {
       status: 'success',

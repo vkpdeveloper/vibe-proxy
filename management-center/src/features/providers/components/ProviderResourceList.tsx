@@ -25,7 +25,6 @@ import {
 import { cn } from '@/lib/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import type { ProviderResource } from '../types';
-import { isMultiProtocolSponsorBrand } from '../sponsorDefinitions';
 import { Hint } from '@/components/ui/tooltip';
 
 interface ProviderResourceListProps {
@@ -70,17 +69,9 @@ export function ProviderResourceList({
   const { t } = useTranslation();
 
   const describe = (r: ProviderResource) => {
-    const sponsor = isMultiProtocolSponsorBrand(r.brand);
-    const protocols = (r.flags.protocols ?? []).map((protocol) =>
-      t(`providersPage.sponsor.protocols.${protocol}`)
-    );
-
     let title: string;
     let subtitle: string | null;
-    if (sponsor) {
-      title = r.name ?? r.identifier;
-      subtitle = r.apiKeyPreview ?? t('providersPage.status.notConfigured');
-    } else if (r.brand === 'openaiCompatibility') {
+    if (r.brand === 'openaiCompatibility') {
       const extra = r.apiKeyEntryCount > 1 ? ` +${r.apiKeyEntryCount - 1}` : '';
       title = r.name ?? r.identifier;
       subtitle = (r.apiKeyPreview ?? '-') + extra;
@@ -90,32 +81,26 @@ export function ProviderResourceList({
     }
 
     let baseUrl: string;
-    if (sponsor) baseUrl = protocols.join(' / ');
-    else if (r.brand === 'claude' && !r.baseUrl)
+    if (r.brand === 'claude' && !r.baseUrl)
       baseUrl = `https://api.anthropic.com ${t('providersPage.status.defaultSuffix')}`;
     else baseUrl = r.baseUrl ?? t('providersPage.status.notSet');
 
     const tags: string[] = [];
     const metrics: Array<[string, number]> = [];
-    if (sponsor) {
-      tags.push(...protocols);
-    } else {
-      metrics.push([t('providersPage.table.metrics.models'), r.modelCount]);
-      if (r.brand === 'openaiCompatibility') {
-        metrics.push([t('providersPage.table.metrics.keys'), r.apiKeyEntryCount]);
-      }
-      metrics.push([t('providersPage.table.metrics.headers'), r.headerCount]);
-      if ((r.brand === 'codex' || r.brand === 'xai') && r.flags.websockets) {
-        tags.push(t('providersPage.table.websocketsTag'));
-      }
-      if (r.brand === 'claude' && r.flags.cloakEnabled)
-        tags.push(t('providersPage.table.cloakTag'));
-      if (r.brand === 'claude' && r.flags.claudeCodeCliProfile) {
-        tags.push(t('providersPage.table.cliProfileTag'));
-      }
+    metrics.push([t('providersPage.table.metrics.models'), r.modelCount]);
+    if (r.brand === 'openaiCompatibility') {
+      metrics.push([t('providersPage.table.metrics.keys'), r.apiKeyEntryCount]);
+    }
+    metrics.push([t('providersPage.table.metrics.headers'), r.headerCount]);
+    if ((r.brand === 'codex' || r.brand === 'xai') && r.flags.websockets) {
+      tags.push(t('providersPage.table.websocketsTag'));
+    }
+    if (r.brand === 'claude' && r.flags.cloakEnabled) tags.push(t('providersPage.table.cloakTag'));
+    if (r.brand === 'claude' && r.flags.claudeCodeCliProfile) {
+      tags.push(t('providersPage.table.cliProfileTag'));
     }
 
-    return { sponsor, title, subtitle, baseUrl, tags, metrics };
+    return { title, subtitle, baseUrl, tags, metrics };
   };
 
   const iconButton = (
@@ -143,7 +128,7 @@ export function ProviderResourceList({
     <div role="list" className="flex flex-col divide-y overflow-hidden rounded-xl border">
       {resources.map((resource) => {
         const row = describe(resource);
-        const usage = usageByProvider && !row.sponsor ? usageFor(resource, usageByProvider) : null;
+        const usage = usageByProvider ? usageFor(resource, usageByProvider) : null;
         const statusLabel = resource.disabled
           ? t('providersPage.status.disabled')
           : t('providersPage.status.active');

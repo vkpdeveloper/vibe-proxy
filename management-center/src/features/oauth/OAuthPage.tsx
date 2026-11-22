@@ -9,9 +9,7 @@ import iconOpenCodeGoDark from '@/assets/icons/opencode-go-dark.svg';
 import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
 import iconDevinCliLight from '@/assets/icons/devin-cli-light.svg';
-import { KIMI_DISPLAY_NAME } from '@/features/providers/kimi';
 import { ProviderTile } from './components/ProviderTile';
-import { SponsorCard, type SponsorCardSite } from './components/SponsorCard';
 import { OAuthFlowDialog } from './components/OAuthFlowDialog';
 import type { DialogHeading } from './components/FlowDialogParts';
 import { VertexImportDialog } from './components/VertexImportDialog';
@@ -27,7 +25,6 @@ import { useVertexImport } from './hooks/useVertexImport';
 import { useOpenCodeGoImport } from './hooks/useOpenCodeGoImport';
 import { useDevinCliImport } from './hooks/useDevinCliImport';
 import {
-  isSponsor,
   OAUTH_PROVIDERS,
   resolveThemedIcon,
   supportsManualCallback,
@@ -104,19 +101,11 @@ export function OAuthPage() {
     onCredentialAdded: flows.recordCredentialAdded,
   });
 
-  const labelOf = (card: OAuthProviderCard) =>
-    card.kind === 'plugin'
-      ? card.title
-      : typeof card.label === 'string'
-        ? card.label
-        : t(card.label.key);
+  const labelOf = (card: OAuthProviderCard) => (card.kind === 'plugin' ? card.title : card.label);
 
   const captionOf = (card: OAuthProviderCard) => {
     if (card.kind === 'plugin') return t('auth_login.method_plugin');
-    const method = t(
-      card.flow === 'device' ? 'auth_login.method_device' : 'auth_login.method_browser'
-    );
-    return card.domain ? `${card.domain} · ${method}` : method;
+    return t(card.flow === 'device' ? 'auth_login.method_device' : 'auth_login.method_browser');
   };
 
   const iconOf = (card: OAuthProviderCard) =>
@@ -131,11 +120,6 @@ export function OAuthPage() {
     icon: iconOf(card),
     flush: card.kind === 'builtin' && card.flush,
   });
-
-  const sponsorOf = (card: OAuthProviderCard) =>
-    isSponsor(card)
-      ? { url: card.sponsor.signUpUrl, label: t('auth_login.kimi_sign_up_button') }
-      : undefined;
 
   const tileStatusLabel = (status: ProviderFlowState['status']) =>
     status === 'waiting'
@@ -215,26 +199,10 @@ export function OAuthPage() {
 
   const dialogCard =
     dialog?.kind === 'oauth' ? providerCards.find((card) => card.id === dialog.id) : undefined;
-  const sponsorCards = providerCards.filter(isSponsor);
-  const regularCards = providerCards.filter((card) => !isSponsor(card));
   const isOpen = (kind: DialogTarget['kind'], id?: string) =>
     dialogOpen && dialog?.kind === kind && (dialog.kind !== 'oauth' || dialog.id === id);
   const isActive = (card: OAuthProviderCard) =>
     isOpen('oauth', card.id) || flows.states[card.id]?.status === 'waiting';
-
-  const sponsorSites: SponsorCardSite[] = sponsorCards.map((card) => {
-    const status = flows.states[card.id]?.status;
-    return {
-      id: card.id,
-      name: labelOf(card),
-      region: t(card.sponsor.siteKey),
-      domain: card.domain ?? '',
-      active: isActive(card),
-      status,
-      statusLabel: tileStatusLabel(status),
-      signUpUrl: card.sponsor.signUpUrl,
-    };
-  });
 
   const waitingCount = Object.values(flows.states).filter(
     (state) => state.status === 'waiting'
@@ -262,25 +230,9 @@ export function OAuthPage() {
         )
       }
     >
-      {sponsorCards.length > 0 && (
-        <Section title={t('auth_login.recommended_provider_section')}>
-          <SponsorCard
-            title={KIMI_DISPLAY_NAME}
-            caption={t('auth_login.sponsor_kimi_caption')}
-            icon={iconOf(sponsorCards[0])}
-            signUpLabel={t('auth_login.sponsor_sign_up')}
-            sites={sponsorSites}
-            onOpen={(siteId) => {
-              const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
-              if (card) openProvider(card);
-            }}
-          />
-        </Section>
-      )}
-
       <Section title={t('auth_login.other_oauth_providers')}>
         <div className="grid gap-2 sm:grid-cols-2">
-          {regularCards.map((card) => {
+          {providerCards.map((card) => {
             const status = flows.states[card.id]?.status;
             return (
               <ProviderTile
@@ -341,7 +293,6 @@ export function OAuthPage() {
           state={flows.states[dialogCard.id] ?? {}}
           text={(suffix) => flows.providerText(dialogCard.id, suffix)}
           supportsCallback={supportsManualCallback(dialogCard)}
-          sponsor={sponsorOf(dialogCard)}
           onStart={() => startFromDialog(dialogCard.id)}
           onAccountNameChange={
             dialogCard.id === CLAUDE_PROVIDER_ID

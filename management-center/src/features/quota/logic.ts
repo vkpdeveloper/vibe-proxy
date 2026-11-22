@@ -11,7 +11,6 @@ import { CODEX_CONFIG } from './providers/codex/data';
 import { CURSOR_CONFIG } from './providers/cursor/data';
 import { DEVIN_CLI_CONFIG } from './providers/devinCli/data';
 import { DEVIN_CONFIG } from './providers/devin/data';
-import { KIMI_CONFIG } from './providers/kimi/data';
 import { META_CONFIG } from './providers/meta/data';
 import { OPENCODE_GO_CONFIG } from './providers/opencodeGo/data';
 import { PLUGIN_CONFIG } from './providers/plugin/data';
@@ -26,7 +25,6 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   cursor: CURSOR_CONFIG.filterFn,
   'devin-cli': DEVIN_CLI_CONFIG.filterFn,
   devin: DEVIN_CONFIG.filterFn,
-  kimi: KIMI_CONFIG.filterFn,
   meta: META_CONFIG.filterFn,
   'opencode-go': OPENCODE_GO_CONFIG.filterFn,
   plugin: PLUGIN_CONFIG.filterFn,

@@ -14,7 +14,6 @@ import type {
   CursorQuotaState,
   DevinCliQuotaState,
   DevinQuotaState,
-  KimiQuotaState,
   MetaQuotaState,
   OpenCodeGoQuotaState,
   PluginQuotaState,
@@ -30,7 +29,6 @@ export type QuotaProviderType =
   | 'cursor'
   | 'devin-cli'
   | 'devin'
-  | 'kimi'
   | 'meta'
   | 'opencode-go'
   | 'plugin'
@@ -44,7 +42,6 @@ export interface QuotaStore {
   cursorQuota: Record<string, CursorQuotaState>;
   devinCliQuota: Record<string, DevinCliQuotaState>;
   devinQuota: Record<string, DevinQuotaState>;
-  kimiQuota: Record<string, KimiQuotaState>;
   metaQuota: Record<string, MetaQuotaState>;
   openCodeGoQuota: Record<string, OpenCodeGoQuotaState>;
   pluginQuota: Record<string, PluginQuotaState>;
@@ -55,7 +52,6 @@ export interface QuotaStore {
   setCursorQuota: (updater: QuotaUpdater<Record<string, CursorQuotaState>>) => void;
   setDevinCliQuota: (updater: QuotaUpdater<Record<string, DevinCliQuotaState>>) => void;
   setDevinQuota: (updater: QuotaUpdater<Record<string, DevinQuotaState>>) => void;
-  setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setMetaQuota: (updater: QuotaUpdater<Record<string, MetaQuotaState>>) => void;
   setOpenCodeGoQuota: (updater: QuotaUpdater<Record<string, OpenCodeGoQuotaState>>) => void;
   setPluginQuota: (updater: QuotaUpdater<Record<string, PluginQuotaState>>) => void;

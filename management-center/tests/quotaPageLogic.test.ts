@@ -23,7 +23,7 @@ const file = (name: string, provider: string, extra: Partial<AuthFileItem> = {})
 const FILES: AuthFileItem[] = [
   file('codex-a.json', 'codex'),
   file('claude-a.json', 'claude'),
-  file('kimi-a.json', 'kimi'),
+  file('meta-a.json', 'meta'),
   file('codex-b.json', 'codex'),
   file('cursor-a.json', 'cursor'),
   file('opencode-go.json', 'opencode-go'),
@@ -79,7 +79,7 @@ describe('classifyQuotaFiles', () => {
       'opencode-go',
       'devin-cli',
       'xai',
-      'kimi',
+      'meta',
     ]);
   });
 });
@@ -95,9 +95,8 @@ describe('buildTabCounts', () => {
       'devin-cli': 1,
       'opencode-go': 1,
       xai: 1,
-      kimi: 1,
       devin: 0,
-      meta: 0,
+      meta: 1,
       plugin: 0,
     });
   });
@@ -270,7 +269,7 @@ describe('sortQuotaEntries', () => {
       resolver({
         'codex-a.json': 300,
         'claude-a.json': 100,
-        'kimi-a.json': 200,
+        'meta-a.json': 200,
         'codex-b.json': 400,
         'cursor-a.json': 250,
         'grok-a.json': 50,
@@ -279,7 +278,7 @@ describe('sortQuotaEntries', () => {
     expect(byName(sorted)).toEqual([
       'grok-a.json',
       'claude-a.json',
-      'kimi-a.json',
+      'meta-a.json',
       'cursor-a.json',
       'codex-a.json',
       'codex-b.json',
@@ -293,10 +292,10 @@ describe('sortQuotaEntries', () => {
     const sorted = sortQuotaEntries(
       entries,
       'soonest',
-      resolver({ 'codex-b.json': 200, 'kimi-a.json': 100 })
+      resolver({ 'codex-b.json': 200, 'meta-a.json': 100 })
     );
     expect(byName(sorted)).toEqual([
-      'kimi-a.json',
+      'meta-a.json',
       'codex-b.json',
       // unresolved tail, in the order classifyQuotaFiles produced
       'claude-a.json',

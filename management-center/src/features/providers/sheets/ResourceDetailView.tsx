@@ -4,13 +4,7 @@ import { Cancel01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
-import {
-  getSponsorProviderDefinition,
-  isMultiProtocolSponsorBrand,
-  sponsorProtocolI18nKey,
-  sponsorProtocolUrl,
-} from '../sponsorDefinitions';
-import type { ProviderResource, SponsorProviderRaw } from '../types';
+import type { ProviderResource } from '../types';
 import { FormSection } from './forms/FormSection';
 
 interface ResourceDetailViewProps {
@@ -32,86 +26,8 @@ function DetailList({ rows }: { rows: Array<[label: string, value: string | numb
   );
 }
 
-const sponsorProtocolEntryKey = (protocol: string): string => {
-  if (protocol === 'claude') return 'anthropicEntries';
-  if (protocol === 'codex') return 'codexEntries';
-  return `${protocol}Entries`;
-};
-
 export function ResourceDetailView({ resource, usageByProvider }: ResourceDetailViewProps) {
   const { t } = useTranslation();
-
-  if (isMultiProtocolSponsorBrand(resource.brand)) {
-    const definition = getSponsorProviderDefinition(resource.brand);
-    const raw = resource.raw as SponsorProviderRaw;
-    const openaiKeyCount = raw.openai.reduce(
-      (count, item) => count + (item.config.apiKeyEntries?.length ?? 0),
-      0
-    );
-    const codexKeyCount = raw.codex.length;
-    const geminiKeyCount = raw.gemini.length;
-    const firstKey =
-      raw.openai
-        .flatMap((item) => item.config.apiKeyEntries ?? [])
-        .find((entry) => entry.apiKey?.trim())?.apiKey ??
-      raw.codex.find((item) => item.config.apiKey?.trim())?.config.apiKey ??
-      raw.claude.find((item) => item.config.apiKey?.trim())?.config.apiKey ??
-      raw.gemini.find((item) => item.config.apiKey?.trim())?.config.apiKey;
-    const baseUrl = definition.resolveBaseUrl(
-      raw.openai[0]?.config.baseUrl ??
-        raw.codex[0]?.config.baseUrl ??
-        raw.claude[0]?.config.baseUrl ??
-        raw.gemini[0]?.config.baseUrl
-    );
-    const protocolUrls = definition.getProtocolUrls(baseUrl);
-    const protocolCounts: Record<string, number> = {
-      openai: openaiKeyCount,
-      codex: codexKeyCount,
-      claude: raw.claude.length,
-      gemini: geminiKeyCount,
-    };
-
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-base font-medium">{resource.name ?? resource.identifier}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t('providersPage.sponsor.detailHint', { provider: definition.displayName })}
-          </p>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          {definition.protocols.map((protocol) => (
-            <div key={protocol} className="flex min-w-0 flex-col gap-1 rounded-xl border px-4 py-3">
-              <span className="text-sm font-medium">
-                {t(`providersPage.sponsor.protocols.${sponsorProtocolI18nKey(protocol)}`)}
-              </span>
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {sponsorProtocolUrl(protocolUrls, protocol)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <DetailList
-          rows={[
-            [
-              t('providersPage.detail.fields.identifier'),
-              firstKey ? maskApiKey(firstKey) : resource.identifier,
-            ],
-            [
-              t('providersPage.detail.fields.prefix'),
-              resource.prefix ?? t('providersPage.status.none'),
-            ],
-            ...definition.protocols.map((protocol): [string, number] => [
-              t(`providersPage.sponsor.${sponsorProtocolEntryKey(protocol)}`),
-              protocolCounts[protocol],
-            ]),
-          ]}
-        />
-      </div>
-    );
-  }
 
   const primary: Array<[string, string]> = [
     ['identifier', resource.identifier],

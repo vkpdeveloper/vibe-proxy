@@ -9,7 +9,6 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
   'opencode-go',
   'devin-cli',
   'xai',
-  'kimi',
   'devin',
   'meta',
   'plugin',

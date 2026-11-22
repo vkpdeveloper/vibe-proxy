@@ -23,7 +23,7 @@ export interface QuotaClassMap {
   quotaResetRelativeSoon: string;
   quotaAmount: string;
   quotaMessage: string;
-  // 套餐 chip 行（codex 命名，claude/antigravity/kimi/xai 复用；
+  // 套餐 chip 行（codex 命名，claude/antigravity/xai 复用；
   // premium=金卡、elite=Pro 20x 液态铂金 —— 均为定稿资产，样式不可改）
   codexPlan: string;
   codexPlanItem: string;

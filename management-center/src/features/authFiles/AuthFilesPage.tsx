@@ -483,7 +483,7 @@ export function AuthFilesPage() {
             <Button
               variant="outline"
               size="lg"
-              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
               onClick={handleRefreshAllCredentials}
               disabled={
                 disableControls ||
@@ -497,16 +497,18 @@ export function AuthFilesPage() {
               <span className="max-sm:hidden">{t('auth_files.refresh_all_button')}</span>
             </Button>
           </Hint>
-          <Button
-            size="lg"
-            className="h-9 px-4 max-sm:w-9 max-sm:px-0"
-            onClick={handleUploadClick}
-            disabled={disableControls || uploading}
-            aria-label={t('auth_files.upload_button')}
-          >
-            <HugeiconsIcon icon={Upload04Icon} strokeWidth={1.75} data-icon="inline-start" />
-            <span className="max-sm:hidden">{t('auth_files.upload_button')}</span>
-          </Button>
+          <Hint label={t('auth_files.upload_button')}>
+            <Button
+              size="lg"
+              className="h-9 px-4 max-sm:w-9 max-sm:px-0!"
+              onClick={handleUploadClick}
+              disabled={disableControls || uploading}
+              aria-label={t('auth_files.upload_button')}
+            >
+              <HugeiconsIcon icon={Upload04Icon} strokeWidth={1.75} data-icon="inline-start" />
+              <span className="max-sm:hidden">{t('auth_files.upload_button')}</span>
+            </Button>
+          </Hint>
         </div>
       }
     >

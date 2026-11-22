@@ -75,7 +75,7 @@
     "custom_connection_label": "伺服器位址",
     "custom_connection_placeholder": "例如: https://example.com:8317",
     "custom_connection_hint": "預設使用目前存取位址，若需要可手動輸入其他位址。",
-    "remember_password_label": "記住密碼",
+    "remember_password_label": "記住金鑰",
     "management_key_label": "管理金鑰",
     "management_key_placeholder": "請輸入管理金鑰",
     "submit_button": "登入",
@@ -113,7 +113,7 @@
     "plugin_store": "插件商店",
     "config_management": "設定面板",
     "logs": "記錄檢視",
-    "system_info": "中心資訊"
+    "system_info": "系統"
   },
   "nav_groups": {
     "operate": "運行",
@@ -157,8 +157,8 @@
     "stat_credentials": "憑證",
     "stat_credentials_hint": "{{active}} 個可用 · {{disabled}} 個未參與排程",
     "stat_credentials_empty": "找不到憑證檔案",
-    "stat_provider_keys": "供應商金鑰",
-    "stat_provider_keys_hint": "所有品牌已設定的 API Key 總數",
+    "stat_spend_today": "今日花費",
+    "stat_spend_today_hint": "所有用戶端金鑰合計",
     "stat_models": "模型",
     "stat_models_hint": "透過代理端點提供的模型",
     "traffic_eyebrow": "即時流量",
@@ -962,7 +962,7 @@
     "devin_callback_state_mismatch": "此回呼不屬於目前的 Devin 登入。請使用本次授權的最終 URL，不要重複使用舊回呼。",
     "recommended_provider_section": "推薦提供商",
     "recommended_provider_badge": "推薦提供商",
-    "other_oauth_providers": "其他 OAuth 提供商",
+    "other_oauth_providers": "OAuth 提供商",
     "other_login_methods": "其他登入方式",
     "codex_oauth_title": "Codex OAuth",
     "codex_oauth_button": "開始 Codex 登入",
@@ -1209,7 +1209,8 @@
     "hidden_lines": "已隱藏 {{count}} 行",
     "loaded_lines": "已載入 {{count}} 行",
     "filtered_lines": "已篩選 {{count}} 行",
-    "hide_management_logs": "隱藏 {{prefix}} 記錄",
+    "hide_management_logs": "隱藏管理面板請求",
+    "show_line_details": "顯示 IP 與原始檔",
     "show_raw_logs": "顯示原始記錄",
     "show_raw_logs_hint": "直接顯示原始記錄文字，方便多行複製",
     "search_placeholder": "搜尋記錄內容或關鍵字",
@@ -1979,7 +1980,7 @@
     "empty_src_desc": "此插件選單未提供可嵌入的頁面位址。"
   },
   "system_info": {
-    "title": "管理中心資訊",
+    "title": "系統",
     "about_title": "VProxy",
     "tab_about": "關於",
     "models_title": "可用模型清單",
@@ -1993,7 +1994,12 @@
     "version_is_latest": "目前已是最新版本",
     "version_check_error": "檢查更新失敗",
     "version_current_missing": "未取得到伺服器版本號，暫無法比對",
-    "version_unknown": "未知",
+    "version_unknown": "未記錄",
+    "dashboard_version": "面板版本",
+    "dashboard_built": "面板建置時間",
+    "proxy_version": "代理版本",
+    "proxy_built": "代理建置時間",
+    "connection": "連線",
     "quick_links_title": "快速連結",
     "quick_links_desc": "存取專案儲存庫和文件，取得協助和更新。",
     "link_main_repo": "主程式儲存庫",
@@ -2052,11 +2058,6 @@
     "collapse": "收起",
     "subtitle": "CLI Proxy API 管理控制台",
     "auth_files_count": "驗證檔案：{{count}} 個"
-  },
-  "footer": {
-    "api_version": "CLI Proxy API 版本",
-    "build_date": "建置時間",
-    "version": "管理中心版本"
   },
   "providersPage": {
     "behavior": {
@@ -2196,7 +2197,8 @@
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
       "cliProfileTag": "CLI 指紋",
-      "empty": "尚未新增設定,點擊右上角新增。",
+      "empty": "尚無提供商金鑰",
+      "noMatches": "沒有符合的資源",
       "filterPlaceholder": "搜尋金鑰、位址、前綴…",
       "description": "在 {{route}} 下管理資源"
     },

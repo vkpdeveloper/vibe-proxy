@@ -349,29 +349,6 @@ describe('buildTimelineLane', () => {
     ]);
   });
 
-  test('kimi: derives remaining from raw used/limit counts', () => {
-    const lane = buildTimelineLane({
-      ...base,
-      provider: 'kimi',
-      quota: {
-        status: 'success',
-        rows: [
-          { label: 'Daily', used: 540, limit: 1000, resetAtMs: 5000, periodHours: 24 },
-          { label: 'Monthly', used: 8100, limit: 30000, resetAtMs: 9000, periodHours: 720 },
-        ],
-      },
-      // A fortnight fits the daily window but not the monthly one.
-      maxPeriodHours: 14 * 24,
-    });
-
-    expect(lane.anchorMs).toBe(5000);
-    expect(lane.remaining).toBe(46);
-    expect(lane.limits).toEqual([
-      { label: 'Daily', remaining: 46 },
-      { label: 'Monthly', remaining: 73 },
-    ]);
-  });
-
   test('antigravity anchors on its bucket reset, with remaining from the fraction', () => {
     const lane = buildTimelineLane({
       ...base,

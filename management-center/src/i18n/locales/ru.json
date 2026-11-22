@@ -75,7 +75,7 @@
     "custom_connection_label": "Адрес сервера",
     "custom_connection_placeholder": "Напр.: https://example.com:8317",
     "custom_connection_hint": "По умолчанию используется текущий URL. При необходимости замените его.",
-    "remember_password_label": "Запомнить пароль",
+    "remember_password_label": "Запомнить ключ",
     "management_key_label": "Ключ управления",
     "management_key_placeholder": "Введите ключ управления",
     "submit_button": "Войти",
@@ -113,7 +113,7 @@
     "plugin_store": "Магазин плагинов",
     "config_management": "Панель конфигурации",
     "logs": "Просмотр логов",
-    "system_info": "Информация системы"
+    "system_info": "Система"
   },
   "nav_groups": {
     "operate": "Работа",
@@ -156,8 +156,8 @@
     "stat_credentials": "Учётные данные",
     "stat_credentials_hint": "{{active}} активны · {{disabled}} не используются",
     "stat_credentials_empty": "Файлы учётных данных не найдены",
-    "stat_provider_keys": "Ключи провайдеров",
-    "stat_provider_keys_hint": "Всего настроенных API-ключей по всем брендам",
+    "stat_spend_today": "Расходы за сегодня",
+    "stat_spend_today_hint": "По всем клиентским ключам",
     "stat_models": "Модели",
     "stat_models_hint": "Доступны через эндпоинт прокси",
     "traffic_eyebrow": "Живой трафик",
@@ -967,7 +967,7 @@
     "devin_callback_state_mismatch": "Этот обратный вызов не относится к текущему входу в Devin. Используйте конечный URL этой попытки, а не старый URL.",
     "recommended_provider_section": "Рекомендуемый провайдер",
     "recommended_provider_badge": "Рекомендуемый провайдер",
-    "other_oauth_providers": "Другие провайдеры OAuth",
+    "other_oauth_providers": "Провайдеры OAuth",
     "other_login_methods": "Другие способы входа",
     "codex_oauth_title": "Codex OAuth",
     "codex_oauth_button": "Начать вход Codex",
@@ -1186,7 +1186,8 @@
     "hidden_lines": "Скрыто: {{count}} строк",
     "loaded_lines": "Загружено: {{count}} строк",
     "filtered_lines": "Отфильтровано: {{count}} строк",
-    "hide_management_logs": "Скрыть журналы {{prefix}}",
+    "hide_management_logs": "Скрыть запросы панели управления",
+    "show_line_details": "Показывать IP и исходный файл",
     "show_raw_logs": "Показать исходные журналы",
     "show_raw_logs_hint": "Показать текст журнала без обработки для удобного копирования в несколько строк",
     "search_placeholder": "Искать по содержимому или ключевым словам",
@@ -1947,7 +1948,7 @@
     "gate_step3_hint": "Введите точный идентификатор, показанный выше, чтобы включить установку."
   },
   "system_info": {
-    "title": "Информация о центре управления",
+    "title": "Система",
     "about_title": "VProxy",
     "tab_about": "О программе",
     "models_title": "Доступные модели",
@@ -1961,7 +1962,12 @@
     "version_is_latest": "Установлена последняя версия",
     "version_check_error": "Не удалось проверить обновление",
     "version_current_missing": "Версия сервера недоступна; сравнение невозможно",
-    "version_unknown": "Неизвестно",
+    "version_unknown": "Не указано",
+    "dashboard_version": "Версия панели",
+    "dashboard_built": "Сборка панели",
+    "proxy_version": "Версия прокси",
+    "proxy_built": "Сборка прокси",
+    "connection": "Подключение",
     "quick_links_title": "Быстрые ссылки",
     "quick_links_desc": "Доступ к репозиториям проекта и документации для помощи и обновлений.",
     "link_main_repo": "Основной репозиторий",
@@ -2020,11 +2026,6 @@
     "collapse": "Свернуть",
     "subtitle": "Консоль управления CLI Proxy API",
     "auth_files_count": "Файлов аутентификации: {{count}}"
-  },
-  "footer": {
-    "api_version": "Версия CLI Proxy API",
-    "build_date": "Время сборки",
-    "version": "Версия интерфейса управления"
   },
   "providersPage": {
     "behavior": {
@@ -2164,7 +2165,8 @@
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
       "cliProfileTag": "CLI-профиль",
-      "empty": "Нет ресурсов, нажмите \"Создать\".",
+      "empty": "Ключей провайдеров пока нет",
+      "noMatches": "Нет подходящих ресурсов",
       "filterPlaceholder": "Поиск по ключам, URL, префиксам…",
       "description": "Управление ресурсами {{route}}"
     },

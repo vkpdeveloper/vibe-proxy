@@ -15,6 +15,7 @@ import { DashboardSpeed01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { authFilesApi } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Hint } from '@/components/ui/tooltip';
 import {
   Empty,
   EmptyContent,
@@ -156,7 +157,6 @@ export function QuotaPage() {
   const cursorQuota = useQuotaStore((state) => state.cursorQuota);
   const devinCliQuota = useQuotaStore((state) => state.devinCliQuota);
   const devinQuota = useQuotaStore((state) => state.devinQuota);
-  const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const metaQuota = useQuotaStore((state) => state.metaQuota);
   const openCodeGoQuota = useQuotaStore((state) => state.openCodeGoQuota);
   const pluginQuota = useQuotaStore((state) => state.pluginQuota);
@@ -171,7 +171,6 @@ export function QuotaPage() {
         cursor: cursorQuota,
         'devin-cli': devinCliQuota,
         devin: devinQuota,
-        kimi: kimiQuota,
         meta: metaQuota,
         'opencode-go': openCodeGoQuota,
         plugin: pluginQuota,
@@ -184,7 +183,6 @@ export function QuotaPage() {
       cursorQuota,
       devinCliQuota,
       devinQuota,
-      kimiQuota,
       metaQuota,
       openCodeGoQuota,
       pluginQuota,
@@ -377,16 +375,18 @@ export function QuotaPage() {
               {t('quota_management.meta_attention', { count: attentionCount })}
             </Badge>
           )}
-          <Button
-            size="lg"
-            className="h-9 px-4"
-            onClick={handleRefreshAll}
-            disabled={disableControls || loading || batchLoading}
-            aria-label={t('quota_management.refresh_all_credentials')}
-          >
-            <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-            <span className="max-sm:hidden">{t('quota_management.refresh_all_credentials')}</span>
-          </Button>
+          <Hint label={t('quota_management.refresh_all_credentials')}>
+            <Button
+              size="lg"
+              className="h-9 px-4 max-sm:w-9 max-sm:px-0!"
+              onClick={handleRefreshAll}
+              disabled={disableControls || loading || batchLoading}
+              aria-label={t('quota_management.refresh_all_credentials')}
+            >
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+              <span className="max-sm:hidden">{t('quota_management.refresh_all_credentials')}</span>
+            </Button>
+          </Hint>
         </div>
       }
     >

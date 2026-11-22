@@ -1,12 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
 import { Section } from '@/components/layout/Page';
-import { Button } from '@/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import type { ProviderRecentUsageMap } from '@/components/providers/utils';
-import { getKimiAffiliateUrl } from '../kimi';
-import { getSponsorProviderDefinition } from '../sponsorDefinitions';
 import type { ProviderGroup, ProviderResource, ProviderSortBy, SortDir } from '../types';
 import { ProviderLogo } from './ProviderLogo';
 import { ProviderResourceList } from './ProviderResourceList';
@@ -35,10 +30,9 @@ interface ProviderResourcePanelProps {
   onEdit: (resource: ProviderResource) => void;
   onDelete: (resource: ProviderResource) => void;
   onToggleDisabled?: (resource: ProviderResource, disabled: boolean) => void;
-  onCreate: () => void;
 }
 
-/** One provider: its logo and sign-up link, the toolbar and its credentials. */
+/** One provider: its logo, the toolbar and its credentials. */
 export function ProviderResourcePanel({
   group,
   filter,
@@ -52,15 +46,8 @@ export function ProviderResourcePanel({
   onEdit,
   onDelete,
   onToggleDisabled,
-  onCreate,
 }: ProviderResourcePanelProps) {
-  const { t, i18n } = useTranslation();
-  const registrationUrl =
-    group.id === 'kimi'
-      ? getKimiAffiliateUrl(i18n.resolvedLanguage ?? i18n.language)
-      : group.id === 'fennoAI' || group.id === 'qiniuCloud'
-        ? getSponsorProviderDefinition(group.id).affiliateUrl
-        : null;
+  const { t } = useTranslation();
   const activeCount = group.resources.filter((resource) => !resource.disabled).length;
 
   return (
@@ -76,24 +63,6 @@ export function ProviderResourcePanel({
         </span>
       }
     >
-      {registrationUrl ? (
-        <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button asChild variant="outline" size="sm">
-            <a href={registrationUrl} target="_blank" rel="noreferrer">
-              {t(
-                group.id === 'kimi'
-                  ? 'providersPage.sponsor.registerNow'
-                  : 'providersPage.sponsor.registerLink'
-              )}
-              <HugeiconsIcon icon={LinkSquare02Icon} strokeWidth={1.75} data-icon="inline-end" />
-            </a>
-          </Button>
-          {group.id === 'kimi' ? (
-            <p className="text-sm text-muted-foreground">{t('providersPage.sponsor.kimiPromo')}</p>
-          ) : null}
-        </div>
-      ) : null}
-
       <ProviderResourceToolbar
         key={group.id}
         filter={filter}
@@ -103,13 +72,7 @@ export function ProviderResourcePanel({
 
       {filteredResources.length === 0 ? (
         <Empty className="rounded-xl border border-dashed py-10">
-          <EmptyDescription>{t('providersPage.table.empty')}</EmptyDescription>
-          <EmptyContent>
-            <Button type="button" variant="outline" onClick={onCreate} disabled={disableMutations}>
-              <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
-              {t('providersPage.actions.new')}
-            </Button>
-          </EmptyContent>
+          <EmptyDescription>{t('providersPage.table.noMatches')}</EmptyDescription>
         </Empty>
       ) : (
         <ProviderResourceList

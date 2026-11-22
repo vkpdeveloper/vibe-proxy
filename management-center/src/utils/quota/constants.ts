@@ -46,10 +46,6 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#f1f1f1', text: '#111111', border: '1px solid #d4d4d4' },
     dark: { bg: '#252525', text: '#f7f7f7', border: '1px solid #484848' },
   },
-  kimi: {
-    light: { bg: '#dce8ff', text: '#0560cf' },
-    dark: { bg: '#003880', text: '#70b5ff' },
-  },
   antigravity: {
     light: { bg: '#e0f7fa', text: '#006064' },
     dark: { bg: '#004d40', text: '#80deea' },
@@ -193,14 +189,6 @@ export const OPENCODE_GO_USAGE_URL = 'https://opencode.ai/zen/go/v1/usage';
 export const OPENCODE_GO_REQUEST_HEADERS = {
   Authorization: 'Bearer $TOKEN$',
   Accept: 'application/json',
-};
-
-// Kimi API configuration
-export const KIMI_USAGE_URL = 'https://api.kimi.com/coding/v1/usages';
-export const KIMI_AI_USAGE_URL = 'https://api.kimi.ai/coding/v1/usages';
-
-export const KIMI_REQUEST_HEADERS = {
-  Authorization: 'Bearer $TOKEN$',
 };
 
 // xAI/Grok API configuration

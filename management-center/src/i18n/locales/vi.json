@@ -75,7 +75,7 @@
     "custom_connection_label": "Địa chỉ máy chủ",
     "custom_connection_placeholder": "Ví dụ: https://example.com:8317",
     "custom_connection_hint": "Mặc định dùng URL hiện tại. Ghi đè tại đây nếu cần.",
-    "remember_password_label": "Ghi nhớ mật khẩu",
+    "remember_password_label": "Ghi nhớ key",
     "management_key_label": "Key quản lý",
     "management_key_placeholder": "Nhập key quản lý",
     "submit_button": "Đăng nhập",
@@ -111,7 +111,7 @@
     "plugin_store": "Cửa hàng Plugin",
     "config_management": "Bảng cấu hình",
     "logs": "Trình xem Log",
-    "system_info": "Thông tin Trung tâm Quản lý",
+    "system_info": "Hệ thống",
     "client_api_keys": "Client API Keys",
     "usage": "Usage & Spend"
   },
@@ -157,8 +157,8 @@
     "stat_credentials": "Credential",
     "stat_credentials_hint": "{{active}} đang hoạt động · {{disabled}} không phục vụ",
     "stat_credentials_empty": "Chưa tìm thấy file credential nào",
-    "stat_provider_keys": "Key provider",
-    "stat_provider_keys_hint": "API key được cấu hình trên tất cả các thương hiệu",
+    "stat_spend_today": "Chi tiêu hôm nay",
+    "stat_spend_today_hint": "Trên tất cả key client",
     "stat_models": "Model",
     "stat_models_hint": "Được phục vụ qua proxy endpoint",
     "traffic_eyebrow": "Lưu lượng trực tiếp",
@@ -810,7 +810,7 @@
   "auth_login": {
     "recommended_provider_section": "Provider đề xuất",
     "recommended_provider_badge": "Provider đề xuất",
-    "other_oauth_providers": "Provider OAuth khác",
+    "other_oauth_providers": "Provider OAuth",
     "other_login_methods": "Phương thức đăng nhập khác",
     "codex_oauth_title": "Codex OAuth",
     "codex_oauth_button": "Bắt đầu đăng nhập Codex",
@@ -1022,7 +1022,8 @@
     "hidden_lines": "Bị ẩn: {{count}} dòng",
     "loaded_lines": "Đã tải: {{count}} dòng",
     "filtered_lines": "Đã lọc: {{count}} dòng",
-    "hide_management_logs": "Ẩn log {{prefix}}",
+    "hide_management_logs": "Ẩn yêu cầu của bảng điều khiển",
+    "show_line_details": "Hiện IP và tệp nguồn",
     "show_raw_logs": "Hiện Log thô",
     "show_raw_logs_hint": "Hiện văn bản log gốc để dễ sao chép nhiều dòng",
     "search_placeholder": "Tìm log theo nội dung hoặc từ khóa",
@@ -1816,7 +1817,7 @@
     "empty_src_desc": "Menu plugin này không cung cấp URL trang nhúng được."
   },
   "system_info": {
-    "title": "Thông tin Trung tâm Quản lý",
+    "title": "Hệ thống",
     "about_title": "VProxy",
     "tab_about": "Giới thiệu",
     "models_title": "Model khả dụng",
@@ -1830,7 +1831,12 @@
     "version_is_latest": "Bạn đang dùng phiên bản mới nhất",
     "version_check_error": "Kiểm tra cập nhật thất bại",
     "version_current_missing": "Không có phiên bản máy chủ; không thể so sánh",
-    "version_unknown": "Không rõ",
+    "version_unknown": "Chưa ghi nhận",
+    "dashboard_version": "Phiên bản bảng điều khiển",
+    "dashboard_built": "Bảng điều khiển được build lúc",
+    "proxy_version": "Phiên bản proxy",
+    "proxy_built": "Proxy được build lúc",
+    "connection": "Kết nối",
     "quick_links_title": "Liên kết nhanh",
     "quick_links_desc": "Truy cập repository dự án và tài liệu để được trợ giúp và cập nhật.",
     "link_main_repo": "Repository chính",
@@ -1890,11 +1896,6 @@
     "subtitle": "Bảng điều khiển CLI Proxy API",
     "auth_files_count": "File xác thực: {{count}}"
   },
-  "footer": {
-    "api_version": "Phiên bản CLI Proxy API",
-    "build_date": "Thời gian build",
-    "version": "Phiên bản giao diện quản lý"
-  },
   "providersPage": {
     "header": {
       "title": "AI Provider",
@@ -1952,7 +1953,8 @@
       },
       "websocketsTag": "WebSocket",
       "cloakTag": "Cloak",
-      "empty": "Chưa có tài nguyên nào, nhấn \"Mới\" để thêm.",
+      "empty": "Chưa có khóa provider",
+      "noMatches": "Không có tài nguyên phù hợp",
       "filterPlaceholder": "Tìm key, URL, tiền tố…",
       "description": "Quản lý tài nguyên trong {{route}}",
       "cliProfileTag": "Hồ sơ CLI"

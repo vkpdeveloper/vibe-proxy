@@ -75,7 +75,7 @@
     "custom_connection_label": "서버 주소",
     "custom_connection_placeholder": "예: https://example.com:8317",
     "custom_connection_hint": "기본적으로 현재 URL이 사용됩니다. 필요한 경우 여기서 재정의하세요.",
-    "remember_password_label": "비밀번호 저장",
+    "remember_password_label": "키 저장",
     "management_key_label": "관리 키",
     "management_key_placeholder": "관리 키를 입력하세요",
     "submit_button": "로그인",
@@ -111,7 +111,7 @@
     "plugin_store": "플러그인 스토어",
     "config_management": "설정 패널",
     "logs": "로그 뷰어",
-    "system_info": "관리 센터 정보",
+    "system_info": "시스템",
     "client_api_keys": "Client API Keys",
     "usage": "Usage & Spend"
   },
@@ -157,8 +157,8 @@
     "stat_credentials": "자격 증명",
     "stat_credentials_hint": "활성 {{active}}개 · 비제공 {{disabled}}개",
     "stat_credentials_empty": "자격 증명 파일을 찾을 수 없습니다",
-    "stat_provider_keys": "공급자 키",
-    "stat_provider_keys_hint": "모든 브랜드에 설정된 API 키",
+    "stat_spend_today": "오늘 지출",
+    "stat_spend_today_hint": "모든 클라이언트 키 합계",
     "stat_models": "모델",
     "stat_models_hint": "프록시 엔드포인트를 통해 제공됨",
     "traffic_eyebrow": "실시간 트래픽",
@@ -871,7 +871,7 @@
     "devin_callback_state_mismatch": "이 콜백은 현재 Devin 로그인에 해당하지 않습니다. 이전 콜백을 재사용하지 말고 이번 시도의 최종 URL을 사용하세요.",
     "recommended_provider_section": "추천 공급자",
     "recommended_provider_badge": "추천 공급자",
-    "other_oauth_providers": "기타 OAuth 공급자",
+    "other_oauth_providers": "OAuth 공급자",
     "other_login_methods": "기타 로그인 방식",
     "codex_oauth_title": "Codex OAuth",
     "codex_oauth_button": "Codex 로그인 시작",
@@ -1090,7 +1090,8 @@
     "hidden_lines": "숨김: {{count}}줄",
     "loaded_lines": "로드됨: {{count}}줄",
     "filtered_lines": "필터링됨: {{count}}줄",
-    "hide_management_logs": "{{prefix}} 로그 숨기기",
+    "hide_management_logs": "대시보드 요청 숨기기",
+    "show_line_details": "IP 및 소스 파일 표시",
     "show_raw_logs": "원본 로그 표시",
     "show_raw_logs_hint": "여러 줄을 쉽게 복사할 수 있도록 원본 로그 텍스트를 표시합니다",
     "search_placeholder": "내용 또는 키워드로 로그 검색",
@@ -1860,7 +1861,7 @@
     "empty_src_desc": "이 플러그인 메뉴는 포함 가능한 페이지 URL을 제공하지 않습니다."
   },
   "system_info": {
-    "title": "관리 센터 정보",
+    "title": "시스템",
     "about_title": "VProxy",
     "tab_about": "정보",
     "models_title": "사용 가능한 모델",
@@ -1874,7 +1875,12 @@
     "version_is_latest": "최신 버전을 사용하고 있습니다",
     "version_check_error": "업데이트 확인에 실패했습니다",
     "version_current_missing": "서버 버전을 확인할 수 없어 비교할 수 없습니다",
-    "version_unknown": "알 수 없음",
+    "version_unknown": "기록 없음",
+    "dashboard_version": "대시보드 버전",
+    "dashboard_built": "대시보드 빌드 시간",
+    "proxy_version": "프록시 버전",
+    "proxy_built": "프록시 빌드 시간",
+    "connection": "연결",
     "quick_links_title": "빠른 링크",
     "quick_links_desc": "도움말과 업데이트를 확인하려면 프로젝트 저장소 및 문서를 참조하세요.",
     "link_main_repo": "메인 저장소",
@@ -1933,11 +1939,6 @@
     "collapse": "접기",
     "subtitle": "CLI Proxy API 콘솔",
     "auth_files_count": "인증 파일: {{count}}개"
-  },
-  "footer": {
-    "api_version": "CLI Proxy API 버전",
-    "build_date": "빌드 시간",
-    "version": "관리 UI 버전"
   },
   "providersPage": {
     "behavior": {
@@ -2077,7 +2078,8 @@
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
       "cliProfileTag": "CLI 프로필",
-      "empty": "아직 리소스가 없습니다. \"새로 만들기\"를 클릭하여 추가하세요.",
+      "empty": "아직 공급자 키가 없습니다",
+      "noMatches": "일치하는 리소스가 없습니다",
       "filterPlaceholder": "키, URL, 접두사 검색…",
       "description": "{{route}}의 리소스를 관리합니다."
     },

@@ -162,10 +162,6 @@ export function collectQuotaRowInstants(
     return collectRows(buckets, 'bucket');
   }
 
-  if (provider === 'kimi') {
-    return collectRows((quota as { rows?: WindowLike[] }).rows ?? [], 'row');
-  }
-
   if (provider === 'meta') {
     const windows =
       (

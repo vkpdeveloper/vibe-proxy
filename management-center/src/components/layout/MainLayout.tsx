@@ -241,11 +241,7 @@ export function MainLayout() {
   const currentDestination = destinations.find((entry) => isActivePath(entry.path, pathname));
   const pageName =
     currentDestination?.label ??
-    (pathname.startsWith('/ai-providers')
-      ? t('nav.ai_providers')
-      : pathname.startsWith('/quick-start')
-        ? t('nav.quick_start')
-        : '');
+    (pathname.startsWith('/ai-providers') ? t('nav.ai_providers') : '');
 
   // The rail item to highlight. On phones, anything outside the bottom bar lights up "More".
   const railItem = currentDestination?.id;

@@ -15,7 +15,6 @@ import { CodexQuotaBody } from '@/features/quota/providers/codex/CodexQuotaBody'
 import { ClaudeQuotaBody } from '@/features/quota/providers/claude/ClaudeQuotaBody';
 import { CursorQuotaBody } from '@/features/quota/providers/cursor/CursorQuotaBody';
 import { DevinCliQuotaBody } from '@/features/quota/providers/devinCli/DevinCliQuotaBody';
-import { KimiQuotaBody } from '@/features/quota/providers/kimi/KimiQuotaBody';
 import { XaiQuotaBody } from '@/features/quota/providers/xai/XaiQuotaBody';
 import {
   getResetDisplayFormats,
@@ -31,7 +30,6 @@ import type {
   CodexQuotaState,
   CursorQuotaState,
   DevinCliQuotaState,
-  KimiQuotaState,
   XaiQuotaState,
 } from '@/types';
 
@@ -213,31 +211,6 @@ describe('CodexQuotaBody', () => {
 
     expect(markup).toContain('08-02 18:00');
     expect(markup).not.toContain('quotaResetCycle');
-  });
-});
-
-describe('KimiQuotaBody', () => {
-  test('renders the concrete reset time as a cycling control', () => {
-    const resetAtMs = now + 3 * HOUR_MS;
-    const quota: KimiQuotaState = {
-      status: 'success',
-      rows: [
-        {
-          id: 'summary',
-          label: 'Weekly limit',
-          used: 34,
-          limit: 100,
-          resetHint: '3h',
-          resetAtMs,
-          periodHours: 168,
-        },
-      ],
-    };
-    const markup = renderToStaticMarkup(createElement(KimiQuotaBody, { quota, classes }));
-
-    expect(markup).toContain('in 3 hours');
-    expect(markup).toContain('quotaResetCycle');
-    expect(markup).not.toContain('resets in 3h');
   });
 });
 

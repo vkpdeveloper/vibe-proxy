@@ -283,15 +283,6 @@ interface ResetCreditLike {
   expiresAt?: string;
 }
 
-interface KimiRowLike {
-  label?: string;
-  labelKey?: string;
-  used: number;
-  limit: number;
-  resetAtMs?: number | null;
-  periodHours?: number | null;
-}
-
 interface XaiBillingLike {
   periodType?: string;
   usagePercent?: number | null;
@@ -508,28 +499,6 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
       remaining: remainingOf(chosen),
       limits: buckets
         .map((bucket) => ({ label: bucket.label ?? '', remaining: remainingOf(bucket) }))
-        .filter((limit): limit is TimelineLimit => limit.remaining !== null),
-    };
-  }
-
-  if (provider === 'kimi') {
-    const rows = ((quota as { rows?: KimiRowLike[] }).rows ?? []).filter(
-      (row) => typeof row.resetAtMs === 'number'
-    );
-    const chosen = pickLaneWindow(rows, maxPeriodHours);
-    if (!chosen) return empty;
-
-    // Kimi reports raw counts; remaining is derived.
-    const remainingOf = (row: KimiRowLike) =>
-      row.limit > 0 ? clampPercent(Math.round(((row.limit - row.used) / row.limit) * 100)) : null;
-
-    return {
-      ...empty,
-      anchorMs: chosen.resetAtMs ?? null,
-      periodHours: chosen.periodHours ?? null,
-      remaining: remainingOf(chosen),
-      limits: rows
-        .map((row) => ({ label: row.label ?? '', remaining: remainingOf(row) }))
         .filter((limit): limit is TimelineLimit => limit.remaining !== null),
     };
   }

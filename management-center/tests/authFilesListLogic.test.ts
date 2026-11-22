@@ -39,7 +39,7 @@ describe('buildWildcardSearch', () => {
 describe('resolveAuthFileQuotaType', () => {
   test('resolves each supported provider while the all tab is selected', () => {
     expect(resolveAuthFileQuotaType(authFile({ type: 'codex' }), 'all')).toBe('codex');
-    expect(resolveAuthFileQuotaType(authFile({ type: 'kimi' }), 'all')).toBe('kimi');
+    expect(resolveAuthFileQuotaType(authFile({ type: 'xai' }), 'all')).toBe('xai');
   });
 
   test('does not expose quota for unsupported or mismatched providers', () => {

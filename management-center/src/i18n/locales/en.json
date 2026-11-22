@@ -75,7 +75,7 @@
     "custom_connection_label": "Server address",
     "custom_connection_placeholder": "Eg: https://example.com:8317",
     "custom_connection_hint": "By default the current URL is used. Override it here if needed.",
-    "remember_password_label": "Remember password",
+    "remember_password_label": "Remember key",
     "management_key_label": "Management key",
     "management_key_placeholder": "Enter the management key",
     "submit_button": "Login",
@@ -113,7 +113,7 @@
     "plugin_store": "Plugin Store",
     "config_management": "Config Panel",
     "logs": "Logs Viewer",
-    "system_info": "Management Center Info"
+    "system_info": "System"
   },
   "nav_groups": {
     "operate": "Operate",
@@ -157,8 +157,8 @@
     "stat_credentials": "Credentials",
     "stat_credentials_hint": "{{active}} active · {{disabled}} not serving",
     "stat_credentials_empty": "No credential files found",
-    "stat_provider_keys": "Provider keys",
-    "stat_provider_keys_hint": "API keys configured across all brands",
+    "stat_spend_today": "Spend today",
+    "stat_spend_today_hint": "Across all client keys",
     "stat_models": "Models",
     "stat_models_hint": "Served through the proxy endpoint",
     "traffic_eyebrow": "Live traffic",
@@ -964,7 +964,7 @@
     "devin_callback_state_mismatch": "This callback does not belong to the current Devin login. Use the final URL from this attempt; do not reuse an old callback.",
     "recommended_provider_section": "Recommended provider",
     "recommended_provider_badge": "Recommended provider",
-    "other_oauth_providers": "Other OAuth providers",
+    "other_oauth_providers": "OAuth providers",
     "other_login_methods": "Other login methods",
     "codex_oauth_title": "Codex OAuth",
     "codex_oauth_button": "Start Codex Login",
@@ -1183,7 +1183,8 @@
     "hidden_lines": "Hidden: {{count}} lines",
     "loaded_lines": "Loaded: {{count}} lines",
     "filtered_lines": "Filtered: {{count}} lines",
-    "hide_management_logs": "Hide {{prefix}} logs",
+    "hide_management_logs": "Hide dashboard requests",
+    "show_line_details": "Show IP and source file",
     "show_raw_logs": "Show Raw Logs",
     "show_raw_logs_hint": "Show original log text for easier multi-line copy",
     "search_placeholder": "Search logs by content or keyword",
@@ -1953,7 +1954,7 @@
     "empty_src_desc": "This plugin menu does not provide an embeddable page URL."
   },
   "system_info": {
-    "title": "Management Center Info",
+    "title": "System",
     "about_title": "VProxy",
     "tab_about": "About",
     "models_title": "Available Models",
@@ -1967,7 +1968,12 @@
     "version_is_latest": "You are on the latest version",
     "version_check_error": "Update check failed",
     "version_current_missing": "Server version is unavailable; cannot compare",
-    "version_unknown": "Unknown",
+    "version_unknown": "Not recorded",
+    "dashboard_version": "Dashboard version",
+    "dashboard_built": "Dashboard built",
+    "proxy_version": "Proxy version",
+    "proxy_built": "Proxy built",
+    "connection": "Connection",
     "quick_links_title": "Quick Links",
     "quick_links_desc": "Access project repositories and documentation for help and updates.",
     "link_main_repo": "Main Repository",
@@ -2026,11 +2032,6 @@
     "collapse": "Collapse",
     "subtitle": "CLI Proxy API Console",
     "auth_files_count": "Authentication files: {{count}}"
-  },
-  "footer": {
-    "api_version": "CLI Proxy API Version",
-    "build_date": "Build Time",
-    "version": "Management UI Version"
   },
   "providersPage": {
     "behavior": {
@@ -2170,7 +2171,8 @@
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
       "cliProfileTag": "CLI Profile",
-      "empty": "No resources yet, click \"New\" to add.",
+      "empty": "No provider keys yet",
+      "noMatches": "No matching resources",
       "filterPlaceholder": "Search keys, URLs, prefixes…",
       "description": "Manage resources under {{route}}"
     },

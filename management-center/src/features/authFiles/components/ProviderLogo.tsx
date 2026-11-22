@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/stores';
-import { getAuthFileIcon, getTypeLabel, isThemeSurfaceIconProvider } from '../constants';
+import { getAuthFileIcon, getTypeLabel } from '../constants';
 
 /** A provider's mark on a small tile, like VM Bridge's provider logos. */
 export function ProviderLogo({ type, className }: { type: string; className?: string }) {
@@ -11,9 +11,7 @@ export function ProviderLogo({ type, className }: { type: string; className?: st
   return (
     <span
       className={cn(
-        'grid size-6 shrink-0 place-items-center overflow-hidden rounded-md ring-1 ring-white/10',
-        // Kimi's mark is drawn for a light surface.
-        isThemeSurfaceIconProvider(type) ? 'bg-white' : 'bg-secondary',
+        'grid size-6 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary ring-1 ring-white/10',
         className
       )}
     >

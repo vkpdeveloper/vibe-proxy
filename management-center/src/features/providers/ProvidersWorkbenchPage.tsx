@@ -6,6 +6,13 @@ import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import { Add01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { Page, type Tab } from '@/components/layout/Page';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
@@ -17,13 +24,11 @@ import {
 } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { PROVIDER_LOGOS } from './brandLogos';
+import { PROVIDER_BRAND_ORDER } from './descriptors';
+import { ProviderLogo } from './components/ProviderLogo';
 import { ProviderResourcePanel } from './components/ProviderResourcePanel';
 import type { ProviderPanelControls } from './components/ProviderResourcePanel';
-import { SponsorQuickStartPanel } from './components/SponsorQuickStartPanel';
 import { ProviderSheet, type ProviderSheetHandle } from './sheets/ProviderSheet';
-import { APIKEY_FUN_DISPLAY_NAME } from './sponsor';
-import { isMultiProtocolSponsorBrand } from './sponsorDefinitions';
-import { isSponsorPartialMutationError } from './sponsorMutationRecovery';
 import { useProviderWorkbench } from './useProviderWorkbench';
 import {
   getProviderFilterState,
@@ -34,9 +39,6 @@ import {
 } from './uiState';
 import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
 import { Hint } from '@/components/ui/tooltip';
-
-/** Sign-up partners come after the regular providers in the tab list. */
-const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = ['fennoAI', 'qiniuCloud'];
 
 /**
  * Page tabs take a Hugeicons icon, which is a list of SVG elements. A single `image` element
@@ -54,10 +56,6 @@ interface SheetState {
   brand: ProviderBrand;
   mode: SheetMode;
   resource: ProviderResource | null;
-}
-
-interface ProvidersWorkbenchPageProps {
-  fixedBrand?: ProviderBrand;
 }
 
 const formatDateTime = (iso: string, locale?: string) => {
@@ -97,9 +95,6 @@ const getResourceRecentSuccess = (
   resource: ProviderResource,
   usageByProvider: ProviderRecentUsageMap
 ): number => {
-  if (isMultiProtocolSponsorBrand(resource.brand)) {
-    return 0;
-  }
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderRecentWindowStats(resource.raw as OpenAIProviderConfig, usageByProvider)
       .success;
@@ -112,7 +107,7 @@ const getResourceRecentSuccess = (
   ).success;
 };
 
-export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPageProps = {}) {
+export function ProvidersWorkbenchPage() {
   const { t, i18n } = useTranslation();
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
   const { showNotification, showConfirmation } = useNotificationStore();
@@ -167,20 +162,14 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     [persistUiState]
   );
 
-  const allGroups = useMemo(() => workbench.snapshot?.groups ?? [], [workbench.snapshot]);
+  // Only provider types with something configured get a tab; "New" adds any type.
   const groups = useMemo(
-    () =>
-      fixedBrand
-        ? allGroups.filter((group) => group.id === fixedBrand)
-        : allGroups.filter((group) => group.id !== 'apikeyFun'),
-    [allGroups, fixedBrand]
+    () => (workbench.snapshot?.groups ?? []).filter((group) => group.resources.length > 0),
+    [workbench.snapshot]
   );
-  const firstVisibleBrand = groups[0]?.id ?? fixedBrand ?? 'gemini';
-  const activeBrand =
-    fixedBrand ??
-    (groups.some((group) => group.id === uiState.activeBrand)
-      ? uiState.activeBrand
-      : firstVisibleBrand);
+  const activeBrand = groups.some((group) => group.id === uiState.activeBrand)
+    ? uiState.activeBrand
+    : (groups[0]?.id ?? uiState.activeBrand);
   const activeFilterState = getProviderFilterState(uiState, activeBrand);
   const filter = activeFilterState.filter;
   const providerSortBy = activeFilterState.sortBy;
@@ -264,29 +253,20 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     [availableModels, providerSortBy, providerSortDir, selectedModels, updateActiveFilterState]
   );
 
-  const tabs = useMemo<Tab<ProviderBrand>[]>(() => {
-    const regular = groups.filter((g) => !QUICK_FILL_BRAND_ORDER.includes(g.id));
-    const quickFill = QUICK_FILL_BRAND_ORDER.flatMap((id) => groups.filter((g) => g.id === id));
-    return [...regular, ...quickFill].map((group) => ({
-      id: group.id,
-      label: t(`providersPage.providerNames.${group.id}`),
-      icon: logoIcon(group.id),
-    }));
-  }, [groups, t]);
-  const quickStartResource = useMemo(
-    () => (fixedBrand === 'apikeyFun' && activeGroup ? (activeGroup.resources[0] ?? null) : null),
-    [activeGroup, fixedBrand]
+  const tabs = useMemo<Tab<ProviderBrand>[]>(
+    () =>
+      groups.map((group) => ({
+        id: group.id,
+        label: t(`providersPage.providerNames.${group.id}`),
+        icon: logoIcon(group.id),
+      })),
+    [groups, t]
   );
 
   const updatedAtLabel = workbench.snapshot
     ? formatDateTime(workbench.snapshot.fetchedAt, i18n.language)
     : t('providersPage.modelCatalog.notLoaded');
-  const pageTitle =
-    fixedBrand === 'apikeyFun'
-      ? quickStartResource
-        ? APIKEY_FUN_DISPLAY_NAME
-        : t('nav.quick_start')
-      : t('providersPage.header.title');
+  const pageTitle = t('providersPage.header.title');
   const errorBanner = workbench.errorMessage ? (
     <p
       role="alert"
@@ -296,10 +276,14 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     </p>
   ) : null;
 
-  const openCreate = useCallback(() => {
-    const brand = activeBrand;
-    setSheetState({ open: true, brand, mode: 'create', resource: null });
-  }, [activeBrand]);
+  // Picking a type also selects its tab, so the new resource is in view once it is saved.
+  const openCreate = useCallback(
+    (brand: ProviderBrand) => {
+      setActiveBrand(brand);
+      setSheetState({ open: true, brand, mode: 'create', resource: null });
+    },
+    [setActiveBrand]
+  );
 
   const openView = useCallback((resource: ProviderResource) => {
     setSheetState({
@@ -336,10 +320,6 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
             await workbench.deleteProvider(resource);
             showNotification(t('providersPage.toast.deleted'), 'success');
           } catch (err) {
-            if (isSponsorPartialMutationError(err)) {
-              showNotification(t('providersPage.sponsor.partialMutationWarning'), 'warning');
-              return;
-            }
             const msg = err instanceof Error ? err.message : String(err);
             showNotification(`${t('notification.delete_failed')}: ${msg}`, 'error');
           }
@@ -358,10 +338,6 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
           'success'
         );
       } catch (err) {
-        if (isSponsorPartialMutationError(err)) {
-          showNotification(t('providersPage.sponsor.partialMutationWarning'), 'warning');
-          return;
-        }
         const msg = err instanceof Error ? err.message : String(err);
         showNotification(`${t('providersPage.toast.toggleFailed')}: ${msg}`, 'error');
       }
@@ -394,6 +370,29 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     });
   };
 
+  const newMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" size="lg" className="h-9 px-4" disabled={disableMutations}>
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+          {t('providersPage.actions.new')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-auto min-w-52">
+        {PROVIDER_BRAND_ORDER.map((brand) => (
+          <DropdownMenuItem
+            key={brand}
+            className="gap-2.5 py-1.5"
+            onSelect={() => openCreate(brand)}
+          >
+            <ProviderLogo brand={brand} className="size-5" />
+            {t(`providersPage.providerNames.${brand}`)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const refreshLabel = workbench.isFetching
     ? t('providersPage.actions.syncing')
     : t('providersPage.actions.refresh');
@@ -413,18 +412,7 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
           <span className="max-sm:hidden">{refreshLabel}</span>
         </Button>
       </Hint>
-      {!fixedBrand ? (
-        <Button
-          type="button"
-          size="lg"
-          className="h-9 px-4"
-          onClick={openCreate}
-          disabled={!activeGroup || disableMutations}
-        >
-          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
-          {t('providersPage.actions.new')}
-        </Button>
-      ) : null}
+      {activeGroup ? newMenu : null}
     </div>
   );
 
@@ -440,31 +428,17 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
     );
   }
 
-  if (!activeGroup) {
-    return (
-      <Page title={pageTitle} actions={actions}>
-        {errorBanner}
-      </Page>
-    );
-  }
-
   return (
     <>
-      <Page
-        title={pageTitle}
-        actions={actions}
-        tabs={fixedBrand ? undefined : tabs}
-        tab={activeGroup.id}
-        onTab={selectBrand}
-      >
-        {errorBanner}
-        {fixedBrand === 'apikeyFun' ? (
-          <SponsorQuickStartPanel
-            resource={quickStartResource}
-            workbench={workbench}
-            mutationDisabled={disableMutations}
-          />
-        ) : (
+      {activeGroup ? (
+        <Page
+          title={pageTitle}
+          actions={actions}
+          tabs={tabs}
+          tab={activeGroup.id}
+          onTab={selectBrand}
+        >
+          {errorBanner}
           <ProviderResourcePanel
             group={activeGroup}
             filter={filter}
@@ -478,26 +452,33 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
             onEdit={openEdit}
             onDelete={handleDelete}
             onToggleDisabled={handleToggleDisabled}
-            onCreate={openCreate}
           />
-        )}
-      </Page>
+        </Page>
+      ) : (
+        <Page title={pageTitle} actions={actions}>
+          {errorBanner}
+          {workbench.snapshot ? (
+            <Empty className="rounded-xl border border-dashed py-10">
+              <EmptyDescription>{t('providersPage.table.empty')}</EmptyDescription>
+              <EmptyContent>{newMenu}</EmptyContent>
+            </Empty>
+          ) : null}
+        </Page>
+      )}
 
-      {!fixedBrand ? (
-        <ProviderSheet
-          ref={sheetRef}
-          state={sheetState}
-          onClose={closeSheet}
-          onSwitchToEdit={() => {
-            setSheetState((s) => (s.resource ? { ...s, mode: 'edit' } : s));
-          }}
-          workbench={workbench}
-          onCreated={handleCreated}
-          onUpdated={handleUpdated}
-          mutationDisabled={disableMutations}
-          usageByProvider={usageByProvider}
-        />
-      ) : null}
+      <ProviderSheet
+        ref={sheetRef}
+        state={sheetState}
+        onClose={closeSheet}
+        onSwitchToEdit={() => {
+          setSheetState((s) => (s.resource ? { ...s, mode: 'edit' } : s));
+        }}
+        workbench={workbench}
+        onCreated={handleCreated}
+        onUpdated={handleUpdated}
+        mutationDisabled={disableMutations}
+        usageByProvider={usageByProvider}
+      />
     </>
   );
 }
