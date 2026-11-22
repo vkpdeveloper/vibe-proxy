@@ -25,8 +25,10 @@ export const quotaClasses: QuotaClassMap = {
   codexPlanValue: 'text-foreground',
   premiumPlanValue: 'text-warning',
   elitePlanValue: 'text-primary',
-  codexResetCredits: 'flex flex-col divide-y rounded-lg border',
-  codexResetCreditsTitle: 'px-3 py-2 text-xs text-muted-foreground',
+  codexResetCredits: 'group/resets flex flex-col divide-y rounded-lg border',
+  // Closed, the summary is the only visible child, so drop the divider it would draw above the hidden rows.
+  codexResetCreditsTitle:
+    'flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [details:not([open])>&]:border-b-0 [&::-webkit-details-marker]:hidden',
   codexResetCreditRow: 'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm',
   codexResetCreditRowSoon: 'bg-warning/5',
   codexResetCreditLabel: 'min-w-0 flex-1 basis-48',

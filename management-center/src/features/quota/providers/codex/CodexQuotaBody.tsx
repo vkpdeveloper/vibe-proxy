@@ -20,6 +20,7 @@ import { formatDateTimeValue } from '@/utils/format';
 import { useNow } from '@/hooks/useNow';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
+import { ResetExpirySection } from '../../components/ResetExpirySection';
 import { collectQuotaRowInstants, pickUrgentRowId, resetCreditRowId } from '../../resetSchedule';
 import type { QuotaBodyProps, QuotaClassMap } from '../../types';
 
@@ -128,10 +129,10 @@ export function CodexQuotaBody({
         </div>
       )}
       {rateLimitResetCredits.length > 0 ? (
-        <div className={classes.codexResetCredits}>
-          <div className={classes.codexResetCreditsTitle}>
-            {t('codex_quota.reset_credits_expiry_label', { timezone: resolveTimeZoneLabel() })}
-          </div>
+        <ResetExpirySection
+          classes={classes}
+          title={t('codex_quota.reset_credits_expiry_label', { timezone: resolveTimeZoneLabel() })}
+        >
           {rateLimitResetCredits.map((credit, index) => {
             const expiresAtMs = parseIsoToMs(credit.expiresAt);
             const expiresDisplay = buildResetDisplay(
@@ -175,7 +176,7 @@ export function CodexQuotaBody({
               </div>
             );
           })}
-        </div>
+        </ResetExpirySection>
       ) : rateLimitResetCreditsError ? (
         <div className={classes.codexResetCreditsError}>
           {t('codex_quota.reset_credits_expiry_failed', {

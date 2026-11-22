@@ -4,6 +4,7 @@ import type { AnthropicResetGrant } from '@/services/api/claudeResetGrants';
 import { buildResetDisplay, parseIsoToMs } from '@/utils/quota';
 import { resolveTimeZoneLabel } from '@/utils/time/timezone';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
+import { ResetExpirySection } from '../../components/ResetExpirySection';
 import type { QuotaClassMap } from '../../types';
 
 interface ClaudeResetGrantDetailsProps {
@@ -30,10 +31,10 @@ export function ClaudeResetGrantDetails({
   if (remaining.length === 0) return null;
 
   return (
-    <div className={classes.codexResetCredits}>
-      <div className={classes.codexResetCreditsTitle}>
-        {t('claude_reset.expiry_title', { timezone: resolveTimeZoneLabel() })}
-      </div>
+    <ResetExpirySection
+      classes={classes}
+      title={t('claude_reset.expiry_title', { timezone: resolveTimeZoneLabel() })}
+    >
       {remaining.map((grant, index) => {
         const display = buildResetDisplay(
           null,
@@ -68,6 +69,6 @@ export function ClaudeResetGrantDetails({
           </div>
         );
       })}
-    </div>
+    </ResetExpirySection>
   );
 }
