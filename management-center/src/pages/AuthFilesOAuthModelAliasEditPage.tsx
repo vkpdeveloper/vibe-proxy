@@ -405,7 +405,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
             <Button
               variant="ghost"
               size="lg"
-              className="h-9 px-3 max-sm:w-9 max-sm:px-0"
+              className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
               onClick={handleBack}
               aria-label={t('common.back')}
             >

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
@@ -23,11 +23,13 @@ import {
 } from '@/components/ui/item';
 import { Page, Section } from '@/components/layout/Page';
 import { cn } from '@/lib/utils';
+import { clientApiKeysApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { formatCompactNumber, formatDateValue, formatPercent } from '@/utils/format';
 import { useDashboardOverview } from './hooks/useDashboardOverview';
 import { Meter } from './components/Meter';
+import { formatUsd, spendToday } from './components/spend';
 import { Sparkline } from './components/Sparkline';
 import { ThroughputChart } from './components/ThroughputChart';
 import { providerLabel, splitWindowMinutes, toneForSuccessRate, type MeterTone } from './utils';
@@ -83,7 +85,27 @@ export function DashboardPage() {
   const { connected, config, counts, traffic, providers, credentials, refresh } =
     useDashboardOverview();
 
-  useHeaderRefresh(refresh, connected);
+  // Same source as the Client API Keys page, so both show the same number.
+  const [spend, setSpend] = useState<number | null>(null);
+  const loadSpend = useCallback(async () => {
+    if (!connected) return;
+    try {
+      const { keys } = await clientApiKeysApi.list();
+      setSpend(spendToday(keys));
+    } catch {
+      setSpend(null);
+    }
+  }, [connected]);
+
+  useEffect(() => {
+    void loadSpend();
+  }, [loadSpend]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([refresh(), loadSpend()]);
+  }, [refresh, loadSpend]);
+
+  useHeaderRefresh(refreshAll, connected);
 
   const windowLabel = useMemo(() => {
     if (traffic.windowMinutes <= 0) return DASH;
@@ -257,9 +279,9 @@ export function DashboardPage() {
             )}
           </Stat>
           <Stat
-            label={t('dashboard.stat_provider_keys')}
-            value={counts.providerKeys === null ? DASH : counts.providerKeys.toLocaleString()}
-            hint={t('dashboard.stat_provider_keys_hint')}
+            label={t('dashboard.stat_spend_today')}
+            value={spend === null ? DASH : formatUsd(spend)}
+            hint={t('dashboard.stat_spend_today_hint')}
           />
           <Stat
             label={t('dashboard.stat_models')}

@@ -36,8 +36,12 @@ export function Page<T extends string>({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-6 sm:px-10 sm:py-8">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      {/* The top bar already names the page, so this stays a slim row. A fixed minimum height
+          keeps pages with and without actions the same height. */}
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-5 py-2 sm:px-10">
+        <h1 className="min-w-0 truncate text-base font-semibold tracking-tight sm:text-lg">
+          {title}
+        </h1>
         {actions}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">

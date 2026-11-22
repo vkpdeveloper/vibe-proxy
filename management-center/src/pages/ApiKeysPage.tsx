@@ -64,9 +64,11 @@ import {
 import { Private } from '@/components/ui/private';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Hint } from '@/components/ui/tooltip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Page } from '@/components/layout/Page';
 import { Meter } from '@/features/dashboard/components/Meter';
+import { formatUsd, spendToday } from '@/features/dashboard/components/spend';
 import { useAction } from '@/hooks/use-action';
 import {
   clientApiKeysApi,
@@ -83,12 +85,6 @@ import {
 import { namedModels } from '@/utils/modelNames';
 
 const emptyOptions: ClientApiKeyOptions = { providers: [], models: [] };
-const money = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
 
 type NumberField =
@@ -179,7 +175,6 @@ export function ApiKeysPage() {
     );
   }, [form.allowed_providers, modelSearch, options.models]);
 
-  const totalToday = keys.reduce((sum, key) => sum + (key.today_usd || 0), 0);
   const activeKeys = keys.filter((key) => !key.disabled).length;
   const blockedKeys = keys.filter((key) => key.blocked).length;
 
@@ -276,7 +271,7 @@ export function ApiKeysPage() {
       value: blockedKeys.toLocaleString(),
       dot: blockedKeys > 0 && 'bg-destructive',
     },
-    { label: 'Spend today', value: money.format(totalToday) },
+    { label: 'Spend today', value: formatUsd(spendToday(keys)) },
   ];
 
   return (
@@ -285,19 +280,28 @@ export function ApiKeysPage() {
         title={t('nav.client_api_keys')}
         actions={
           <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon-lg"
-              aria-label="Refresh"
-              disabled={loading}
-              onClick={() => void load()}
-            >
-              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
-            </Button>
-            <Button size="lg" className="h-9 px-3" onClick={openCreate}>
-              <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
-              Generate key
-            </Button>
+            <Hint label={t('common.refresh')}>
+              <Button
+                variant="outline"
+                size="icon-lg"
+                aria-label={t('common.refresh')}
+                disabled={loading}
+                onClick={() => void load()}
+              >
+                <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+              </Button>
+            </Hint>
+            <Hint label="Generate key">
+              <Button
+                size="lg"
+                className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
+                aria-label="Generate key"
+                onClick={openCreate}
+              >
+                <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
+                <span className="max-sm:hidden">Generate key</span>
+              </Button>
+            </Hint>
           </div>
         }
       >
@@ -410,11 +414,11 @@ export function ApiKeysPage() {
                     </ItemContent>
                     <div className="flex w-full flex-col gap-1.5 pl-6.5 sm:w-36 sm:items-end sm:pl-0">
                       <span className="font-mono text-sm tabular-nums">
-                        {money.format(key.today_usd)}
+                        {formatUsd(key.today_usd)}
                         {key.daily_limit_usd > 0 && (
                           <span className="text-xs text-faint">
                             {' '}
-                            / {money.format(key.daily_limit_usd)}
+                            / {formatUsd(key.daily_limit_usd)}
                           </span>
                         )}
                       </span>
