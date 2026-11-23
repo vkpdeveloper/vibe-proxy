@@ -5,7 +5,6 @@ import { NotificationContainer } from '@/components/common/NotificationContainer
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/router/ProtectedRoute';
-import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useLanguageStore, useThemeStore } from '@/stores';
 
@@ -58,7 +57,6 @@ function App() {
   return (
     <TooltipProvider delayDuration={150}>
       <RouterProvider router={router} />
-      <Toaster position="bottom-right" />
     </TooltipProvider>
   );
 }

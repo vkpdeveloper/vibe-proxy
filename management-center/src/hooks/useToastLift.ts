@@ -2,7 +2,7 @@ import { useLayoutEffect, type RefObject } from 'react';
 
 /**
  * Phone toasts dock just above the bottom nav, where floating action bars also sit. While `active`,
- * this sets --toast-lift (read by the Toaster's phone offset) to the bar's height plus a gap, so
+ * this sets --toast-lift (read by the toasts' phone offset) to the bar's height plus a gap, so
  * toasts stack above the bar instead of covering it.
  */
 export function useToastLift(ref: RefObject<HTMLElement | null>, active: boolean) {

@@ -62,7 +62,7 @@ export function focusSheetOnPhone(event: Event) {
  * dialog, which would otherwise close it.
  */
 export function ignoreToastPress(event: Event) {
-  if (event.target instanceof Element && event.target.closest('[data-sonner-toaster]')) {
+  if (event.target instanceof Element && event.target.closest('[data-toaster]')) {
     event.preventDefault();
   }
 }
