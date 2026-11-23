@@ -5,6 +5,18 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import {
+  PHONE_SHEET_BODY,
+  PHONE_SHEET_CLOSE,
+  PHONE_SHEET_DIALOG,
+  PHONE_SHEET_FOOTER,
+  PHONE_SHEET_HEADER,
+  PHONE_SHEET_OVERLAY,
+  PHONE_SHEET_TITLE,
+  SHEET_GRABBER,
+  focusSheetOnPhone,
+  ignoreToastPress,
+} from '@/components/ui/phone-sheet';
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -31,6 +43,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         'fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        PHONE_SHEET_OVERLAY,
         className
       )}
       {...props}
@@ -42,6 +55,8 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -51,16 +66,32 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event);
+          focusSheetOnPhone(event);
+        }}
+        onInteractOutside={(event) => {
+          ignoreToastPress(event);
+          onInteractOutside?.(event);
+        }}
         className={cn(
           'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          PHONE_SHEET_DIALOG,
           className
         )}
         {...props}
       >
-        {children}
+        <span aria-hidden className={cn('sm:hidden', SHEET_GRABBER)} />
+        <div data-slot="dialog-body" className={PHONE_SHEET_BODY}>
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
+            <Button
+              variant="ghost"
+              className={cn('absolute top-2 right-2', PHONE_SHEET_CLOSE)}
+              size="icon-sm"
+            >
               <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
               <span className="sr-only">Close</span>
             </Button>
@@ -73,7 +104,11 @@ function DialogContent({
 
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <div data-slot="dialog-header" className={cn('flex flex-col gap-2', className)} {...props} />
+    <div
+      data-slot="dialog-header"
+      className={cn('flex flex-col gap-2', PHONE_SHEET_HEADER, className)}
+      {...props}
+    />
   );
 }
 
@@ -89,15 +124,19 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        '-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end',
+        '-mx-4 -mb-4 flex flex-wrap gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:justify-end',
+        PHONE_SHEET_FOOTER,
         className
       )}
       {...props}
     >
       {children}
+      {/* Phones already have the sheet's X. */}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline" className="max-sm:hidden">
+            Close
+          </Button>
         </DialogPrimitive.Close>
       )}
     </div>
@@ -108,7 +147,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn('text-base leading-none font-medium', className)}
+      className={cn('text-base leading-none font-medium', PHONE_SHEET_TITLE, className)}
       {...props}
     />
   );

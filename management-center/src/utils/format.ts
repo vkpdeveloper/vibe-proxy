@@ -40,7 +40,8 @@ export function formatFileSize(bytes: number): string {
 const COMPACT_SUFFIXES = ['', 'K', 'M', 'B', 'T'] as const;
 
 /**
- * 将较大的计数压缩为紧凑形式（1284 → 1.3K），用于统计卡片与图表标签
+ * Shortens a count to three significant digits (1284 → 1.28K, 1.15e9 → 1.15B). Every page that
+ * shortens counts uses this, so the same number reads the same everywhere.
  */
 export function formatCompactNumber(value: number): string {
   if (!Number.isFinite(value)) return '0';
@@ -54,8 +55,8 @@ export function formatCompactNumber(value: number): string {
     tier += 1;
   }
 
-  // 三位有效数字以内保留一位小数；Number() 顺带去掉 "1.0K" 这类冗余尾巴
-  let rendered = tier === 0 ? Math.round(scaled) : Number(scaled.toFixed(scaled < 100 ? 1 : 0));
+  // Number() drops trailing zeros such as "1.00K".
+  let rendered = tier === 0 ? Math.round(scaled) : Number(scaled.toPrecision(3));
 
   // 四舍五入后又进位到 1000（如 999,999 → 1000K）时再升一档
   if (rendered >= 1000 && tier < COMPACT_SUFFIXES.length - 1) {
@@ -118,14 +119,16 @@ export function parseDateValue(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** The app's one date style, e.g. "Nov 22, 2026" (device clock and the UI language). */
 export function formatDateValue(value: unknown, locale?: string): string {
   const date = parseDateValue(value);
   if (!date) return '';
-  return locale ? date.toLocaleDateString(locale) : date.toLocaleDateString();
+  return date.toLocaleDateString(locale, { dateStyle: 'medium' });
 }
 
+/** The app's one date-and-time style, e.g. "Nov 22, 2026, 8:28 PM". */
 export function formatDateTimeValue(value: unknown, locale?: string): string {
   const date = parseDateValue(value);
   if (!date) return '';
-  return locale ? date.toLocaleString(locale) : date.toLocaleString();
+  return date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }

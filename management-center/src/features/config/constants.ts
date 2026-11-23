@@ -5,7 +5,6 @@ import {
   Key01Icon,
   NoteIcon,
   Shield01Icon,
-  SlidersHorizontalIcon,
   WaveIcon,
 } from '@hugeicons/core-free-icons';
 import type { VisualConfigFieldPath } from '@/types/visualConfig';
@@ -14,8 +13,8 @@ import type { VisualSectionId } from './searchIndex';
 /** 编辑模式：可视化表单 or YAML 源码。 */
 export type ConfigEditorMode = 'visual' | 'source';
 
-/** 顶部 tabs：'common'（常用，原简单模式的继任者）+ 6 个正典分区。 */
-export type ConfigTabId = 'common' | VisualSectionId;
+/** One tab per section. Each field lives in exactly one tab, so one edit marks one tab unsaved. */
+export type ConfigTabId = VisualSectionId;
 
 export const CONFIG_SECTION_IDS = [
   'connectivity',
@@ -26,9 +25,9 @@ export const CONFIG_SECTION_IDS = [
   'payload',
 ] as const satisfies readonly VisualSectionId[];
 
-export const CONFIG_TAB_IDS: readonly ConfigTabId[] = ['common', ...CONFIG_SECTION_IDS];
+export const CONFIG_TAB_IDS: readonly ConfigTabId[] = CONFIG_SECTION_IDS;
 
-/** 分区序号（01–06）。常用 tab 是别名视图，不占序号。 */
+/** 分区序号（01–06）。 */
 export const SECTION_INDEX_LABELS: Record<VisualSectionId, string> = {
   connectivity: '01',
   network: '02',
@@ -39,7 +38,6 @@ export const SECTION_INDEX_LABELS: Record<VisualSectionId, string> = {
 };
 
 export const CONFIG_TAB_ICONS: Record<ConfigTabId, IconSvgElement> = {
-  common: SlidersHorizontalIcon,
   connectivity: Key01Icon,
   network: GlobalIcon,
   logging: NoteIcon,
@@ -47,16 +45,6 @@ export const CONFIG_TAB_ICONS: Record<ConfigTabId, IconSvgElement> = {
   advanced: Shield01Icon,
   payload: CodeIcon,
 };
-
-/** 常用 tab 的 6 个字段（原简单模式），渲染源与正典分区共享（fields/sharedFields.tsx）。 */
-export const COMMON_FIELD_IDS = [
-  'host',
-  'port',
-  'apiKeys',
-  'proxyUrl',
-  'debug',
-  'loggingToFile',
-] as const;
 
 /**
  * 每个分区承载的校验字段路径（tab 错误徽章的分桶依据）。

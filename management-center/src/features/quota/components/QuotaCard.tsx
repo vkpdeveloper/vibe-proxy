@@ -5,9 +5,19 @@
 
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { RefreshIcon } from '@hugeicons/core-free-icons';
+import {
+  ArrowReloadHorizontalIcon,
+  MoreHorizontalIcon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Private } from '@/components/ui/private';
 import { useNow } from '@/hooks/useNow';
 import type {
@@ -125,10 +135,10 @@ export function QuotaCard({
     ? routingSelection.model
       ? t('auth_files.routing_selected_hint', {
           model: routingSelection.model,
-          time: formatQuotaResetTime(routingSelection.expires_at),
+          time: formatQuotaResetTime(routingSelection.expires_at, i18n.resolvedLanguage),
         })
       : t('auth_files.routing_selected_hint_no_model', {
-          time: formatQuotaResetTime(routingSelection.expires_at),
+          time: formatQuotaResetTime(routingSelection.expires_at, i18n.resolvedLanguage),
         })
     : undefined;
   const claudeReset = useClaudeResetGrants(
@@ -149,14 +159,9 @@ export function QuotaCard({
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
-  // Claude banked resets join the plan chip row; their expiry list follows it.
+  // Saved resets live only in the fold-out after the plan row, which carries their count and
+  // renders nothing when there are none.
   const showClaudeReset = entry.type === 'claude' && status === 'success';
-  const claudePlanItems = showClaudeReset ? (
-    <span className={quotaClasses.codexPlanItem}>
-      <span className={quotaClasses.codexPlanLabel}>{t('claude_reset.remaining')}</span>
-      <span className={quotaClasses.codexPlanValue}>{claudeReset.count ?? '--'}</span>
-    </span>
-  ) : undefined;
   const claudeAfterPlan = showClaudeReset ? (
     <>
       <ClaudeResetGrantDetails
@@ -178,11 +183,38 @@ export function QuotaCard({
     quota !== undefined &&
     Boolean(adapter.canResetQuota?.(quota));
   const showActions = status !== 'idle' || storedSnapshot !== null;
+  // Desktop shows these as buttons; a phone lists them in the card menu.
+  const resetActions = [
+    ...(entry.type === 'claude'
+      ? [
+          {
+            id: 'claude',
+            label: t(`claude_reset.${claudeReset.buttonLabel}`),
+            disabled: claudeReset.blocked,
+            run: () => claudeReset.confirm(),
+          },
+        ]
+      : []),
+    ...(showReset
+      ? [
+          {
+            id: 'quota',
+            label: t('codex_quota.reset_button'),
+            disabled: !canRefresh || loading || resetting,
+            run: () => onReset(),
+          },
+        ]
+      : []),
+  ];
+  const refreshDisabled = isQuotaRefreshDisabled(
+    canRefresh,
+    loading,
+    resetting || claudeReset.busy
+  );
   const body = quota ? (
     <adapter.Body
       quota={quota}
       classes={quotaClasses}
-      planItems={claudePlanItems}
       afterPlan={claudeAfterPlan}
       onUseReset={showReset ? onReset : undefined}
       useResetDisabled={!canRefresh || loading || resetting}
@@ -190,13 +222,14 @@ export function QuotaCard({
   ) : null;
 
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ProviderLogo type={providerType} className="size-9 rounded-lg" />
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 max-sm:gap-3">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 max-sm:flex-nowrap">
+        <ProviderLogo type={providerType} className="size-9 rounded-lg max-sm:size-8" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            {/* Clip only sideways: Private's vertical padding is its 40px tap target. */}
             <span
-              className="min-w-0 truncate"
+              className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap"
               title={identity.kind === 'email' ? undefined : displayIdentity}
             >
               {identity.kind === 'email' ? <Private>{displayIdentity}</Private> : displayIdentity}
@@ -211,37 +244,24 @@ export function QuotaCard({
           <span className="text-xs text-muted-foreground">{typeLabel}</span>
         </div>
         {showActions && (
-          <div className="ml-auto flex items-center gap-1.5">
-            {entry.type === 'claude' && (
+          <div className="ml-auto flex items-center gap-1.5 max-sm:hidden">
+            {resetActions.map((action) => (
               <Button
+                key={action.id}
                 variant="outline"
                 size="sm"
-                disabled={claudeReset.blocked}
-                onClick={() => claudeReset.confirm()}
+                disabled={action.disabled}
+                onClick={action.run}
               >
-                {t(`claude_reset.${claudeReset.buttonLabel}`)}
+                {action.label}
               </Button>
-            )}
-            {showReset && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onReset()}
-                disabled={!canRefresh || loading || resetting}
-              >
-                {t('codex_quota.reset_button')}
-              </Button>
-            )}
+            ))}
             <Hint label={t('auth_files.quota_refresh_hint')}>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 onClick={onRefresh}
-                disabled={isQuotaRefreshDisabled(
-                  canRefresh,
-                  loading,
-                  resetting || claudeReset.busy
-                )}
+                disabled={refreshDisabled}
                 aria-label={t('auth_files.quota_refresh_single')}
               >
                 <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
@@ -249,6 +269,32 @@ export function QuotaCard({
             </Hint>
           </div>
         )}
+        {/* Every phone card gets the same single menu, so headers line up across providers.
+            The negative margins keep the 40px tap target from making the header taller. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-my-1.5 -mr-2 ml-auto size-10 sm:hidden"
+              aria-label={t('common.more')}
+            >
+              <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" collisionPadding={16} className="w-auto min-w-44">
+            <DropdownMenuItem disabled={refreshDisabled} onSelect={onRefresh}>
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+              {t('auth_files.quota_refresh_single')}
+            </DropdownMenuItem>
+            {resetActions.map((action) => (
+              <DropdownMenuItem key={action.id} disabled={action.disabled} onSelect={action.run}>
+                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} strokeWidth={1.75} />
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {status === 'idle' && storedSnapshot ? (
@@ -290,11 +336,11 @@ export function QuotaCard({
               </div>
             );
           })}
-          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-faint">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-faint max-sm:font-sans max-sm:text-muted-foreground">
             {storedSnapshot.fetchedAt && (
               <span>
                 {t('quota_management.snapshot_updated', {
-                  time: formatQuotaResetTime(storedSnapshot.fetchedAt),
+                  time: formatQuotaResetTime(storedSnapshot.fetchedAt, i18n.resolvedLanguage),
                 })}
               </span>
             )}

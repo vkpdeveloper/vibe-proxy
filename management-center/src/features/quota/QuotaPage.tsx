@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { DashboardSpeed01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+import { DashboardSpeed01Icon, RefreshIcon, SortByDown02Icon } from '@hugeicons/core-free-icons';
 import { authFilesApi } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,13 +34,14 @@ import {
 import { Page } from '@/components/layout/Page';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useInterval } from '@/hooks/useInterval';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNow } from '@/hooks/useNow';
 import { useAuthStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
-import { ProviderFilter } from '@/features/authFiles/components/ProviderFilter';
 import { ListPagination, SearchField } from '@/features/authFiles/components/ListControls';
 import { QuotaCard } from './components/QuotaCard';
+import { ProviderFilter } from '@/features/authFiles/components/ProviderFilter';
 import {
   QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
@@ -56,12 +57,14 @@ import {
   filterEntriesBySearch,
   hasStoredQuotaCapacity,
   hasStoredQuotaError,
+  lowestStoredRemainingPercent,
   paginate,
   resolveXaiGrokBotWindow,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
 import { nextRecoveryMs } from './resetSchedule';
+import { lowestRemainingPercent } from './quotaTimelineModel';
 import { readSavedQuotaCard, resolveQuotaCard, startQuotaDetailsSync } from './quotaDetails';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
@@ -91,6 +94,7 @@ export function QuotaPage() {
   const [search, setSearch] = useState('');
 
   const disableControls = connectionStatus !== 'connected';
+  const isPhone = useMediaQuery('(max-width: 639px)');
 
   /* ---------- 文件列表 ---------- */
 
@@ -194,8 +198,8 @@ export function QuotaPage() {
 
   // 只在「最快恢复优先」下订阅分钟时钟。默认序下不门控的话，pageItems 每分钟
   // 换一次身份，会反复空转下面那个「刷新全部」的 loading 下降沿 effect。
-  const tick = useNow(sortMode !== 'default');
-  const sortNow = sortMode === 'default' ? 0 : tick;
+  const tick = useNow(sortMode === 'soonest');
+  const sortNow = sortMode === 'soonest' ? tick : 0;
 
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
@@ -233,14 +237,20 @@ export function QuotaPage() {
     [quotaByType]
   );
 
-  const resolveNextRecovery = useCallback(
-    (entry: QuotaFileEntry) => nextRecoveryMs(entry.type, getQuota(entry), sortNow),
-    [getQuota, sortNow]
+  const resolveSortKey = useCallback(
+    (entry: QuotaFileEntry) => {
+      if (sortMode === 'soonest') return nextRecoveryMs(entry.type, getQuota(entry), sortNow);
+      // Cards that were never refreshed here still show the server's stored snapshot.
+      return (
+        lowestRemainingPercent(entry.type, getQuota(entry)) ?? lowestStoredRemainingPercent(entry)
+      );
+    },
+    [getQuota, sortMode, sortNow]
   );
   // 排序在分页之前：否则「最快恢复」只在当前页内成立。
   const sortedEntries = useMemo(
-    () => sortQuotaEntries(filteredEntries, sortMode, resolveNextRecovery),
-    [filteredEntries, sortMode, resolveNextRecovery]
+    () => sortQuotaEntries(filteredEntries, sortMode, resolveSortKey),
+    [filteredEntries, sortMode, resolveSortKey]
   );
 
   const { pageItems, currentPage, totalPages } = useMemo(
@@ -376,45 +386,65 @@ export function QuotaPage() {
             </Badge>
           )}
           <Hint label={t('quota_management.refresh_all_credentials')}>
+            {/* In the phone top bar refresh is a plain ghost icon; purple is kept for create actions. */}
             <Button
               size="lg"
-              className="h-9 px-4 max-sm:w-9 max-sm:px-0!"
+              variant={isPhone ? 'ghost' : 'default'}
+              className="h-9 px-4 max-sm:size-10 max-sm:px-0!"
               onClick={handleRefreshAll}
               disabled={disableControls || loading || batchLoading}
-              aria-label={t('quota_management.refresh_all_credentials')}
+              aria-label={t('common.refresh')}
             >
               <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-              <span className="max-sm:hidden">{t('quota_management.refresh_all_credentials')}</span>
+              {/* The visible text matches the accessible name; the hint says what it covers. */}
+              <span className="max-sm:hidden">{t('common.refresh')}</span>
             </Button>
           </Hint>
         </div>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-4 max-sm:gap-3">
+        {/* Phones keep search, filter and sort on one row: sort shrinks to an icon. */}
+        <div className="flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
           <SearchField
-            className="min-w-48 flex-1 basis-full sm:basis-0"
+            className="min-w-48 flex-1 basis-full max-sm:h-10 max-sm:min-w-0 max-sm:basis-0 sm:basis-0"
             value={search}
             onChange={handleSearchChange}
-            placeholder={t('quota_management.search_placeholder')}
+            placeholder={
+              isPhone
+                ? t('quota_management.search_placeholder_short')
+                : t('quota_management.search_placeholder')
+            }
             label={t('quota_management.search_label')}
             clearLabel={t('quota_management.search_clear')}
           />
           <ProviderFilter
-            className="max-sm:flex-1"
             types={visibleTabs}
             counts={tabCounts}
             active={tab}
             onChange={handleTabChange}
+            align={isPhone ? 'end' : 'start'}
           />
           <Select value={sortMode} onValueChange={handleSortModeChange}>
             <SelectTrigger
               aria-label={t('quota_management.sort_label')}
-              className="data-[size=default]:h-9 max-sm:flex-1"
+              className="data-[size=default]:h-9 max-sm:relative max-sm:size-10 max-sm:justify-center max-sm:p-0 max-sm:data-[size=default]:h-10 max-sm:*:data-[slot=select-value]:sr-only max-sm:[&>svg:last-child]:hidden"
             >
+              <HugeiconsIcon
+                icon={SortByDown02Icon}
+                strokeWidth={1.75}
+                className={sortMode === 'default' ? 'sm:hidden' : 'text-primary sm:hidden'}
+              />
+              {/* On phones the label is hidden, so a dot marks a non-default sort. */}
+              {sortMode !== 'default' && (
+                <span
+                  aria-hidden
+                  className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary sm:hidden"
+                />
+              )}
               <SelectValue />
             </SelectTrigger>
-            <SelectContent position="popper" align="end">
+            <SelectContent position="popper" align="end" collisionPadding={16}>
               {QUOTA_SORT_MODES.map((mode) => (
                 <SelectItem key={mode} value={mode}>
                   {t(`quota_management.sort_${mode}`)}

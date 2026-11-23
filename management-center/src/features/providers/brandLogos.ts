@@ -1,5 +1,5 @@
 import claudeLogo from '@/assets/icons/claude.svg';
-import codexLogo from '@/assets/icons/codex.svg';
+import codexGlyph from '@/features/oauth/codex-glyph.svg';
 import metaLogo from '@/assets/icons/meta.svg';
 import devinLightLogo from '@/assets/icons/devin.svg';
 import devinDarkLogo from '@/assets/icons/devin-dark.svg';
@@ -15,8 +15,6 @@ export interface ProviderBrandLogo {
   src: string;
   /** Variant for the dark theme, which is the only theme the app renders. */
   darkSrc?: string;
-  /** The artwork carries its own rounded tile, so it is shown flush instead of inset. */
-  themeSurface?: boolean;
 }
 
 export type ProviderBrandLogoKey = ProviderBrand | 'devin';
@@ -25,7 +23,7 @@ export const PROVIDER_LOGOS: Record<ProviderBrandLogoKey, ProviderBrandLogo> = {
   gemini: { src: geminiLogo },
   interactions: { src: geminiLogo },
   claude: { src: claudeLogo },
-  codex: { src: codexLogo, themeSurface: true },
+  codex: { src: codexGlyph },
   meta: { src: metaLogo },
   devin: { src: devinLightLogo, darkSrc: devinDarkLogo },
   xai: { src: xaiLightLogo, darkSrc: xaiDarkLogo },

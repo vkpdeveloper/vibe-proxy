@@ -62,13 +62,11 @@ describe('global GitHub token configuration', () => {
     ).toContain('githubToken');
   });
 
-  test('renders a masked, labelled input with localized hints and disabled support', () => {
+  test('renders a masked, labelled input with disabled support', () => {
     for (const lng of ['en', 'zh-CN', 'zh-TW', 'ru', 'vi']) {
       const translations = i18n.cloneInstance({ lng });
       const key = 'config_management.visual.sections.server.github_token';
-      for (const path of [key, `${key}_hint`]) {
-        expect(typeof translations.getResource(lng, 'translation', path)).toBe('string');
-      }
+      expect(typeof translations.getResource(lng, 'translation', key)).toBe('string');
       for (const disabled of [false, true]) {
         const markup = renderToStaticMarkup(
           createElement(
@@ -91,8 +89,6 @@ describe('global GitHub token configuration', () => {
         const id = input.match(/\bid="([^"]+)"/)?.[1];
         expect(id).toBeTruthy();
         expect(field).toContain(`for="${id}"`);
-        expect(field).toContain(`id="${id}-hint"`);
-        expect(input).toContain(`aria-describedby="${id}-hint"`);
       }
     }
   });

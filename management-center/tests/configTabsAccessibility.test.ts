@@ -14,7 +14,7 @@ describe('config tabs accessibility', () => {
       createElement(Page<(typeof tabs)[number]['id']>, {
         title: 'Config',
         tabs,
-        tab: 'common',
+        tab: 'connectivity',
         children: null,
       })
     );
@@ -31,8 +31,8 @@ describe('config tabs accessibility', () => {
     // The dot itself stays out of the accessible name.
     expect(streaming).toMatch(/<span aria-hidden="true" class="[^"]*bg-warning/);
 
-    const common = markup.match(/<button\b[^>]*data-nav-item="common"[^>]*>(.*?)<\/button>/)?.[1];
-    expect(common).not.toContain('sr-only');
-    expect(common).not.toContain('bg-warning');
+    const clean = markup.match(/<button\b[^>]*data-nav-item="logging"[^>]*>(.*?)<\/button>/)?.[1];
+    expect(clean).not.toContain('sr-only');
+    expect(clean).not.toContain('bg-warning');
   });
 });

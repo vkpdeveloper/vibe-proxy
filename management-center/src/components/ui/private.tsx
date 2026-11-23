@@ -3,7 +3,10 @@ import { cn } from '@/lib/utils';
 
 /**
  * Private values, like email addresses and base URLs, stay blurred until clicked, so the dashboard
- * is safe on a shared screen. An inline span keeps the parent's truncation working.
+ * is safe on a shared screen. As an inline block it inherits the parent's wrapping: in a truncated
+ * parent it draws its own "…", which is blurred with the value, and elsewhere it wraps as before.
+ * The vertical padding, cancelled by negative margins, makes the tap target 40px tall or more
+ * without moving the text.
  */
 export function Private({ children, className }: { children: ReactNode; className?: string }) {
   const [shown, setShown] = useState(false);
@@ -15,7 +18,7 @@ export function Private({ children, className }: { children: ReactNode; classNam
       aria-pressed={shown}
       title={shown ? 'Click to hide' : 'Click to show'}
       className={cn(
-        'cursor-pointer rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative -my-3 inline-block max-w-full cursor-pointer overflow-hidden rounded-sm py-3 align-top text-ellipsis outline-none focus-visible:ring-2 focus-visible:ring-ring',
         !shown && 'blur-[5px] select-none',
         className
       )}

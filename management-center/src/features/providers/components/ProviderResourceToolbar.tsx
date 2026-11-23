@@ -77,7 +77,7 @@ export function ProviderResourceToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <InputGroup className="h-9 min-w-0 basis-full sm:basis-0 sm:flex-1">
+      <InputGroup className="h-9 min-w-0 basis-full max-sm:h-10 sm:basis-0 sm:flex-1">
         <InputGroupAddon>
           <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
         </InputGroupAddon>
@@ -92,7 +92,10 @@ export function ProviderResourceToolbar({
 
       <div className="flex min-w-0 items-center gap-1">
         <Select value={sortBy} onValueChange={(value) => onSortBy(value as ProviderSortBy)}>
-          <SelectTrigger className="h-9 min-w-0" aria-label={t('providersPage.toolbar.sortBy')}>
+          <SelectTrigger
+            className="h-9 min-w-0 max-sm:h-10"
+            aria-label={t('providersPage.toolbar.sortBy')}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
@@ -108,6 +111,7 @@ export function ProviderResourceToolbar({
             type="button"
             variant="ghost"
             size="icon-lg"
+            className="max-sm:size-10"
             onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
             aria-label={directionLabel}
           >
@@ -125,7 +129,7 @@ export function ProviderResourceToolbar({
             type="button"
             variant="outline"
             size="lg"
-            className="min-w-0"
+            className="min-w-0 max-sm:h-10"
             disabled={availableModels.length === 0}
           >
             <HugeiconsIcon

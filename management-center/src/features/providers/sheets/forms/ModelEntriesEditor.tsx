@@ -78,7 +78,7 @@ export function ModelEntriesEditor({
           <div key={idx} className="rounded-lg border">
             <div className="flex flex-wrap items-center gap-2 p-2">
               <Input
-                className="min-w-0 flex-1 basis-36 font-mono"
+                className="min-w-0 flex-1 basis-36 font-mono placeholder:font-sans"
                 placeholder={t('providersPage.modelOptions.modelName')}
                 aria-label={t('providersPage.modelOptions.modelName')}
                 value={entry.name}
@@ -86,7 +86,7 @@ export function ModelEntriesEditor({
                 disabled={mutating}
               />
               <Input
-                className="min-w-0 flex-1 basis-36 font-mono"
+                className="min-w-0 flex-1 basis-36 font-mono placeholder:font-sans"
                 placeholder={aliasLabel}
                 aria-label={aliasLabel}
                 required={oauthAliasOnly}
@@ -191,12 +191,25 @@ export function ModelEntriesEditor({
         );
       })}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={mutating} onClick={handleAdd}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="max-sm:h-10"
+          disabled={mutating}
+          onClick={handleAdd}
+        >
           <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
           {t('providersPage.form.addModel')}
         </Button>
         {models.length > COLLAPSED_LIMIT ? (
-          <Button type="button" variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="max-sm:h-10"
+            onClick={() => setShowAll((v) => !v)}
+          >
             {showAll
               ? t('providersPage.form.showFewerEntries')
               : t('providersPage.form.showAllEntries', { count: models.length })}

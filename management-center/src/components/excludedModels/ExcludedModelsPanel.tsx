@@ -64,7 +64,8 @@ export function ExcludedModelsPanel({
   const activeId = activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined;
 
   useLayoutEffect(() => {
-    if (!autoFocus) return;
+    // Touch screens would pop the keyboard over the list the user opened to scan.
+    if (!autoFocus || window.matchMedia('(pointer: coarse)').matches) return;
     // preventScroll：裸 focus() 会把外层 Sheet 的滚动猛拽过来，动画中途还会把面板顶出视野。
     inputRef.current?.focus({ preventScroll: true });
   }, [autoFocus]);
@@ -128,14 +129,15 @@ export function ExcludedModelsPanel({
   return (
     <div className="mt-1.5 flex flex-col overflow-hidden rounded-xl border bg-card duration-200 animate-in fade-in-0 zoom-in-[0.98] motion-reduce:animate-none">
       <div className="border-b p-2">
-        <InputGroup className="h-7">
+        {/* 16px on phones: iOS zooms into any smaller text field on focus. */}
+        <InputGroup className="h-7 max-sm:h-10">
           <InputGroupAddon>
             <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
           </InputGroupAddon>
           <InputGroupInput
             ref={inputRef}
             type="text"
-            className="h-7 text-[13px]"
+            className="h-7 text-[13px] max-sm:h-10 max-sm:text-base"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -182,7 +184,7 @@ export function ExcludedModelsPanel({
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t bg-muted/50 px-3 py-1.5">
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="font-sans text-xs text-muted-foreground">
           {t('excluded_models.footer_count', { excluded: stats.excluded, total: stats.total })}
         </span>
         <span className="flex items-center gap-1">
@@ -190,6 +192,7 @@ export function ExcludedModelsPanel({
             type="button"
             variant="ghost"
             size="xs"
+            className="max-sm:h-10 max-sm:px-3"
             onClick={onSelectAll}
             disabled={disabled || candidates.length === 0}
           >
@@ -199,6 +202,7 @@ export function ExcludedModelsPanel({
             type="button"
             variant="ghost"
             size="xs"
+            className="max-sm:h-10 max-sm:px-3"
             onClick={onClear}
             disabled={disabled}
             aria-label={t('excluded_models.clear_aria')}
@@ -264,7 +268,7 @@ function ExcludedModelRow({
       <span
         className={cn(
           'flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input bg-input/30 transition-colors',
-          excluded && 'border-primary bg-primary text-primary-foreground'
+          excluded && 'border-primary-solid bg-primary-solid text-primary-foreground'
         )}
         aria-hidden="true"
       >

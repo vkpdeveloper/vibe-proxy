@@ -1,11 +1,8 @@
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
-import { Button } from '@/components/ui/button';
 import { makeClientId } from '@/types/visualConfig';
 import { ExpandableInput } from './ExpandableInput';
-import { Hint } from '@/components/ui/tooltip';
+import { AddButton, RemoveButton } from './parts';
 
 export const StringListEditor = memo(function StringListEditor({
   value,
@@ -54,26 +51,16 @@ export const StringListEditor = memo(function StringListEditor({
             onChange={(nextValue) => updateItem(index, nextValue)}
             disabled={disabled}
           />
-          <Hint label={t('config_management.visual.common.delete')}>
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => removeItem(index)}
-              disabled={disabled}
-              aria-label={t('config_management.visual.common.delete')}
-            >
-              <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-            </Button>
-          </Hint>
+          <RemoveButton
+            label={t('config_management.visual.common.delete')}
+            onClick={() => removeItem(index)}
+            disabled={disabled}
+          />
         </div>
       ))}
-      <div>
-        <Button variant="outline" onClick={addItem} disabled={disabled}>
-          <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
-          {t('config_management.visual.common.add')}
-        </Button>
-      </div>
+      <AddButton onClick={addItem} disabled={disabled}>
+        {t('config_management.visual.common.add')}
+      </AddButton>
     </div>
   );
 });

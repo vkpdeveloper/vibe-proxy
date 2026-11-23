@@ -65,6 +65,8 @@ interface UseLogScrollerReturn {
   resumeFollowing: () => void;
   pendingLines: number;
   historyEvicted: boolean;
+  /** The viewer is scrolled to its end, whether or not it is following new lines. */
+  atBottom: boolean;
 }
 
 export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerReturn {
@@ -84,6 +86,7 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
   const [isFollowing, setIsFollowing] = useState(true);
   const [pendingLines, setPendingLines] = useState(0);
   const [historyEvicted, setHistoryEvicted] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
   const followingRef = useRef(true);
   const anchorRef = useRef<LogAnchor | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -98,6 +101,7 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
     setIsFollowing(true);
     setPendingLines(0);
     setHistoryEvicted(false);
+    setAtBottom(true);
     anchorRef.current = null;
     pendingPrependScrollRef.current = null;
     pendingScrollToBottomRef.current = true;
@@ -153,6 +157,7 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
       // Reaching the bottom while browsing does not discard the expanded history;
       // the explicit resume action is what restores the 100-line live window.
       lastScrollTopRef.current = node.scrollTop;
+      setAtBottom(isNearBottom(node));
       anchorRef.current = findVisibleLogAnchor(rows);
       if (!followingRef.current && node.scrollTop <= LOAD_MORE_THRESHOLD_PX) {
         prependVisibleLines();
@@ -207,6 +212,7 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
     }
     pendingPrependScrollRef.current = null;
     lastScrollTopRef.current = node.scrollTop;
+    setAtBottom(isNearBottom(node));
     anchorRef.current = findVisibleLogAnchor(readLogRows(node));
   }, [
     bufferStart,
@@ -265,5 +271,6 @@ export function useLogScroller(options: UseLogScrollerOptions): UseLogScrollerRe
     resumeFollowing,
     pendingLines,
     historyEvicted,
+    atBottom,
   };
 }

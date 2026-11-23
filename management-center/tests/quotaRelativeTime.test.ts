@@ -113,10 +113,11 @@ describe('formatInstantShort', () => {
 });
 
 describe('buildResetDisplay', () => {
-  test('pairs a baked absolute label with a computed relative one', () => {
-    const display = buildResetDisplay('08-13 14:30', NOW + 11 * DAY_MS, NOW, 'en');
+  test('formats the absolute half from the instant, ignoring a baked label', () => {
+    // A label cached by an older build or in another locale must not leak a second format.
+    const display = buildResetDisplay('11/27, 07:30', NOW + 11 * DAY_MS, NOW, 'en');
     expect(display).not.toBeNull();
-    expect(display?.absolute).toBe('08-13 14:30');
+    expect(display?.absolute).toBe(formatInstantShort(NOW + 11 * DAY_MS, 'en'));
     expect(display?.relative).toContain('11 days');
     expect(display?.full).toContain('2026');
   });
@@ -127,6 +128,8 @@ describe('buildResetDisplay', () => {
       absolute: '08-13 14:30',
       relative: null,
       full: null,
+      span: null,
+      ago: null,
     });
     expect(buildResetDisplay('08-13 14:30', undefined, NOW, 'en')?.relative).toBeNull();
   });
@@ -151,6 +154,12 @@ describe('buildResetDisplay', () => {
     const display = buildResetDisplay('-', NOW + DAY_MS, NOW, 'en');
     expect(display?.absolute).toBe(formatInstantShort(NOW + DAY_MS));
     expect(display?.relative).toContain('1 day');
+  });
+
+  test('gives a passed instant a narrow time since, not a countdown', () => {
+    const display = buildResetDisplay(null, NOW - 12 * MINUTE_MS, NOW, 'en');
+    expect(display?.span).toBeNull();
+    expect(display?.ago).toBe('12m');
   });
 
   test('rejects a non-finite instant', () => {

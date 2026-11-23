@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Add01Icon,
   Alert02Icon,
+  Analytics01Icon,
   ArrowReloadHorizontalIcon,
   Delete02Icon,
   Key01Icon,
@@ -44,6 +46,7 @@ import {
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -67,6 +70,8 @@ import { Switch } from '@/components/ui/switch';
 import { Hint } from '@/components/ui/tooltip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Page } from '@/components/layout/Page';
+import { usePhone } from '@/components/layout/pageBar';
+import { cn } from '@/lib/utils';
 import { Meter } from '@/features/dashboard/components/Meter';
 import { formatUsd, spendToday } from '@/features/dashboard/components/spend';
 import { useAction } from '@/hooks/use-action';
@@ -82,10 +87,23 @@ import {
   getTypeLabel,
   normalizeProviderKey,
 } from '@/features/authFiles/constants';
+import { formatCompactNumber } from '@/utils/format';
 import { namedModels } from '@/utils/modelNames';
 
 const emptyOptions: ClientApiKeyOptions = { providers: [], models: [] };
-const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+const wholeUsd = new Intl.NumberFormat(undefined, {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+}).format;
+/** Limits are usually round numbers, so "$100" reads better than "$100.00". */
+const formatLimitUsd = (value: number) =>
+  Number.isInteger(value) ? wholeUsd(value) : formatUsd(value);
+/**
+ * Usage takes the same stable key id its key picker uses. Cards show today's numbers,
+ * so the link opens today's range to match them.
+ */
+const usagePath = (key: ClientApiKey) => `/usage?key=${encodeURIComponent(key.id)}&range=today`;
 
 type NumberField =
   'daily_limit_usd' | 'daily_request_limit' | 'daily_token_limit' | 'requests_per_minute';
@@ -142,6 +160,10 @@ export function ApiKeysPage() {
   const [revealedSecret, setRevealedSecret] = useState('');
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
   const confirmAction = useAction();
+  const phone = usePhone();
+  const navigate = useNavigate();
+  // Config links here with this state; going back returns to the setting it came from.
+  const fromConfig = (useLocation().state as { from?: string } | null)?.from === 'config';
 
   const load = useCallback(async () => {
     if (!connected) return;
@@ -213,15 +235,10 @@ export function ApiKeysPage() {
     }));
   };
 
+  // The submit button stays disabled until this holds, which also blocks Enter-to-submit.
+  const formValid = form.name.trim() !== '' && form.allowed_providers.length > 0;
+
   const save = async () => {
-    if (!form.name.trim()) {
-      showNotification('Give this key a name.', 'warning');
-      return;
-    }
-    if (form.allowed_providers.length === 0) {
-      showNotification('Select at least one provider.', 'warning');
-      return;
-    }
     setSaving(true);
     try {
       if (editing) {
@@ -278,12 +295,14 @@ export function ApiKeysPage() {
     <>
       <Page
         title={t('nav.client_api_keys')}
+        onBack={fromConfig ? () => navigate(-1) : undefined}
         actions={
           <div className="flex shrink-0 items-center gap-2">
             <Hint label={t('common.refresh')}>
               <Button
-                variant="outline"
+                variant={phone ? 'ghost' : 'outline'}
                 size="icon-lg"
+                className="max-sm:size-10"
                 aria-label={t('common.refresh')}
                 disabled={loading}
                 onClick={() => void load()}
@@ -294,7 +313,7 @@ export function ApiKeysPage() {
             <Hint label="Generate key">
               <Button
                 size="lg"
-                className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
+                className="h-9 px-3 max-sm:size-10 max-sm:px-0!"
                 aria-label="Generate key"
                 onClick={openCreate}
               >
@@ -316,7 +335,20 @@ export function ApiKeysPage() {
         )}
 
         <section aria-busy={loading} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
+          {/* Phone: one line, spend first. The grid of boxes takes half the screen there. */}
+          <div className="flex items-end justify-between gap-3 sm:hidden">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-[13px] text-muted-foreground">Spend today</span>
+              <span className="truncate text-2xl font-medium tracking-tight">
+                {formatUsd(spendToday(keys))}
+              </span>
+            </div>
+            <span className="shrink-0 pb-1 text-[13px] text-muted-foreground">
+              {keys.length} keys, {activeKeys} enabled
+              {blockedKeys > 0 && <span className="text-destructive">, {blockedKeys} blocked</span>}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border bg-border max-sm:hidden">
             {stats.map((stat) => (
               <div key={stat.label} className="flex min-w-0 flex-col gap-1.5 bg-card p-4">
                 <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -352,28 +384,41 @@ export function ApiKeysPage() {
               </EmptyContent>
             </Empty>
           ) : (
-            <ItemGroup className="gap-2">
+            <ItemGroup className="gap-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border">
               {keys.map((key) => {
                 const budgetUsed =
                   key.daily_limit_usd > 0 ? (key.today_usd / key.daily_limit_usd) * 100 : null;
                 const limits = [
                   key.daily_request_limit > 0 &&
-                    `${compact.format(key.daily_request_limit)} req/day`,
-                  key.daily_token_limit > 0 && `${compact.format(key.daily_token_limit)} tok/day`,
-                  key.requests_per_minute > 0 && `${compact.format(key.requests_per_minute)} rpm`,
+                    `${formatCompactNumber(key.daily_request_limit)} req/day`,
+                  key.daily_token_limit > 0 &&
+                    `${formatCompactNumber(key.daily_token_limit)} tok/day`,
+                  key.requests_per_minute > 0 &&
+                    `${formatCompactNumber(key.requests_per_minute)} rpm`,
                 ].filter(Boolean);
+                const unused = key.today_requests === 0;
                 return (
                   <Item
                     key={key.id}
                     variant="outline"
-                    className={key.disabled ? 'relative opacity-60' : 'relative'}
+                    className={cn(
+                      'relative transition-colors hover:bg-muted/30 max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:p-4 max-sm:last:border-b-0 max-sm:active:bg-muted/40',
+                      key.disabled && 'opacity-60'
+                    )}
                   >
-                    <ItemMedia variant="icon">
+                    <ItemMedia variant="icon" className="max-sm:hidden">
                       <HugeiconsIcon icon={Key01Icon} strokeWidth={1.75} />
                     </ItemMedia>
-                    <ItemContent className="min-w-0 max-sm:pr-8">
-                      <ItemTitle className="max-w-full">
-                        <span className="truncate">{key.name}</span>
+                    <ItemContent className="min-w-0 max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:pr-9">
+                      <ItemTitle className="max-w-full max-sm:basis-full">
+                        {/* The name's link covers the whole card, so a tap anywhere opens its usage. */}
+                        <Link
+                          to={usagePath(key)}
+                          state={{ from: 'api-keys' }}
+                          className="truncate outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-ring/50"
+                        >
+                          {key.name}
+                        </Link>
                         {key.disabled ? (
                           <Badge variant="secondary" className="gap-1.5">
                             <span className="size-1.5 rounded-full bg-faint" />
@@ -386,45 +431,73 @@ export function ApiKeysPage() {
                         ) : null}
                       </ItemTitle>
                       {key.managed && (
-                        <ItemDescription className="truncate font-mono text-xs">
+                        <ItemDescription className="truncate font-mono text-xs max-sm:shrink-0">
                           {key.masked_key}
                         </ItemDescription>
                       )}
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground max-sm:gap-x-1.5">
                         {key.managed ? (
                           key.allowed_providers.map((provider) => {
                             const icon = providerIcon(provider);
                             return (
-                              <span key={provider} className="flex items-center gap-1">
-                                {icon && <img src={icon} alt="" className="size-3.5 rounded-sm" />}
-                                {providerLabel(provider)}
+                              <span key={provider} className="flex items-center gap-1 max-sm:gap-0">
+                                {icon && (
+                                  <img
+                                    src={icon}
+                                    alt=""
+                                    title={providerLabel(provider)}
+                                    className="size-3.5 rounded-sm"
+                                  />
+                                )}
+                                <span className={icon ? 'max-sm:sr-only' : undefined}>
+                                  {providerLabel(provider)}
+                                </span>
                               </span>
                             );
                           })
                         ) : (
                           <span>Unrestricted</span>
                         )}
-                        <span className="text-faint">
+                        <span className="text-faint max-sm:text-muted-foreground">
                           {key.allowed_models.length
                             ? `${key.allowed_models.length} model${key.allowed_models.length === 1 ? '' : 's'}`
                             : 'All models'}
-                          {limits.length > 0 && `, ${limits.join(', ')}`}
+                          {/* Phone leaves the request and token limits to the edit dialog. */}
+                          {limits.length > 0 && (
+                            <span className="max-sm:hidden">, {limits.join(', ')}</span>
+                          )}
                         </span>
                       </div>
                     </ItemContent>
-                    <div className="flex w-full flex-col gap-1.5 pl-6.5 sm:w-36 sm:items-end sm:pl-0">
-                      <span className="font-mono text-sm tabular-nums">
+                    <div className="flex w-full flex-col gap-1.5 pl-6.5 max-sm:flex-row max-sm:pl-0 max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-3 sm:w-36 sm:items-end sm:pl-0">
+                      {unused && (
+                        <span className="text-[13px] text-muted-foreground sm:hidden">
+                          Not used today
+                        </span>
+                      )}
+                      <span
+                        className={cn(
+                          'font-mono text-sm tabular-nums max-sm:font-sans max-sm:font-medium max-sm:normal-nums',
+                          unused && 'max-sm:hidden'
+                        )}
+                      >
                         {formatUsd(key.today_usd)}
                         {key.daily_limit_usd > 0 && (
-                          <span className="text-xs text-faint">
-                            {' '}
-                            / {formatUsd(key.daily_limit_usd)}
+                          <span className="text-xs text-faint max-sm:font-normal max-sm:text-muted-foreground">
+                            <span className="max-sm:hidden">
+                              {' '}
+                              / {formatUsd(key.daily_limit_usd)}
+                            </span>
+                            <span className="sm:hidden">
+                              {' '}
+                              of {formatLimitUsd(key.daily_limit_usd)} today
+                            </span>
                           </span>
                         )}
                       </span>
                       {budgetUsed !== null && (
                         <Meter
-                          className="w-full"
+                          className={cn('w-full max-sm:order-last', unused && 'max-sm:hidden')}
                           value={budgetUsed}
                           tone={
                             budgetUsed >= 100 ? 'critical' : budgetUsed >= 80 ? 'warning' : 'good'
@@ -432,28 +505,45 @@ export function ApiKeysPage() {
                           ariaLabel={`${key.name} daily budget used`}
                         />
                       )}
-                      <span className="font-mono text-xs text-faint tabular-nums">
-                        {compact.format(key.today_requests)} req, {compact.format(key.today_tokens)}{' '}
-                        tok
+                      <span className="font-mono text-xs text-faint tabular-nums max-sm:hidden">
+                        {formatCompactNumber(key.today_requests)} req,{' '}
+                        {formatCompactNumber(key.today_tokens)} tok
                       </span>
+                      {!unused && (
+                        <span className="text-[13px] text-muted-foreground sm:hidden">
+                          {formatCompactNumber(key.today_requests)} requests ·{' '}
+                          {formatCompactNumber(key.today_tokens)} tokens
+                        </span>
+                      )}
                     </div>
-                    <ItemActions className="max-sm:absolute max-sm:top-2 max-sm:right-2">
+                    <ItemActions className="relative max-sm:absolute max-sm:top-1.5 max-sm:right-1.5">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon-sm"
+                            className="max-sm:size-10"
                             aria-label={`Actions for ${key.name}`}
                           >
                             <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => openEdit(key)}>
+                        <DropdownMenuContent align="end" className="max-sm:min-w-44">
+                          <DropdownMenuItem
+                            className="max-sm:py-2"
+                            onSelect={() =>
+                              navigate(usagePath(key), { state: { from: 'api-keys' } })
+                            }
+                          >
+                            <HugeiconsIcon icon={Analytics01Icon} strokeWidth={1.75} />
+                            View usage
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="max-sm:py-2" onSelect={() => openEdit(key)}>
                             <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            className="max-sm:py-2"
                             onSelect={() => {
                               confirmAction.setError(null);
                               setConfirm({ kind: 'rotate', key });
@@ -465,6 +555,7 @@ export function ApiKeysPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
+                            className="max-sm:py-2"
                             onSelect={() => {
                               confirmAction.setError(null);
                               setConfirm({ kind: 'delete', key });
@@ -560,19 +651,22 @@ export function ApiKeysPage() {
                       onChange={(event) => setModelSearch(event.target.value)}
                     />
                   </InputGroup>
-                  <div className="max-h-56 divide-y overflow-y-auto rounded-lg border">
+                  {/* relative: checkbox inputs are absolutely positioned and must stay inside the
+                      list. Phone lets the sheet do the scrolling instead of a scroll in a scroll. */}
+                  <div className="relative max-h-56 divide-y overflow-y-auto rounded-lg border max-sm:max-h-none max-sm:overflow-visible">
                     {visibleModels.map((model) => (
                       <label
                         key={model.id}
-                        className="flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors duration-150 hover:bg-muted/50"
+                        className="flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors duration-150 hover:bg-muted/50 max-sm:min-h-11 max-sm:flex-wrap max-sm:gap-y-0.5"
                       >
                         <Checkbox
                           checked={form.allowed_models.includes(model.id)}
                           onCheckedChange={(value) => toggleModel(model.id, value === true)}
                         />
                         <span className="min-w-0 flex-1 truncate text-[13px]">{model.name}</span>
+                        {/* Phone puts the id on its own line so the date suffix that tells versions apart stays visible. */}
                         {model.name !== model.id && (
-                          <code className="max-w-[45%] truncate font-mono text-xs text-faint">
+                          <code className="max-w-[45%] truncate font-mono text-xs text-faint max-sm:max-w-none max-sm:basis-full max-sm:pl-7 max-sm:text-muted-foreground">
                             {model.id}
                           </code>
                         )}
@@ -586,32 +680,19 @@ export function ApiKeysPage() {
                   </div>
                 </FieldSet>
 
-                <FieldSet className="gap-2">
-                  <FieldLegend
-                    variant="label"
-                    className="flex w-full items-center justify-between gap-3"
-                  >
-                    Limits
-                    <span className="text-xs font-normal text-muted-foreground">
-                      0 means no limit
-                    </span>
-                  </FieldLegend>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-5">
                     {LIMIT_FIELDS.map(({ field, label, step }) => (
-                      <Field key={field} className="gap-1.5">
-                        <FieldLabel
-                          htmlFor={`api-key-${field}`}
-                          className="text-xs font-normal text-muted-foreground"
-                        >
-                          {label}
-                        </FieldLabel>
+                      <Field key={field}>
+                        <FieldLabel htmlFor={`api-key-${field}`}>{label}</FieldLabel>
                         <Input
                           id={`api-key-${field}`}
-                          className="h-9 font-mono"
+                          className="h-9 font-mono max-sm:font-sans"
                           type="number"
                           min="0"
                           step={step}
                           value={form[field]}
+                          aria-describedby="api-key-limits-help"
                           onChange={(event) =>
                             setForm({ ...form, [field]: Number(event.target.value) })
                           }
@@ -619,9 +700,13 @@ export function ApiKeysPage() {
                       </Field>
                     ))}
                   </div>
-                </FieldSet>
+                  <FieldDescription id="api-key-limits-help">0 means no limit.</FieldDescription>
+                </div>
 
-                <Field orientation="horizontal" className="justify-between">
+                {/* relative: the switch's hidden input is absolutely positioned. Without a
+                    positioned parent it escapes the sheet's scrolling body and leaves the sheet
+                    itself scrollable, so scrollIntoView could push the title off-screen. */}
+                <Field orientation="horizontal" className="relative justify-between">
                   <FieldLabel htmlFor="api-key-enabled">Enabled</FieldLabel>
                   <Switch
                     id="api-key-enabled"
@@ -639,7 +724,7 @@ export function ApiKeysPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={saving || !formValid}>
                   {editing ? 'Save' : 'Generate key'}
                 </Button>
               </DialogFooter>

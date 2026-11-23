@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Page, Section } from '@/components/layout/Page';
+import { usePhone } from '@/components/layout/pageBar';
 import { useAuthStore, useThemeStore } from '@/stores';
 import iconVertex from '@/assets/icons/vertex.svg';
-import iconCodex from '@/assets/icons/codex.svg';
+import iconCodex from './codex-glyph.svg';
 import iconOpenCodeGoDark from '@/assets/icons/opencode-go-dark.svg';
 import iconOpenCodeGoLight from '@/assets/icons/opencode-go-light.svg';
 import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
@@ -42,6 +43,10 @@ const DEVIN_CLI_ICON: ThemedIcon = { light: iconDevinCliDark, dark: iconDevinCli
 /** Claude asks for an optional name first, so its tile opens without starting. */
 const CLAUDE_PROVIDER_ID = 'anthropic';
 
+/** Two columns of tiles on wider screens; on phones one grouped list instead of a box per tile. */
+const TILE_GRID =
+  'grid gap-2 sm:grid-cols-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border';
+
 /** Router state the auth files page sends to reconnect a Claude limits login. */
 export interface OAuthPageLocationState {
   claudeReconnect?: ClaudeReconnectTarget;
@@ -66,6 +71,7 @@ export function OAuthPage() {
   const location = useLocation();
   const apiBase = useAuthStore((state) => state.apiBase);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const phone = usePhone();
 
   const pluginProviders = usePluginOAuthProviders(apiBase);
   const providerCards = useMemo<OAuthProviderCard[]>(
@@ -111,14 +117,11 @@ export function OAuthPage() {
   const iconOf = (card: OAuthProviderCard) =>
     card.kind === 'plugin' ? card.icon : resolveThemedIcon(card.icon, resolvedTheme);
 
+  // The dialog is titled with the row's own name, so "Claude" opens "Claude".
   const headingOf = (card: OAuthProviderCard): DialogHeading => ({
-    title:
-      card.kind === 'plugin'
-        ? t('auth_login.plugin_oauth_title', { name: card.title })
-        : t(card.titleKey),
+    title: labelOf(card),
     caption: captionOf(card),
     icon: iconOf(card),
-    flush: card.kind === 'builtin' && card.flush,
   });
 
   const tileStatusLabel = (status: ProviderFlowState['status']) =>
@@ -208,30 +211,31 @@ export function OAuthPage() {
     (state) => state.status === 'waiting'
   ).length;
 
+  const progress = (waitingCount > 0 || flows.addedCount > 0) && (
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      {waitingCount > 0 && (
+        <span className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
+          {t('auth_login.meta_waiting', { count: waitingCount })}
+        </span>
+      )}
+      {flows.addedCount > 0 && (
+        <span className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-success" aria-hidden="true" />
+          {t('auth_login.meta_added', { count: flows.addedCount })}
+        </span>
+      )}
+    </div>
+  );
+
   return (
-    <Page
-      title={t('nav.oauth', { defaultValue: 'OAuth' })}
-      actions={
-        (waitingCount > 0 || flows.addedCount > 0) && (
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {waitingCount > 0 && (
-              <span className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
-                {t('auth_login.meta_waiting', { count: waitingCount })}
-              </span>
-            )}
-            {flows.addedCount > 0 && (
-              <span className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-success" aria-hidden="true" />
-                {t('auth_login.meta_added', { count: flows.addedCount })}
-              </span>
-            )}
-          </div>
-        )
-      }
-    >
-      <Section title={t('auth_login.other_oauth_providers')}>
-        <div className="grid gap-2 sm:grid-cols-2">
+    // Page actions replace the top bar's refresh on phones, so there the progress sits by the list.
+    <Page title={t('nav.oauth', { defaultValue: 'OAuth' })} actions={!phone && progress}>
+      <Section
+        title={t('auth_login.browser_sign_in_heading')}
+        actions={phone ? progress : undefined}
+      >
+        <div className={TILE_GRID}>
           {providerCards.map((card) => {
             const status = flows.states[card.id]?.status;
             return (
@@ -240,7 +244,6 @@ export function OAuthPage() {
                 label={labelOf(card)}
                 caption={captionOf(card)}
                 icon={iconOf(card)}
-                flush={card.kind === 'builtin' && card.flush}
                 active={isActive(card)}
                 status={status}
                 statusLabel={tileStatusLabel(status)}
@@ -252,7 +255,7 @@ export function OAuthPage() {
       </Section>
 
       <Section title={t('auth_login.other_login_methods')}>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className={TILE_GRID}>
           <ProviderTile
             label={VERTEX_LABEL}
             caption={t('vertex_import.file_label')}
@@ -264,20 +267,19 @@ export function OAuthPage() {
             label={t('siwc.bind')}
             caption={t('siwc.tile_caption')}
             icon={iconCodex}
-            flush
             active={siwcOpen}
             onOpen={openSiwc}
           />
           <ProviderTile
             label={t('opencode_go_login.title')}
-            caption={t('opencode_go_login.api_key_label')}
+            caption={t('opencode_go_login.caption')}
             icon={resolveThemedIcon(OPENCODE_GO_ICON, resolvedTheme)}
             active={isOpen('opencode-go')}
             onOpen={openOpenCodeGo}
           />
           <ProviderTile
             label={t('devin_cli_login.title')}
-            caption={t('devin_cli_login.api_key_label')}
+            caption={t('devin_cli_login.caption')}
             icon={resolveThemedIcon(DEVIN_CLI_ICON, resolvedTheme)}
             active={isOpen('devin-cli')}
             onOpen={openDevinCli}
@@ -310,7 +312,7 @@ export function OAuthPage() {
       <VertexImportDialog
         open={dialogOpen && dialog?.kind === 'vertex'}
         heading={{
-          title: t('vertex_import.title'),
+          title: VERTEX_LABEL,
           caption: t('vertex_import.file_label'),
           icon: iconVertex,
         }}
@@ -327,7 +329,7 @@ export function OAuthPage() {
         open={dialogOpen && dialog?.kind === 'opencode-go'}
         heading={{
           title: t('opencode_go_login.title'),
-          caption: t('opencode_go_login.api_key_label'),
+          caption: t('opencode_go_login.caption'),
           icon: resolveThemedIcon(OPENCODE_GO_ICON, resolvedTheme),
         }}
         namespace="opencode_go_login"
@@ -353,7 +355,7 @@ export function OAuthPage() {
         open={dialogOpen && dialog?.kind === 'devin-cli'}
         heading={{
           title: t('devin_cli_login.title'),
-          caption: t('devin_cli_login.api_key_label'),
+          caption: t('devin_cli_login.caption'),
           icon: resolveThemedIcon(DEVIN_CLI_ICON, resolvedTheme),
         }}
         namespace="devin_cli_login"

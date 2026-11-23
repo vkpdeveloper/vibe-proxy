@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  COMMON_FIELD_IDS,
   CONFIG_SECTION_IDS,
   CONFIG_TAB_IDS,
   FIELD_VALUE_KEYS,
@@ -95,7 +94,7 @@ describe('resolveStatus', () => {
 });
 
 describe('countSectionErrors', () => {
-  test('buckets field errors by section and mirrors common-tab fields', () => {
+  test('buckets field errors by section', () => {
     const errors: VisualConfigValidationErrors = {
       port: 'port_range',
       requestRetry: 'non_negative_integer',
@@ -109,14 +108,11 @@ describe('countSectionErrors', () => {
     expect(counts).not.toHaveProperty('quota');
     expect(counts.advanced).toBe(0);
     expect(counts.payload).toBe(0);
-    // port 由常用 tab 渲染，同一错误在两个 tab 都要可见
-    expect(counts.common).toBe(1);
   });
 
   test('payload flag adds one to the payload tab only', () => {
     const counts = countSectionErrors(undefined, true);
     expect(counts.payload).toBe(1);
-    expect(counts.common).toBe(0);
     expect(counts.connectivity).toBe(0);
   });
 
@@ -124,7 +120,6 @@ describe('countSectionErrors', () => {
     const errors: VisualConfigValidationErrors = { port: undefined };
     const counts = countSectionErrors(errors, false);
     expect(counts.connectivity).toBe(0);
-    expect(counts.common).toBe(0);
   });
 });
 
@@ -146,15 +141,12 @@ describe('resolveDirtyTabs', () => {
     const tabs = resolveDirtyTabs(new Set(['rmSecretKey', 'streaming.bootstrapRetries']));
     expect(tabs.has('connectivity')).toBe(true);
     expect(tabs.has('streaming')).toBe(true);
-    expect(tabs.has('common')).toBe(false);
     expect(tabs.size).toBe(2);
   });
 
-  test('a common field lights both the common tab and its canonical section', () => {
-    const tabs = resolveDirtyTabs(new Set(['apiKeysText']));
-    expect(tabs.has('common')).toBe(true);
-    expect(tabs.has('connectivity')).toBe(true);
-    expect(tabs.size).toBe(2);
+  test('a field lights only the one tab that renders it', () => {
+    expect([...resolveDirtyTabs(new Set(['proxyUrl']))]).toEqual(['network']);
+    expect([...resolveDirtyTabs(new Set(['debug']))]).toEqual(['logging']);
 
     expect([...resolveDirtyTabs(new Set(['quotaAntigravityCredits']))]).toEqual(['advanced']);
     expect(resolveDirtyTabs(new Set(['quotaSwitchProject', 'quotaSwitchPreviewModel'])).size).toBe(
@@ -185,7 +177,6 @@ describe('Antigravity credits UI and search', () => {
     for (const field of ['quotaSwitchProject', 'quotaSwitchPreviewModel']) {
       expect(findConfigFieldById(field)).toBeUndefined();
       expect(FIELD_VALUE_KEYS).not.toHaveProperty(field);
-      expect(COMMON_FIELD_IDS).not.toContain(field);
     }
     for (const query of ['switch-project', 'switch-preview-model', 'quota-exceeded']) {
       expect(searchConfigFields(query, (key) => key)).toEqual([]);
@@ -209,7 +200,7 @@ describe('Antigravity credits UI and search', () => {
     }
   });
 
-  test('renders credits inside the Advanced Antigravity group, not common', async () => {
+  test('renders credits inside the Advanced Antigravity group', async () => {
     const root = 'src/features/config';
     const advanced = await Bun.file(`${root}/components/sections/SectionAdvanced.tsx`).text();
     const group = advanced.slice(
@@ -222,11 +213,7 @@ describe('Antigravity credits UI and search', () => {
       'onChange={(quotaAntigravityCredits) => onChange({ quotaAntigravityCredits })}'
     );
     expect(group).toContain('config_management.visual.sections.advanced.antigravity_credits');
-    for (const file of [
-      'components/sections/SectionCommon.tsx',
-      'components/fields/sharedFields.tsx',
-      'ConfigPage.tsx',
-    ]) {
+    for (const file of ['components/fields/sharedFields.tsx', 'ConfigPage.tsx']) {
       const source = await Bun.file(`${root}/${file}`).text();
       expect(source).not.toMatch(/QuotaSwitch|quotaSwitch|SectionQuota|case 'quota'/);
     }
@@ -294,11 +281,11 @@ describe('localStorage readers', () => {
     expect(readSavedMode(null)).toBe('visual');
   });
 
-  test('readSavedSection falls back to common on stale values', () => {
-    expect(readSavedSection('quota')).toBe('common');
+  test('readSavedSection falls back to connectivity on stale values', () => {
+    expect(readSavedSection('quota')).toBe('connectivity');
     expect(readSavedSection('payload')).toBe('payload');
-    expect(readSavedSection('common')).toBe('common');
-    expect(readSavedSection('server')).toBe('common'); // 历史分区 id 不再存在
-    expect(readSavedSection(null)).toBe('common');
+    expect(readSavedSection('common')).toBe('connectivity'); // the removed alias tab
+    expect(readSavedSection('server')).toBe('connectivity'); // 历史分区 id 不再存在
+    expect(readSavedSection(null)).toBe('connectivity');
   });
 });

@@ -42,7 +42,7 @@ describe('OAuth behavior configuration UI', () => {
       expect(own).toContain(`id="cfg-field-${entry.fieldId}"`);
       expect(other).not.toContain(`id="cfg-field-${entry.fieldId}"`);
       expect(own).toContain(escapeText(translations.t(entry.labelKey)));
-      expect(own).toContain(escapeText(translations.t(entry.hintKey!)));
+      if (entry.hintKey) expect(own).toContain(escapeText(translations.t(entry.hintKey)));
       expect(entry.yamlKeys?.join('.')).toMatch(/^(routing|multimedia|oauth|upstream|client)\./);
     }
     const oauth = render(createElement(SectionOAuthBehavior, props));

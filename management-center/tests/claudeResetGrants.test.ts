@@ -387,7 +387,6 @@ test('all grant messages and confirmation are translated in six locales', async 
     }
     expect(locale.confirm_text).toContain('{{name}}');
     expect(locale.retry_confirm).toContain('{{name}}');
-    expect(typeof locale.remaining).toBe('string');
     expect(locale.count).toContain('{{left}}');
     for (const key of [
       ...ANTHROPIC_RESET_RESULTS,
@@ -428,12 +427,11 @@ test('card selection spends the soonest-expiring usable grant', () => {
   }
 });
 
-test('Claude card uses Codex count and action styles and shared confirmation, not a grant dialog', async () => {
+test('Claude card uses Codex action styles and shared confirmation, not a grant dialog', async () => {
   const card = await Bun.file('src/features/quota/components/QuotaCard.tsx').text();
   const hook = await Bun.file('src/features/quota/providers/claude/ClaudeResetGrants.tsx').text();
-  expect(card).toContain('quotaClasses.codexPlanValue}>{claudeReset.count');
-  expect(card).toContain('disabled={claudeReset.blocked}');
-  expect(card).toContain('onClick={() => claudeReset.confirm()}');
+  expect(card).toContain('disabled: claudeReset.blocked');
+  expect(card).toContain('run: () => claudeReset.confirm()');
   expect(card).toContain('onUse={claudeReset.confirm}');
   expect(hook).toContain('showConfirmation({');
   expect(hook).toContain("pending ? 'claude_reset.retry_confirm'");

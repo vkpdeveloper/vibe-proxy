@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SettingGroup } from '../fields/SettingGroup';
+import { SettingGroup, SettingGroups } from '../fields/SettingGroup';
 import type { PayloadFilterRule, PayloadRule } from '@/types/visualConfig';
 import type { ConfigSectionProps } from '../../types';
 import { Section } from '@/components/layout/Page';
-import { FieldAnchor, FieldStack } from '../fields/FieldPrimitives';
+import { FieldAnchor } from '../fields/FieldPrimitives';
 import { PayloadFilterRulesEditor } from '../blocks/PayloadFilterRulesEditor';
 import { PayloadRulesEditor } from '../blocks/PayloadRulesEditor';
 
@@ -46,7 +46,7 @@ export function SectionPayload({
 
   return (
     <Section title={t('config_management.visual.sections.payload.title')}>
-      <FieldStack>
+      <SettingGroups>
         <FieldAnchor fieldId="payloadDefaultRules">
           <SettingGroup
             key={`payloadDefaultRules-${payloadValidationKey}`}
@@ -125,7 +125,7 @@ export function SectionPayload({
             />
           </SettingGroup>
         </FieldAnchor>
-      </FieldStack>
+      </SettingGroups>
     </Section>
   );
 }

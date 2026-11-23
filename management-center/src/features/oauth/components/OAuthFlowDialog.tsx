@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import type { ProviderFlowState } from '../hooks/useOAuthFlows';
@@ -15,7 +16,6 @@ import {
   FlowFooter,
   FlowView,
   OpenLinkButton,
-  OptionalTag,
   ResultView,
   Step,
   Steps,
@@ -60,6 +60,9 @@ export function OAuthFlowContent(props: OAuthFlowDialogProps) {
         {view === 'success' ? <SuccessView {...props} /> : <FlowBody {...props} view={view} />}
       </FlowView>
       {view === 'flow' && <FlowStatusBar {...props} />}
+      {view !== 'flow' && view !== 'success' && (
+        <StartFooter {...props} failed={view === 'failed'} />
+      )}
     </>
   );
 }
@@ -96,9 +99,6 @@ function FlowBody(props: OAuthFlowDialogProps & { view: Exclude<FlowViewKind, 's
             {text('oauth_status_error')} {state.error || ''}
           </FlowAlert>
         )}
-        <Button size="lg" className="h-9 w-fit px-4" onClick={onStart}>
-          {view === 'failed' ? t('auth_login.restart_login') : text('oauth_button')}
-        </Button>
       </>
     );
   }
@@ -167,10 +167,7 @@ function AccountNameField({
       }}
     >
       <Field>
-        <FieldLabel htmlFor={inputId}>
-          {t('auth_login.account_name_label')}
-          <OptionalTag />
-        </FieldLabel>
+        <FieldLabel htmlFor={inputId}>{t('auth_login.account_name_label')}</FieldLabel>
         <Input
           id={inputId}
           className="h-9"
@@ -225,7 +222,6 @@ function CallbackStep({
     <Step
       title={t(isXai ? 'auth_login.xai_callback_label' : 'auth_login.oauth_callback_label')}
       titleFor={inputId}
-      aside={<OptionalTag />}
     >
       <p className="text-sm text-muted-foreground" id={hintId}>
         {t(hintKey)}
@@ -233,7 +229,7 @@ function CallbackStep({
       <CallbackForm onSubmit={onCallbackSubmit}>
         <Input
           id={inputId}
-          className="h-9 flex-1 font-mono text-xs md:text-xs"
+          className="h-10 font-mono text-base sm:h-9 sm:flex-1 sm:text-xs md:text-xs"
           value={state.callbackUrl || ''}
           onChange={(event) => onCallbackChange(event.target.value)}
           placeholder={t(placeholderKey)}
@@ -247,7 +243,7 @@ function CallbackStep({
           type="submit"
           variant="outline"
           size="lg"
-          className="h-9 px-4"
+          className="h-10 px-4 sm:h-9"
           disabled={disabled || state.callbackSubmitting}
         >
           {t('auth_login.oauth_callback_button')}
@@ -280,6 +276,7 @@ function FlowStatusBar({ providerId, state, text, onStart, onCancel }: OAuthFlow
             ? `${text('oauth_status_error')} ${state.error || ''}`
             : text('oauth_status_waiting')
       }
+      hint={canCancel || failed ? undefined : t('auth_login.waiting_background_hint')}
     >
       {canCancel ? (
         <Button variant="outline" onClick={onCancel} disabled={state.cancelling}>
@@ -289,10 +286,28 @@ function FlowStatusBar({ providerId, state, text, onStart, onCancel }: OAuthFlow
         <Button variant="outline" onClick={onStart}>
           {t('auth_login.restart_login')}
         </Button>
-      ) : (
-        <span className="text-xs text-faint">{t('auth_login.waiting_background_hint')}</span>
-      )}
+      ) : null}
     </FlowFooter>
+  );
+}
+
+/** Before a sign-in starts (or after it failed): the standard footer with Cancel and Start. */
+function StartFooter({
+  text,
+  onStart,
+  onClose,
+  failed,
+}: OAuthFlowDialogProps & { failed: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <DialogFooter>
+      <Button variant="outline" size="lg" className="h-10 px-4 sm:h-9" onClick={onClose}>
+        {t('common.cancel')}
+      </Button>
+      <Button size="lg" className="h-10 px-4 sm:h-9" onClick={onStart}>
+        {failed ? t('auth_login.restart_login') : text('oauth_button')}
+      </Button>
+    </DialogFooter>
   );
 }
 
@@ -303,10 +318,15 @@ function SuccessView({ text, onStart, onViewAuthFiles }: OAuthFlowDialogProps) {
       title={text('oauth_status_success')}
       actions={
         <>
-          <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-10 px-4 sm:h-9"
+            onClick={onViewAuthFiles}
+          >
             {t('auth_login.view_auth_files')}
           </Button>
-          <Button size="lg" className="h-9 px-4" onClick={onStart}>
+          <Button size="lg" className="h-10 px-4 sm:h-9" onClick={onStart}>
             {t('auth_login.login_another_account')}
           </Button>
         </>

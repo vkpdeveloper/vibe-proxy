@@ -1,12 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import type { PluginQuotaMetric, PluginQuotaState } from '@/types';
+import { formatInstantShort } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import type { QuotaBodyProps } from '../../types';
 
-const formatReset = (value: string | undefined): string => {
+// Same short format as every other reset time on the page; an unparseable value shows as sent.
+const formatReset = (value: string | undefined, locale?: string): string => {
   if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? value : formatInstantShort(ms, locale);
 };
 
 const formatMetric = (metric: PluginQuotaMetric): string => {
@@ -20,7 +22,7 @@ const formatMetric = (metric: PluginQuotaMetric): string => {
 };
 
 export function PluginQuotaBody({ quota, classes }: QuotaBodyProps<PluginQuotaState>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const plan =
     quota.subscription?.tierName || quota.subscription?.plan || quota.subscription?.tierId;
 
@@ -67,7 +69,9 @@ export function PluginQuotaBody({ quota, classes }: QuotaBodyProps<PluginQuotaSt
                       <span className={classes.quotaPercent}>
                         {t('plugin_quota.remaining_percent', { percent })}
                       </span>
-                      <span className={classes.quotaReset}>{formatReset(bucket.resetTime)}</span>
+                      <span className={classes.quotaReset}>
+                        {formatReset(bucket.resetTime, i18n.resolvedLanguage)}
+                      </span>
                     </div>
                   </div>
                   <QuotaMeter percent={percent} classes={classes} index={index} />

@@ -5,7 +5,6 @@ import i18n from '@/i18n';
 import { ClaudeResetGrantDetails } from '@/features/quota/providers/claude/ClaudeResetGrantDetails';
 import { bindQuotaClasses, QUOTA_CLASS_KEYS } from '@/features/quota/types';
 import type { AnthropicResetGrant } from '@/services/api/claudeResetGrants';
-import { resolveTimeZoneLabel } from '@/utils/time/timezone';
 
 const classes = bindQuotaClasses(
   Object.fromEntries(QUOTA_CLASS_KEYS.map((key) => [key, key])),
@@ -34,15 +33,18 @@ beforeAll(async () => {
 });
 
 describe('Claude reset grant details', () => {
-  test('uses Codex detail classes, timezone, remaining count and live relative date', () => {
-    const markup = render([grant()]);
+  test('uses Codex detail classes, saved count, remaining count and live relative date', () => {
+    const markup = render([grant(), grant({ id: 'second', label: 'Second', resetsLeft: 1 })]);
     expect(markup).toContain('class="codexResetCredits"');
     expect(markup).toContain('class="codexResetCreditRow"');
-    expect(markup).toContain(resolveTimeZoneLabel());
-    expect(markup).toContain('Launch · 2 / 3 resets remaining');
+    // A muted count after the label, no brackets.
+    expect(markup).toContain('Saved resets <span class="ml-0.5 text-faint">3</span>');
+    // The title stands alone; the count leads the grey expiry line.
+    expect(markup).toContain('<span class="codexResetCreditLabel">Launch</span>');
+    expect(markup).toContain('<span class="codexResetCreditTime">2 left · ');
     // Reset times start relative; clicking cycles to the compact and full formats.
     expect(markup).toContain('in 11 days');
-    expect(markup).toContain('class="quotaResetCycle"');
+    expect(markup).toContain('class="quotaResetCycle max-sm:hidden"');
   });
 
   test('hides empty and spent grants', () => {
@@ -73,7 +75,7 @@ describe('Claude reset grant details', () => {
     expect(markup).toMatch(/\d+ days( \d+ hours?)? ago/);
     // The only button is the reset-time format toggle, not a use action.
     expect(markup.match(/<button/g)?.length).toBe(1);
-    expect(markup).toContain('class="quotaResetCycle"');
+    expect(markup).toContain('class="quotaResetCycle max-sm:hidden"');
   });
 
   test('renders a per-grant use button only when the host supplies an action', () => {

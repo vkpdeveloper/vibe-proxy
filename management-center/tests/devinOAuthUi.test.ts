@@ -43,7 +43,7 @@ describe('Devin OAuth login UI', () => {
             createElement(OAuthFlowContent, {
               open: true,
               providerId: 'devin',
-              heading: { title: i18n.t(devin!.titleKey), caption: 'Browser sign-in', icon: '' },
+              heading: { title: devin!.label, caption: 'Browser sign-in', icon: '' },
               state,
               text: (suffix: string) => i18n.t(`auth_login.devin_${suffix}`),
               supportsCallback: true,
@@ -58,10 +58,10 @@ describe('Devin OAuth login UI', () => {
         )
       );
 
-    // The dialog body renders without the Radix portal; the header title comes from this key.
-    expect(i18n.t(devin!.titleKey)).toBe('Devin OAuth');
+    // The dialog body renders without the Radix portal; its header reuses the row's label.
+    expect(devin!.label).toBe('Devin');
     const idle = renderDialog({});
-    expect(idle).toContain('Start Devin Login');
+    expect(idle).toMatch(/>Sign in</);
     expect(idle).toContain('v7.3.1');
     expect(idle).toContain('five minutes');
     expect(idle).not.toContain('auth_login.devin_');

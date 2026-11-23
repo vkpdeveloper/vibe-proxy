@@ -115,27 +115,27 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
     expect(markup).not.toContain('Used 0%');
   });
 
-  test('renders zero usage as 100% remaining', () => {
+  test('renders zero usage as 100% left', () => {
     const markup = render(quotaFor(weeklyConfig({ creditUsagePercent: 0 }), monthlyConfig()));
 
-    expect(markup).toContain('class="quotaPercent">100%</span>');
+    expect(markup).toContain('class="quotaPercent">100% left</span>');
     expect(markup).not.toContain('Used 0%');
     expect(markup).not.toContain('Usage unavailable from xAI');
   });
 
-  test('renders 37% usage as 63% remaining', () => {
+  test('renders 37% usage as 63% left', () => {
     const markup = render(quotaFor(weeklyConfig({ creditUsagePercent: 37 }), monthlyConfig()));
 
-    expect(markup).toContain('class="quotaPercent">63%</span>');
+    expect(markup).toContain('class="quotaPercent">63% left</span>');
     expect(markup).toContain('width:63%');
     expect(markup).not.toContain('Used 37%');
     expect(markup).not.toContain('Usage unavailable from xAI');
   });
 
-  test.each([100, 120])('renders exhausted usage %i as 0% remaining', (percent) => {
+  test.each([100, 120])('renders exhausted usage %i as 0% left', (percent) => {
     const markup = render(quotaFor(weeklyConfig({ creditUsagePercent: percent }), monthlyConfig()));
 
-    expect(markup).toContain('class="quotaPercent">0%</span>');
+    expect(markup).toContain('class="quotaPercent">0% left</span>');
     expect(markup).toContain('width:0%');
   });
 
@@ -163,7 +163,7 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
 
     expect(quota.billing?.usagePercent).toBe(percent);
     expect(quota.billing?.usedPercent).toBe(20);
-    expect(render(quota)).toContain(`class="quotaPercent">${100 - percent}%</span>`);
+    expect(render(quota)).toContain(`class="quotaPercent">${100 - percent}% left</span>`);
   });
 
   test('preserves monthly-only usage', () => {
@@ -205,7 +205,7 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
     expect(markup).toContain('SuperGrok Heavy');
     expect(markup).toContain('Resets');
     expect(markup).toContain(formatInstantShort(Date.parse(WEEKLY_PERIOD_END)));
-    expect(markup).toContain('GrokChat usage');
+    expect(markup).toContain('<span class="whitespace-nowrap">Grok Chat 1%</span>');
     expect(markup).toContain('Prepaid');
     expect(markup).toContain('$2.50');
     expect(markup).toContain('$0.00 / $0.00');
@@ -225,10 +225,14 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
       )
     );
 
-    expect(markup).toContain('class="quotaPercent">84%</span>');
-    expect(markup).toContain('Usage breakdown (shared quota)');
-    expect(markup).toContain('GrokBuild usage: 14%');
-    expect(markup).toContain('GrokChat usage: 2%');
+    expect(markup).toContain('class="quotaPercent">84% left</span>');
+    // Shares of one quota are amounts used, so they sit under "Used by", not as "% left".
+    // One grey label and one white value, like Plan.
+    expect(markup).toContain(
+      '<span class="codexPlanLabel shrink-0 max-sm:self-start">Used by</span><span class="codexPlanValue">' +
+        '<span class="whitespace-nowrap">Grok Build 14%</span> · ' +
+        '<span class="whitespace-nowrap">Grok Chat 2%</span></span>'
+    );
     expect(markup).toContain('width:84%');
     expect(markup.match(/class="quotaRow"/g)).toHaveLength(1);
     expect(markup).not.toContain('width:86%');
@@ -248,8 +252,8 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
       )
     );
 
-    expect(markup).toContain('GrokBuild usage: 14%');
-    expect(markup).toContain('GrokChat usage: Usage unavailable from xAI');
+    expect(markup).toContain('<span class="whitespace-nowrap">Grok Build 14%</span>');
+    expect(markup).toContain('<span class="whitespace-nowrap">Grok Chat --</span>');
     expect(markup).not.toContain('width:');
     expect(markup).not.toContain('Used 14%');
   });
@@ -264,7 +268,7 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
         })
       )
     );
-    expect(markup).toContain('>90%<');
+    expect(markup).toContain('>90% left<');
     expect(markup).toContain('$135.00 / $150.00');
     expect(markup).not.toContain('$15.00 / $150.00');
     expect(markup).toContain('width:90%');
@@ -276,7 +280,7 @@ describe('XaiQuotaBody unavailable weekly usage', () => {
     const disabled = i18n.t('xai_quota.pay_as_you_go_disabled');
 
     expect(markup).toContain(
-      `<span class="codexPlanItem"><span class="codexPlanLabel">${label}</span><span class="codexPlanValue">${disabled}</span></span>`
+      `<span class="codexPlanItem max-sm:hidden"><span class="codexPlanLabel">${label}</span><span class="codexPlanValue">${disabled}</span></span>`
     );
     expect(markup.indexOf(label)).toBeLessThan(markup.indexOf('class="quotaRow"'));
     expect(markup.split(label)).toHaveLength(2);

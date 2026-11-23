@@ -4,26 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   AiBrain01Icon,
+  ArrowRight01Icon,
   ArrowUpRight01Icon,
   BookOpen01Icon,
+  Download04Icon,
   GithubIcon,
   InformationCircleIcon,
   LinkSquare02Icon,
+  Logout01Icon,
   RefreshIcon,
   SourceCodeIcon,
-  UserLock01Icon,
 } from '@hugeicons/core-free-icons';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,7 +30,6 @@ import {
   Item,
   ItemActions,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -47,6 +37,7 @@ import {
 import { Private } from '@/components/ui/private';
 import { Switch } from '@/components/ui/switch';
 import { Page, Section, type Tab } from '@/components/layout/Page';
+import { usePageBar } from '@/components/layout/pageBar';
 import { Logo } from '@/components/brand';
 import { cn } from '@/lib/utils';
 import {
@@ -58,9 +49,9 @@ import {
 } from '@/stores';
 import { configApi, versionApi } from '@/services/api';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { useConfirmLogout } from '@/hooks/useConfirmLogout';
 import { formatDateTimeValue } from '@/utils/format';
 import { classifyModels } from '@/utils/models';
-import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import iconGemini from '@/assets/icons/gemini.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconMeta from '@/assets/icons/meta.svg';
@@ -93,24 +84,24 @@ const LINKS = [
     href: 'https://github.com/router-for-me/CLIProxyAPI',
     icon: GithubIcon,
     title: 'system_info.link_main_repo',
-    description: 'system_info.link_main_repo_desc',
   },
   {
     href: 'https://github.com/router-for-me/Cli-Proxy-API-Management-Center',
     icon: SourceCodeIcon,
     title: 'system_info.link_webui_repo',
-    description: 'system_info.link_webui_repo_desc',
   },
   {
     href: 'https://help.router-for.me/',
     icon: BookOpen01Icon,
     title: 'system_info.link_docs',
-    description: 'system_info.link_docs_desc',
   },
 ] as const;
 
-type SystemTab = 'about' | 'models' | 'links' | 'storage';
-const TAB_IDS: SystemTab[] = ['about', 'models', 'links', 'storage'];
+type SystemTab = 'about' | 'models' | 'links';
+
+/** Wraps a Section whose heading only repeats its tab name: phones see the tab row right above. */
+const TAB_NAMES_SECTION = 'contents max-sm:[&>section>div:first-child]:hidden';
+const TAB_IDS: SystemTab[] = ['about', 'models', 'links'];
 
 const STATUS_DOT = {
   success: 'bg-success',
@@ -150,6 +141,7 @@ export function SystemPage() {
   const { showNotification } = useNotificationStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const auth = useAuthStore();
+  const confirmLogout = useConfirmLogout();
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
@@ -160,6 +152,7 @@ export function SystemPage() {
   const modelsError = useModelsStore((state) => state.error);
   const fetchModelsFromStore = useModelsStore((state) => state.fetchModels);
 
+  const pageBar = usePageBar();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: SystemTab = TAB_IDS.find((id) => id === tabParam) ?? 'about';
@@ -173,6 +166,8 @@ export function SystemPage() {
   const [requestLogTouched, setRequestLogTouched] = useState(false);
   const [requestLogSaving, setRequestLogSaving] = useState(false);
   const [checkingVersion, setCheckingVersion] = useState(false);
+  // The last check's result, shown in the row itself.
+  const [versionStatus, setVersionStatus] = useState<{ latest: string; newer: boolean }>();
 
   const versionTapCount = useRef(0);
   const versionTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,7 +176,14 @@ export function SystemPage() {
     () => (i18n.language?.toLowerCase().startsWith('zh') ? '其他' : 'Other'),
     [i18n.language]
   );
-  const groupedModels = useMemo(() => classifyModels(models, { otherLabel }), [models, otherLabel]);
+  const groupedModels = useMemo(
+    () =>
+      classifyModels(models, { otherLabel }).map((group) => ({
+        ...group,
+        items: [...group.items].sort((a, b) => a.name.localeCompare(b.name)),
+      })),
+    [models, otherLabel]
+  );
   const requestLogEnabled = config?.requestLog ?? false;
   const requestLogDirty = requestLogDraft !== requestLogEnabled;
   const canEditRequestLog = auth.connectionStatus === 'connected' && Boolean(config);
@@ -196,7 +198,6 @@ export function SystemPage() {
     { id: 'about', label: t('system_info.tab_about'), icon: InformationCircleIcon },
     { id: 'models', label: t('system_info.models_title'), icon: AiBrain01Icon },
     { id: 'links', label: t('system_info.quick_links_title'), icon: LinkSquare02Icon },
-    { id: 'storage', label: t('system_info.clear_login_title'), icon: UserLock01Icon },
   ];
 
   const getIconForCategory = (categoryId: string): string | null => {
@@ -240,14 +241,6 @@ export function SystemPage() {
       const text = `${t('system_info.models_error')}${suffix}`;
       setModelStatus({ type: 'error', message: text });
     }
-  };
-
-  const clearLoginStorage = () => {
-    auth.logout();
-    if (typeof localStorage === 'undefined') return;
-    const keysToRemove = [STORAGE_KEY_AUTH, 'isLoggedIn', 'apiBase', 'apiUrl', 'managementKey'];
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-    showNotification(t('notification.login_storage_cleared'), 'success');
   };
 
   const openRequestLogModal = useCallback(() => {
@@ -312,6 +305,7 @@ export function SystemPage() {
 
   const handleVersionCheck = useCallback(async () => {
     setCheckingVersion(true);
+    setVersionStatus(undefined);
     try {
       const data = await versionApi.checkLatest();
       const latestRaw = data?.['latest-version'] ?? data?.latest_version ?? data?.latest ?? '';
@@ -328,11 +322,7 @@ export function SystemPage() {
         return;
       }
 
-      if (comparison > 0) {
-        showNotification(t('system_info.version_update_available', { version: latest }), 'warning');
-      } else {
-        showNotification(t('system_info.version_is_latest'), 'success');
-      }
+      setVersionStatus({ latest, newer: comparison > 0 });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : typeof error === 'string' ? error : '';
@@ -368,6 +358,28 @@ export function SystemPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.connectionStatus, auth.apiBase]);
 
+  const refreshModels = () => void fetchModels({ forceRefresh: true });
+  // Phones hide the section heading, so the models refresh moves into the top bar, where it
+  // replaces the app-wide one instead of adding a second refresh.
+  const phoneRefresh =
+    tab === 'models' && pageBar ? (
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        className="size-10"
+        disabled={modelsLoading}
+        onClick={refreshModels}
+        aria-label={t('common.refresh')}
+      >
+        <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
+      </Button>
+    ) : undefined;
+
+  // Laid out like the Links rows: icon, label, and a chevron for rows that lead somewhere.
+  const actionRow =
+    'flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 disabled:pointer-events-none disabled:opacity-50';
+  const rowIcon = 'size-4 shrink-0 text-muted-foreground';
+
   const connectionDot =
     auth.connectionStatus === 'connected'
       ? 'bg-success'
@@ -378,201 +390,235 @@ export function SystemPage() {
   return (
     <Page
       title={t('system_info.title')}
+      actions={phoneRefresh}
       tabs={tabs}
       tab={tab}
       onTab={(next) => setSearchParams(next === 'about' ? {} : { tab: next }, { replace: true })}
     >
       {tab === 'about' && (
-        <Section title={t('system_info.about_title')} icon={<Logo className="size-6" />}>
-          <div className="divide-y overflow-hidden rounded-xl border bg-card text-sm">
-            {/* A plain row to the eye; also the seven-tap target for the request log switch. */}
-            <button
-              type="button"
-              className="flex w-full cursor-default items-center justify-between gap-6 px-4 py-3 text-left outline-none focus-visible:bg-muted/50"
-              onClick={handleInfoVersionTap}
-            >
-              <span className="text-muted-foreground">{t('system_info.dashboard_version')}</span>
-              <span className="truncate font-mono text-xs">{appVersion}</span>
-            </button>
-            <div className="flex items-center justify-between gap-6 px-4 py-3">
-              <span className="text-muted-foreground">{t('system_info.dashboard_built')}</span>
-              <span className="truncate font-mono text-xs">{appBuilt}</span>
-            </div>
-            <div className="flex items-center justify-between gap-6 px-4 py-2">
-              <span className="text-muted-foreground">{t('system_info.proxy_version')}</span>
-              <span className="flex min-w-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <span className="max-w-full truncate font-mono text-xs">{apiVersion}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={checkingVersion}
-                  onClick={() => void handleVersionCheck()}
-                >
-                  {t('system_info.version_check_button')}
-                </Button>
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-6 px-4 py-3">
-              <span className="text-muted-foreground">{t('system_info.proxy_built')}</span>
-              <span className="truncate font-mono text-xs">{apiBuilt}</span>
-            </div>
-            <div className="flex items-center justify-between gap-6 px-4 py-3">
-              <span className="shrink-0 text-muted-foreground">{t('system_info.connection')}</span>
-              <span className="flex min-w-0 flex-col items-end gap-1">
-                <span className="flex items-center gap-2">
-                  <span className={cn('size-2 rounded-full', connectionDot)} />
-                  {t(`common.${auth.connectionStatus}_status`)}
+        // Phones already show the logo and name in the top bar, so they skip this heading.
+        <div className={TAB_NAMES_SECTION}>
+          <Section title={t('system_info.about_title')} icon={<Logo className="size-6" />}>
+            <div className="divide-y overflow-hidden rounded-xl border bg-card text-sm">
+              {/* A plain row to the eye; also the seven-tap target for the request log switch. */}
+              <button
+                type="button"
+                className="flex w-full cursor-default items-center justify-between gap-6 px-4 py-3 text-left outline-none focus-visible:bg-muted/50"
+                onClick={handleInfoVersionTap}
+              >
+                <span className="text-muted-foreground">{t('system_info.dashboard_version')}</span>
+                <span className="truncate font-mono text-xs">{appVersion}</span>
+              </button>
+              <div className="flex items-center justify-between gap-6 px-4 py-3">
+                <span className="text-muted-foreground">{t('system_info.dashboard_built')}</span>
+                <span className="truncate">{appBuilt}</span>
+              </div>
+              <div className="flex items-center justify-between gap-6 px-4 py-3">
+                <span className="shrink-0 text-muted-foreground">
+                  {t('system_info.proxy_version')}
                 </span>
-                {auth.apiBase && (
-                  <span className="max-w-full truncate font-mono text-xs text-muted-foreground">
-                    <Private>{auth.apiBase}</Private>
+                <span className="truncate font-mono text-xs">{apiVersion}</span>
+              </div>
+              <div className="flex items-center justify-between gap-6 px-4 py-3">
+                <span className="text-muted-foreground">{t('system_info.proxy_built')}</span>
+                <span className="truncate">{apiBuilt}</span>
+              </div>
+              <div className="flex items-center justify-between gap-6 px-4 py-3">
+                <span className="shrink-0 text-muted-foreground">
+                  {t('system_info.connection')}
+                </span>
+                <span className="flex min-w-0 flex-col items-end gap-1">
+                  <span className="flex items-center gap-2">
+                    <span className={cn('size-2 rounded-full', connectionDot)} />
+                    {t(`common.${auth.connectionStatus}_status`)}
                   </span>
-                )}
-              </span>
+                  {auth.apiBase && (
+                    // Clips sideways only, so Private's taller tap area isn't cut off; Private
+                    // draws its own ellipsis.
+                    <span className="max-w-full overflow-x-clip font-mono text-xs whitespace-nowrap text-muted-foreground">
+                      <Private>{auth.apiBase}</Private>
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
-          </div>
-        </Section>
+
+            <div className="divide-y overflow-hidden rounded-xl border bg-card">
+              <button
+                type="button"
+                className={actionRow}
+                disabled={checkingVersion}
+                onClick={() => void handleVersionCheck()}
+              >
+                <HugeiconsIcon icon={Download04Icon} className={rowIcon} strokeWidth={1.75} />
+                {t('system_info.version_check_button')}
+                <span
+                  aria-live="polite"
+                  className={cn(
+                    'ml-auto font-normal',
+                    versionStatus?.newer ? 'text-success' : 'text-muted-foreground'
+                  )}
+                >
+                  {versionStatus &&
+                    (versionStatus.newer
+                      ? t('system_info.version_update_available', {
+                          version: versionStatus.latest,
+                        })
+                      : t('system_info.version_is_latest'))}
+                </span>
+                {!versionStatus && (
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={2}
+                  />
+                )}
+              </button>
+              {versionStatus?.newer && (
+                <a
+                  href={`https://github.com/router-for-me/CLIProxyAPI/releases/tag/${encodeURIComponent(versionStatus.latest)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={actionRow}
+                >
+                  <HugeiconsIcon icon={GithubIcon} className={rowIcon} strokeWidth={1.75} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('system_info.version_release_notes', { version: versionStatus.latest })}
+                  </span>
+                  <HugeiconsIcon
+                    icon={ArrowUpRight01Icon}
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={2}
+                  />
+                </a>
+              )}
+              <button type="button" className={actionRow} onClick={confirmLogout}>
+                <HugeiconsIcon icon={Logout01Icon} className={rowIcon} strokeWidth={1.75} />
+                {t('header.logout')}
+              </button>
+            </div>
+          </Section>
+        </div>
       )}
 
       {tab === 'models' && (
-        <Section
-          title={t('system_info.models_title')}
-          actions={
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-9"
-              disabled={modelsLoading}
-              onClick={() => void fetchModels({ forceRefresh: true })}
-            >
-              <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
-              {t('common.refresh')}
-            </Button>
-          }
-        >
-          <div className="flex flex-col gap-3">
-            <p className="text-[13px] text-muted-foreground">{t('system_info.models_desc')}</p>
-            {modelStatus && (
-              <span className="flex items-center gap-2 text-[13px]">
-                <span className={cn('size-2 rounded-full', STATUS_DOT[modelStatus.type])} />
-                <span className={modelStatus.type === 'error' ? 'text-destructive' : undefined}>
-                  {modelStatus.message}
+        <div className={TAB_NAMES_SECTION}>
+          <Section
+            title={t('system_info.models_title')}
+            actions={
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-9"
+                disabled={modelsLoading}
+                onClick={refreshModels}
+              >
+                <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
+                {t('common.refresh')}
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-3">
+              {modelStatus && (
+                <span className="flex min-w-0 items-center gap-2 text-[13px]">
+                  <span
+                    className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[modelStatus.type])}
+                  />
+                  <span className={modelStatus.type === 'error' ? 'text-destructive' : undefined}>
+                    {modelStatus.message}
+                  </span>
                 </span>
-              </span>
-            )}
-            {modelsError && <p className="text-[13px] text-destructive">{modelsError}</p>}
-          </div>
-          {modelsLoading ? (
-            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-          ) : models.length === 0 ? (
-            <Empty className="border border-dashed">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <HugeiconsIcon icon={AiBrain01Icon} strokeWidth={1.75} />
-                </EmptyMedia>
-                <EmptyTitle>{t('system_info.models_empty')}</EmptyTitle>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="divide-y overflow-hidden rounded-xl border bg-card">
-              {groupedModels.map((group) => {
-                const iconSrc = getIconForCategory(group.id);
-                return (
-                  <div key={group.id} className="flex flex-col gap-3 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2.5 text-sm font-medium">
-                        {iconSrc ? (
-                          <img src={iconSrc} alt="" className="size-5 rounded" />
-                        ) : (
-                          <HugeiconsIcon
-                            icon={AiBrain01Icon}
-                            className="size-5 text-muted-foreground"
-                            strokeWidth={1.75}
-                          />
-                        )}
-                        {group.label}
-                      </span>
-                      <span className="font-mono text-xs text-faint">{group.items.length}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.items.map((model) => (
-                        <Badge
-                          key={`${model.name}-${model.alias ?? 'default'}`}
-                          variant="secondary"
-                          className="h-auto max-w-full gap-1.5 font-mono font-normal"
-                          title={model.description || ''}
-                        >
-                          <span className="truncate">{model.name}</span>
-                          {model.alias && (
-                            <span className="truncate text-muted-foreground">{model.alias}</span>
-                          )}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              )}
+              {modelsError && <p className="text-[13px] text-destructive">{modelsError}</p>}
             </div>
-          )}
-        </Section>
+            {modelsLoading ? (
+              <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+            ) : models.length === 0 ? (
+              <Empty className="border border-dashed">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <HugeiconsIcon icon={AiBrain01Icon} strokeWidth={1.75} />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('system_info.models_empty')}</EmptyTitle>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div className="divide-y overflow-hidden rounded-xl border bg-card">
+                {groupedModels.map((group) => {
+                  const iconSrc = getIconForCategory(group.id);
+                  return (
+                    <div key={group.id} className="flex flex-col gap-3 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2.5 text-sm font-medium">
+                          {iconSrc ? (
+                            <img src={iconSrc} alt="" className="size-5 rounded" />
+                          ) : (
+                            <HugeiconsIcon
+                              icon={AiBrain01Icon}
+                              className="size-5 text-muted-foreground"
+                              strokeWidth={1.75}
+                            />
+                          )}
+                          {group.label}
+                        </span>
+                        <span className="text-xs text-faint">{group.items.length}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.items.map((model) => (
+                          <Badge
+                            key={`${model.name}-${model.alias ?? 'default'}`}
+                            variant="secondary"
+                            className="h-auto max-w-full gap-1.5 font-mono font-normal"
+                            title={model.description || ''}
+                          >
+                            <span className="truncate">{model.name}</span>
+                            {model.alias && (
+                              <span className="truncate text-muted-foreground">{model.alias}</span>
+                            )}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+        </div>
       )}
 
       {tab === 'links' && (
-        <Section title={t('system_info.quick_links_title')}>
-          <ItemGroup className="gap-2">
-            {LINKS.map((link) => (
-              <Item key={link.href} variant="outline" asChild>
-                <a href={link.href} target="_blank" rel="noopener noreferrer">
-                  <ItemMedia variant="icon">
-                    <HugeiconsIcon icon={link.icon} strokeWidth={1.75} />
-                  </ItemMedia>
-                  <ItemContent className="min-w-0">
-                    <ItemTitle>{t(link.title)}</ItemTitle>
-                    <ItemDescription>{t(link.description)}</ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <HugeiconsIcon
-                      icon={ArrowUpRight01Icon}
-                      className="size-4 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                  </ItemActions>
-                </a>
-              </Item>
-            ))}
-          </ItemGroup>
-        </Section>
-      )}
-
-      {tab === 'storage' && (
-        <Section title={t('system_info.clear_login_title')}>
-          <Item variant="outline">
-            <ItemContent>
-              <ItemDescription>{t('system_info.clear_login_desc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">{t('system_info.clear_login_button')}</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('system_info.clear_login_title')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('system_info.clear_login_confirm')}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={clearLoginStorage}>
-                      {t('common.confirm')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </ItemActions>
-          </Item>
-        </Section>
+        <div className={TAB_NAMES_SECTION}>
+          <Section title={t('system_info.quick_links_title')}>
+            {/* One grouped list on phones instead of a box per link. */}
+            <ItemGroup className="gap-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border">
+              {LINKS.map((link) => (
+                <Item
+                  key={link.href}
+                  variant="outline"
+                  className="max-sm:min-h-11 max-sm:rounded-none max-sm:border-x-0 max-sm:border-t-0 max-sm:py-2 max-sm:last:border-b-0"
+                  asChild
+                >
+                  <a href={link.href} target="_blank" rel="noopener noreferrer">
+                    <ItemMedia variant="icon">
+                      <HugeiconsIcon icon={link.icon} strokeWidth={1.75} />
+                    </ItemMedia>
+                    <ItemContent className="min-w-0">
+                      <ItemTitle>{t(link.title)}</ItemTitle>
+                    </ItemContent>
+                    <ItemActions>
+                      <HugeiconsIcon
+                        icon={ArrowUpRight01Icon}
+                        className="size-4 text-muted-foreground"
+                        strokeWidth={2}
+                      />
+                    </ItemActions>
+                  </a>
+                </Item>
+              ))}
+            </ItemGroup>
+          </Section>
+        </div>
       )}
 
       <Dialog

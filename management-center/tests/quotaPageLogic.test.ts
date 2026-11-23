@@ -9,12 +9,14 @@ import {
   hasStoredQuotaCapacity,
   hasStoredQuotaError,
   isQuotaRefreshDisabled,
+  lowestStoredRemainingPercent,
   paginate,
   resolveQuotaProviderType,
   resolveXaiGrokBotWindow,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from '@/features/quota/logic';
+import { lowestRemainingPercent } from '@/features/quota/quotaTimelineModel';
 import type { AuthFileItem } from '@/types';
 
 const file = (name: string, provider: string, extra: Partial<AuthFileItem> = {}): AuthFileItem =>
@@ -327,6 +329,55 @@ describe('sortQuotaEntries', () => {
     const last = entries[entries.length - 1].file.name;
     const sorted = sortQuotaEntries(entries, 'soonest', resolver({ [last]: 1 }));
     expect(paginate(sorted, 1, 2).pageItems[0].file.name).toBe(last);
+  });
+});
+
+describe('least left first', () => {
+  const window = (id: string, usedPercent: number) => ({
+    id,
+    label: id,
+    usedPercent,
+    resetAtMs: 1_000,
+    periodHours: 5,
+  });
+
+  test('keys a credential by its tightest limit, whatever the provider shape', () => {
+    expect(
+      lowestRemainingPercent('claude', {
+        status: 'success',
+        windows: [window('five-hour', 10), window('weekly', 70)],
+      } as { status: string })
+    ).toBe(30);
+    expect(lowestRemainingPercent('codex', undefined)).toBeNull();
+  });
+
+  test('falls back to the stored snapshot and ranks the emptiest first', () => {
+    const stored = (name: string, remaining: number[]) =>
+      file(name, 'codex', {
+        quota_capacity: {
+          provider: 'codex',
+          supported: true,
+          windows: remaining.map((value, index) => ({
+            id: `w${index}`,
+            label: `w${index}`,
+            used_percent: 100 - value,
+            remaining_percent: value,
+            known: true,
+            routing: true,
+          })),
+        },
+      } as Partial<AuthFileItem>);
+    const entries = classifyQuotaFiles([
+      stored('roomy.json', [90, 64]),
+      stored('tight.json', [80, 12]),
+      file('unknown.json', 'codex'),
+    ]);
+    const sorted = sortQuotaEntries(entries, 'least_left', lowestStoredRemainingPercent);
+    expect(sorted.map((entry) => entry.file.name)).toEqual([
+      'tight.json',
+      'roomy.json',
+      'unknown.json',
+    ]);
   });
 });
 

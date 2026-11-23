@@ -32,6 +32,7 @@ const render = (json: Record<string, unknown> = original, disabled = false) =>
       { i18n },
       createElement(AuthFilePolicyFields, {
         draft: readCredentialPolicy(json),
+        fields: ['requestRetry', 'modelAliases', 'errorRules'],
         disabled,
         onChange: () => {},
       })
@@ -104,7 +105,8 @@ describe('credential policy structured forms', () => {
 
   test('inherited errors do not pretend to override provider rules', () => {
     const html = render({});
-    expect(html).toContain('Inherit');
+    // Only the mode pickers render: inherited values have no rows to edit.
+    expect(html.match(/role="combobox"/g)).toHaveLength(3);
     expect(html).not.toContain('Add rule');
     expect(html).not.toContain('Add model');
   });

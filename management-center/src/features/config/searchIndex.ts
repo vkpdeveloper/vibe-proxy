@@ -41,7 +41,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'routingSessionAffinitySubagents',
     sectionId: 'network',
     labelKey: L('additions.routingSessionAffinitySubagents.label'),
-    hintKey: L('additions.routingSessionAffinitySubagents.hint'),
     yamlKeys: ['routing', 'session-affinity-subagents'],
   },
   {
@@ -146,7 +145,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'antigravityConnectionPoolEnabled',
     sectionId: 'advanced',
     labelKey: L('additions.antigravityConnectionPoolEnabled.label'),
-    hintKey: L('additions.antigravityConnectionPoolEnabled.hint'),
     yamlKeys: ['oauth', 'providers', 'antigravity', 'connection-pool', 'enabled'],
   },
   {
@@ -209,7 +207,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'codexLiveMediaRelayUDPPortMax',
     sectionId: 'advanced',
     labelKey: L('additions.codexLiveMediaRelayUDPPortMax.label'),
-    hintKey: L('additions.codexLiveMediaRelayUDPPortMax.hint'),
     yamlKeys: ['oauth', 'providers', 'codex', 'live-media-relay', 'udp-port-max'],
   },
   {
@@ -226,7 +223,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'githubToken',
     sectionId: 'connectivity',
     labelKey: L('sections.server.github_token'),
-    hintKey: L('sections.server.github_token_hint'),
     yamlKeys: ['server', 'github-token'],
     keywords: ['GITHUB_TOKEN', 'GitHub', 'token'],
   },
@@ -309,7 +305,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'authDir',
     sectionId: 'connectivity',
     labelKey: L('sections.auth.auth_dir'),
-    hintKey: L('sections.auth.auth_dir_hint'),
     yamlKeys: ['oauth', 'auth-dir'],
   },
   {
@@ -323,7 +318,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'tlsEnable',
     sectionId: 'connectivity',
     labelKey: L('sections.tls.enable'),
-    hintKey: L('sections.tls.enable_desc'),
     yamlKeys: ['server', 'tls'],
     keywords: ['tls', 'ssl', 'https'],
   },
@@ -345,7 +339,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'rmAllowRemote',
     sectionId: 'connectivity',
     labelKey: L('sections.remote.allow_remote'),
-    hintKey: L('sections.remote.allow_remote_desc'),
     yamlKeys: ['management', 'allow-remote'],
   },
   {
@@ -403,14 +396,12 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'authAutoRefreshWorkers',
     sectionId: 'network',
     labelKey: L('sections.network.auth_auto_refresh_workers'),
-    hintKey: L('sections.network.auth_auto_refresh_workers_hint'),
     yamlKeys: ['oauth', 'auth-auto-refresh-workers'],
   },
   {
     fieldId: 'routingStrategy',
     sectionId: 'network',
     labelKey: L('sections.network.routing_strategy'),
-    hintKey: L('sections.network.routing_strategy_hint'),
     yamlKeys: ['routing', 'strategy'],
     keywords: [
       'round-robin',
@@ -426,7 +417,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'routingQuotaDrainRefreshInterval',
     sectionId: 'network',
     labelKey: L('sections.network.quota_drain_refresh_interval'),
-    hintKey: L('sections.network.quota_drain_refresh_interval_hint'),
     yamlKeys: ['routing', 'quota-drain', 'refresh-interval'],
     keywords: ['quota-drain', 'poll', 'refresh'],
   },
@@ -442,7 +432,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'disableImageGeneration',
     sectionId: 'network',
     labelKey: L('sections.network.disable_image_generation'),
-    hintKey: L('sections.network.disable_image_generation_hint'),
     yamlKeys: ['multimedia', 'disable-image-generation'],
     keywords: ['false', 'true', 'chat', 'passthrough'],
   },
@@ -450,7 +439,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'gptImage2BaseModel',
     sectionId: 'network',
     labelKey: L('sections.network.gpt_image_2_base_model'),
-    hintKey: L('sections.network.gpt_image_2_base_model_hint'),
     yamlKeys: ['multimedia', 'gpt-image-2-base-model'],
   },
   {
@@ -470,7 +458,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'passthroughHeaders',
     sectionId: 'network',
     labelKey: L('sections.network.passthrough_headers'),
-    hintKey: L('sections.network.passthrough_headers_desc'),
     yamlKeys: ['requests', 'passthrough-headers'],
   },
   {
@@ -499,7 +486,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'debug',
     sectionId: 'logging',
     labelKey: L('sections.system.debug'),
-    hintKey: L('sections.system.debug_desc'),
     yamlKeys: ['observability', 'logs', 'debug'],
   },
   {
@@ -513,7 +499,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'loggingToFile',
     sectionId: 'logging',
     labelKey: L('sections.system.logging_to_file'),
-    hintKey: L('sections.system.logging_to_file_desc'),
     yamlKeys: ['observability', 'logs', 'logging-to-file'],
   },
   {
@@ -539,7 +524,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'usageStatisticsEnabled',
     sectionId: 'logging',
     labelKey: L('sections.system.usage_statistics_enabled'),
-    hintKey: L('sections.system.usage_statistics_enabled_desc'),
     yamlKeys: ['observability', 'usage', 'usage-statistics-enabled'],
   },
   // ── streaming ─────────────────────────────────────────────────────────────
@@ -575,7 +559,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'pluginsEnabled',
     sectionId: 'advanced',
     labelKey: L('sections.system.plugins_enabled'),
-    hintKey: L('sections.system.plugins_enabled_desc'),
     yamlKeys: ['plugins'],
   },
   {
@@ -598,7 +581,6 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     fieldId: 'antigravitySignatureCacheEnabled',
     sectionId: 'advanced',
     labelKey: L('sections.system.antigravity_signature_cache'),
-    hintKey: L('sections.system.antigravity_signature_cache_desc'),
     yamlKeys: ['oauth', 'providers', 'antigravity', 'signature-cache-enabled'],
   },
   {

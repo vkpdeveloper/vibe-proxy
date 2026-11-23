@@ -22,6 +22,8 @@ import {
   RESET_DISPLAY_MODES,
   useQuotaResetDisplayStore,
 } from '@/features/quota/components/resetDisplayFormats';
+import { QuotaMeter } from '@/features/quota/components/QuotaMeter';
+import { QuotaResetLabel } from '@/features/quota/components/QuotaResetLabel';
 import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
 import { buildResetDisplay, formatInstantShort } from '@/utils/quota';
 import { DAY_MS, HOUR_MS } from '@/utils/time/durations';
@@ -105,20 +107,31 @@ describe('CodexQuotaBody', () => {
   });
 
   test.each([
-    ['en', 'Credit balance', 'Unlimited'],
-    ['zh-CN', 'Credit 余额', '无限额'],
-    ['zh-TW', 'Credit 餘額', '無限額'],
-    ['ru', 'Остаток кредитов', 'Без ограничений'],
+    ['en', 'Balance', 'Unlimited'],
+    ['zh-CN', '余额', '无限额'],
+    ['zh-TW', '餘額', '無限額'],
+    ['ru', 'Баланс', 'Без ограничений'],
   ])(
     'renders account credits independently of manual resets in %s',
     async (language, label, unlimited) => {
       await i18n.changeLanguage(language);
       try {
         const balance = renderToStaticMarkup(
-          createElement(CodexQuotaBody, { quota: { ...quota, creditBalance: '0' }, classes })
+          createElement(CodexQuotaBody, {
+            quota: { ...quota, creditBalance: '51649.1093280000' },
+            classes,
+          })
         );
         expect(balance).toContain(label);
-        expect(balance).toContain('<span class="codexPlanValue">0</span>');
+        // The raw API decimal is grouped and rounded to 2 decimals for the locale.
+        const grouped = new Intl.NumberFormat(language, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(51649.109328);
+        expect(balance).toContain(
+          `<span class="codexPlanValue">${i18n.t('codex_quota.credit_balance_value', { amount: grouped })}</span>`
+        );
+        if (language === 'en') expect(balance).toContain('51,649.11 credits');
         const infinite = renderToStaticMarkup(
           createElement(CodexQuotaBody, {
             quota: { ...quota, creditBalance: null, creditsUnlimited: true },
@@ -170,22 +183,31 @@ describe('CodexQuotaBody', () => {
     expect(markup).not.toContain('quotaRowSoon');
   });
 
-  test('does not emphasize a reset countdown more than one hour away', () => {
-    const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
-
-    expect(markup).not.toContain('quotaRowSoon');
-    expect(markup).not.toContain('quotaResetRelativeSoon');
-    expect(markup).not.toContain('codexResetCreditRowSoon');
-  });
-
-  test('emphasizes a reset countdown within the final hour', () => {
-    const urgent: CodexQuotaState = {
+  test('keeps a near reset muted while plenty is left', () => {
+    // Amber means "running low", not "resets soon": 62% left, resetting in 30 minutes.
+    const near: CodexQuotaState = {
       ...quota,
       windows: [{ ...quota.windows[0], resetAtMs: now + 30 * 60_000 }],
     };
-    const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota: urgent, classes }));
+    const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota: near, classes }));
 
-    expect(markup).toContain('quotaResetRelativeSoon');
+    expect(markup).not.toContain('quotaResetMedium');
+    expect(markup).not.toContain('quotaResetLow');
+    expect(markup).not.toContain('codexResetCreditRowSoon');
+  });
+
+  test.each([
+    [75, 'quotaResetMedium'],
+    [95, 'quotaResetLow'],
+  ])('colours the reset line like the meter at %d%% used', (usedPercent, tone) => {
+    const low: CodexQuotaState = {
+      ...quota,
+      windows: [{ ...quota.windows[0], usedPercent, resetAtMs: now + 5 * DAY_MS }],
+    };
+    const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota: low, classes }));
+
+    expect(markup).toContain(`quotaResetCycle ${tone}`);
+    expect(markup).toContain(`quotaReset ${tone} col-span-2`);
   });
 
   test('highlights nothing once every instant is in the past', () => {
@@ -297,7 +319,7 @@ describe('CursorQuotaBody', () => {
       windows: [
         {
           id: 'grok-bot',
-          label: 'Grok Bot · Weekly usage',
+          label: 'Grok Bot weekly limit',
           labelKey: 'cursor_quota.grok_bot_weekly',
           descriptionKey: 'cursor_quota.grok_bot_weekly_desc',
           usedPercent: 9,
@@ -308,7 +330,7 @@ describe('CursorQuotaBody', () => {
     };
     const markup = renderToStaticMarkup(createElement(CursorQuotaBody, { quota, classes }));
 
-    expect(markup).toContain('Grok Bot · Weekly usage');
+    expect(markup).toContain('Grok Bot weekly limit');
     expect(markup).toContain('91% left');
     expect(markup).toContain('Separate allowance included with your Cursor plan');
     expect(markup).toContain('in 5 days');
@@ -357,7 +379,7 @@ describe('DevinCliQuotaBody', () => {
       windows: [
         {
           id: 'daily',
-          label: 'Daily quota',
+          label: 'Daily limit',
           labelKey: 'devin_cli_quota.daily',
           descriptionKey: 'devin_cli_quota.daily_desc',
           usedPercent: 25,
@@ -366,7 +388,7 @@ describe('DevinCliQuotaBody', () => {
         },
         {
           id: 'weekly',
-          label: 'Weekly quota',
+          label: 'Weekly limit',
           labelKey: 'devin_cli_quota.weekly',
           descriptionKey: 'devin_cli_quota.weekly_desc',
           usedPercent: 60,
@@ -378,14 +400,19 @@ describe('DevinCliQuotaBody', () => {
     const markup = renderToStaticMarkup(createElement(DevinCliQuotaBody, { quota, classes }));
 
     expect(markup).toContain('Pro');
-    expect(markup).toContain('Daily quota');
-    expect(markup).toContain('Weekly quota');
+    expect(markup).toContain('Daily limit');
+    expect(markup).toContain('Weekly limit');
     expect(markup).toContain('75% left');
     expect(markup).toContain('40% left');
     expect(markup).toContain('Devin daily ACU allowance');
     expect(markup).toContain('$45.23');
     expect(markup).toContain('Extra usage balance');
-    expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(3);
+    // The plan end is a plain label/value like Codex "Renews"; only the two limits cycle.
+    expect(markup).toContain(
+      `<span class="codexPlanLabel">Plan period ends</span><span class="codexPlanValue" title="`
+    );
+    expect(markup).toContain(`>${formatInstantShort(now + 20 * DAY_MS, 'en')} · in 20d</span>`);
+    expect(markup.match(/aria-label="Change reset time format"/g)).toHaveLength(2);
   });
 });
 
@@ -419,7 +446,7 @@ describe('XaiQuotaBody', () => {
     expect(markup).toContain('Weekly limit');
     expect(markup).toContain('Grok Bot');
     expect(markup).toContain('funded by this account');
-    expect(markup).toContain('Used 16%');
+    expect(markup).toContain('84% left');
   });
 
   test('omits the Grok Bot row when no Cursor credential reports it', () => {
@@ -427,5 +454,68 @@ describe('XaiQuotaBody', () => {
     const markup = renderToStaticMarkup(createElement(XaiQuotaBody, { quota, classes }));
 
     expect(markup).not.toContain('Grok Bot');
+  });
+});
+
+describe('QuotaMeter', () => {
+  // Amber and red are reserved for genuinely low quota, so a mid-week account stays green.
+  test.each([
+    [64, 'quotaBarFillHigh'],
+    [30, 'quotaBarFillHigh'],
+    [25, 'quotaBarFillMedium'],
+    [9, 'quotaBarFillLow'],
+  ])('%d%% left fills with %s', (percent, fill) => {
+    const markup = renderToStaticMarkup(createElement(QuotaMeter, { percent, classes }));
+    expect(markup).toContain(`quotaBarFill ${fill}`);
+  });
+});
+
+describe('QuotaResetLabel on phones', () => {
+  const display = buildResetDisplay(null, now + 3 * HOUR_MS, now, 'en')!;
+  const at = formatInstantShort(now + 3 * HOUR_MS, 'en');
+
+  test('shows the countdown and the time together, with no hidden toggle', () => {
+    const markup = renderToStaticMarkup(createElement(QuotaResetLabel, { display, classes }));
+    expect(markup).toContain(
+      `<span class="quotaReset col-span-2 order-last sm:hidden">Resets in 3h · ${at}</span>`
+    );
+    expect(markup).toContain('class="quotaResetCycle max-sm:hidden"');
+  });
+
+  test('says when a saved reset expires rather than resets', () => {
+    const markup = renderToStaticMarkup(
+      createElement(QuotaResetLabel, { display, classes, kind: 'expiry' })
+    );
+    expect(markup).toContain(`>Expires in 3h · ${at}</span>`);
+  });
+
+  test('labels a passed reset with the same narrow duration', () => {
+    const past = buildResetDisplay(null, now - 12 * 60_000, now, 'en')!;
+    const markup = renderToStaticMarkup(createElement(QuotaResetLabel, { display: past, classes }));
+    expect(markup).toContain(`>Reset 12m ago · ${past.absolute}</span>`);
+  });
+
+  test('keeps the short countdown where a label already names the date', () => {
+    const markup = renderToStaticMarkup(
+      createElement(QuotaResetLabel, { display, classes, kind: 'plain' })
+    );
+    expect(markup).toContain(`>in 3h · ${at}</span>`);
+  });
+});
+
+describe('Codex renewal', () => {
+  test('reads as a white label/value pair like Plan, date first', () => {
+    const quota: CodexQuotaState = {
+      status: 'success',
+      planType: 'pro',
+      windows: [],
+      subscriptionActiveUntil: new Date(now + 3 * HOUR_MS).toISOString(),
+    };
+    const markup = renderToStaticMarkup(createElement(CodexQuotaBody, { quota, classes }));
+    const at = formatInstantShort(now + 3 * HOUR_MS, 'en');
+    expect(markup).toContain('<span class="codexPlanLabel">Renews</span>');
+    expect(markup).toMatch(
+      new RegExp(`<span class="codexPlanValue" title="[^"]+">${at} · in 3h</span>`)
+    );
   });
 });

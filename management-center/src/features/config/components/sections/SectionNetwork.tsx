@@ -9,7 +9,7 @@ import { getValidationMessage } from '../blocks/shared';
 type RoutingStrategy = VisualConfigValues['routingStrategy'];
 type DisableImageGeneration = VisualConfigValues['disableImageGeneration'];
 
-/** 02 网络配置：代理、重试、路由策略、图像生成开关与网络行为开关。 */
+/** 02 Requests: proxy and request handling, then retries, routing, and images and video. */
 export function SectionNetwork({
   values,
   validationErrors,
@@ -61,6 +61,43 @@ export function SectionNetwork({
       <SettingList>
         <ProxyUrlField values={values} disabled={disabled} onChange={onChange} />
         <TextSetting
+          fieldId="authAutoRefreshWorkers"
+          size="sm"
+          label={t('config_management.visual.sections.network.auth_auto_refresh_workers')}
+          type="number"
+          placeholder="16"
+          value={values.authAutoRefreshWorkers}
+          onChange={(authAutoRefreshWorkers) => onChange({ authAutoRefreshWorkers })}
+          disabled={disabled}
+          error={getValidationMessage(t, validationErrors?.authAutoRefreshWorkers)}
+        />
+        <ToggleSetting
+          fieldId="forceModelPrefix"
+          label={t('config_management.visual.sections.network.force_model_prefix')}
+          description={t('config_management.visual.sections.network.force_model_prefix_desc')}
+          checked={values.forceModelPrefix}
+          disabled={disabled}
+          onChange={(forceModelPrefix) => onChange({ forceModelPrefix })}
+        />
+        <ToggleSetting
+          fieldId="passthroughHeaders"
+          label={t('config_management.visual.sections.network.passthrough_headers')}
+          checked={values.passthroughHeaders}
+          disabled={disabled}
+          onChange={(passthroughHeaders) => onChange({ passthroughHeaders })}
+        />
+        <ToggleSetting
+          fieldId="wsAuth"
+          label={t('config_management.visual.sections.network.ws_auth')}
+          description={t('config_management.visual.sections.network.ws_auth_desc')}
+          checked={values.wsAuth}
+          disabled={disabled}
+          onChange={(wsAuth) => onChange({ wsAuth })}
+        />
+      </SettingList>
+
+      <SettingList title={t('config_management.visual.sections.network.retries_group')}>
+        <TextSetting
           fieldId="requestRetry"
           size="sm"
           label={t('config_management.visual.sections.network.request_retry')}
@@ -95,24 +132,40 @@ export function SectionNetwork({
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.maxRetryInterval)}
         />
-        <TextSetting
-          fieldId="authAutoRefreshWorkers"
-          size="sm"
-          label={t('config_management.visual.sections.network.auth_auto_refresh_workers')}
-          description={t(
-            'config_management.visual.sections.network.auth_auto_refresh_workers_hint'
-          )}
-          type="number"
-          placeholder="16"
-          value={values.authAutoRefreshWorkers}
-          onChange={(authAutoRefreshWorkers) => onChange({ authAutoRefreshWorkers })}
+        <ToggleSetting
+          fieldId="disableCooling"
+          label={t('config_management.visual.sections.network.disable_cooling')}
+          description={t('config_management.visual.sections.network.disable_cooling_desc')}
+          checked={values.disableCooling}
           disabled={disabled}
-          error={getValidationMessage(t, validationErrors?.authAutoRefreshWorkers)}
+          onChange={(disableCooling) => onChange({ disableCooling })}
         />
+        <ToggleSetting
+          fieldId="saveCooldownStatus"
+          label={t('config_management.visual.additions.saveCooldownStatus.label')}
+          description={t('config_management.visual.additions.saveCooldownStatus.hint')}
+          checked={values.saveCooldownStatus}
+          disabled={disabled}
+          onChange={(saveCooldownStatus) => onChange({ saveCooldownStatus })}
+        />
+        <TextSetting
+          fieldId="transientErrorCooldownSeconds"
+          size="sm"
+          label={t('config_management.visual.additions.transientErrorCooldownSeconds.label')}
+          description={t('config_management.visual.additions.transientErrorCooldownSeconds.hint')}
+          type="number"
+          placeholder="60"
+          value={values.transientErrorCooldownSeconds}
+          onChange={(transientErrorCooldownSeconds) => onChange({ transientErrorCooldownSeconds })}
+          disabled={disabled}
+          error={getValidationMessage(t, validationErrors?.transientErrorCooldownSeconds)}
+        />
+      </SettingList>
+
+      <SettingList title={t('config_management.visual.sections.network.routing_group')}>
         <SelectSetting
           fieldId="routingStrategy"
           label={t('config_management.visual.sections.network.routing_strategy')}
-          description={t('config_management.visual.sections.network.routing_strategy_hint')}
           value={values.routingStrategy}
           options={routingStrategyOptions}
           disabled={disabled}
@@ -124,9 +177,6 @@ export function SectionNetwork({
               fieldId="routingQuotaDrainRefreshInterval"
               size="sm"
               label={t('config_management.visual.sections.network.quota_drain_refresh_interval')}
-              description={t(
-                'config_management.visual.sections.network.quota_drain_refresh_interval_hint'
-              )}
               placeholder="5m"
               value={values.routingQuotaDrainRefreshInterval}
               onChange={(routingQuotaDrainRefreshInterval) =>
@@ -148,23 +198,12 @@ export function SectionNetwork({
             />
           </>
         )}
-        <SelectSetting
-          fieldId="disableImageGeneration"
-          label={t('config_management.visual.sections.network.disable_image_generation')}
-          description={t('config_management.visual.sections.network.disable_image_generation_hint')}
-          value={values.disableImageGeneration}
-          options={disableImageGenerationOptions}
+        <ToggleSetting
+          fieldId="routingSessionAffinity"
+          label={t('config_management.visual.sections.network.session_affinity')}
+          checked={values.routingSessionAffinity}
           disabled={disabled}
-          onChange={(disableImageGeneration) => onChange({ disableImageGeneration })}
-        />
-        <TextSetting
-          fieldId="gptImage2BaseModel"
-          label={t('config_management.visual.sections.network.gpt_image_2_base_model')}
-          description={t('config_management.visual.sections.network.gpt_image_2_base_model_hint')}
-          placeholder="gpt-5.4-mini"
-          value={values.gptImage2BaseModel}
-          onChange={(gptImage2BaseModel) => onChange({ gptImage2BaseModel })}
-          disabled={disabled}
+          onChange={(routingSessionAffinity) => onChange({ routingSessionAffinity })}
         />
         <TextSetting
           fieldId="routingSessionAffinityTTL"
@@ -175,86 +214,44 @@ export function SectionNetwork({
           onChange={(routingSessionAffinityTTL) => onChange({ routingSessionAffinityTTL })}
           disabled={disabled}
         />
-      </SettingList>
-
-      <SettingList>
         <ToggleSetting
           fieldId="routingSessionAffinitySubagents"
           label={t('config_management.visual.additions.routingSessionAffinitySubagents.label')}
-          description={t('config_management.visual.additions.routingSessionAffinitySubagents.hint')}
           checked={values.routingSessionAffinitySubagents}
           disabled={disabled}
           onChange={(routingSessionAffinitySubagents) =>
             onChange({ routingSessionAffinitySubagents })
           }
         />
-        <ToggleSetting
-          fieldId="saveCooldownStatus"
-          label={t('config_management.visual.additions.saveCooldownStatus.label')}
-          description={t('config_management.visual.additions.saveCooldownStatus.hint')}
-          checked={values.saveCooldownStatus}
+      </SettingList>
+
+      <SettingList title={t('config_management.visual.sections.network.media_group')}>
+        <SelectSetting
+          fieldId="disableImageGeneration"
+          label={t('config_management.visual.sections.network.disable_image_generation')}
+          value={values.disableImageGeneration}
+          options={disableImageGenerationOptions}
           disabled={disabled}
-          onChange={(saveCooldownStatus) => onChange({ saveCooldownStatus })}
+          onChange={(disableImageGeneration) => onChange({ disableImageGeneration })}
         />
         <TextSetting
-          fieldId="transientErrorCooldownSeconds"
-          size="sm"
-          label={t('config_management.visual.additions.transientErrorCooldownSeconds.label')}
-          description={t('config_management.visual.additions.transientErrorCooldownSeconds.hint')}
-          type="number"
-          value={values.transientErrorCooldownSeconds}
-          onChange={(transientErrorCooldownSeconds) => onChange({ transientErrorCooldownSeconds })}
+          fieldId="gptImage2BaseModel"
+          label={t('config_management.visual.sections.network.gpt_image_2_base_model')}
+          placeholder="gpt-5.4-mini"
+          value={values.gptImage2BaseModel}
+          onChange={(gptImage2BaseModel) => onChange({ gptImage2BaseModel })}
           disabled={disabled}
-          error={getValidationMessage(t, validationErrors?.transientErrorCooldownSeconds)}
         />
         <TextSetting
           fieldId="videoResultAuthCacheTTL"
           size="sm"
           label={t('config_management.visual.additions.videoResultAuthCacheTTL.label')}
           description={t('config_management.visual.additions.videoResultAuthCacheTTL.hint')}
+          placeholder="3h"
           value={values.videoResultAuthCacheTTL}
           onChange={(videoResultAuthCacheTTL) => onChange({ videoResultAuthCacheTTL })}
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.videoResultAuthCacheTTL)}
-        />
-        <ToggleSetting
-          fieldId="forceModelPrefix"
-          label={t('config_management.visual.sections.network.force_model_prefix')}
-          description={t('config_management.visual.sections.network.force_model_prefix_desc')}
-          checked={values.forceModelPrefix}
-          disabled={disabled}
-          onChange={(forceModelPrefix) => onChange({ forceModelPrefix })}
-        />
-        <ToggleSetting
-          fieldId="passthroughHeaders"
-          label={t('config_management.visual.sections.network.passthrough_headers')}
-          description={t('config_management.visual.sections.network.passthrough_headers_desc')}
-          checked={values.passthroughHeaders}
-          disabled={disabled}
-          onChange={(passthroughHeaders) => onChange({ passthroughHeaders })}
-        />
-        <ToggleSetting
-          fieldId="disableCooling"
-          label={t('config_management.visual.sections.network.disable_cooling')}
-          description={t('config_management.visual.sections.network.disable_cooling_desc')}
-          checked={values.disableCooling}
-          disabled={disabled}
-          onChange={(disableCooling) => onChange({ disableCooling })}
-        />
-        <ToggleSetting
-          fieldId="routingSessionAffinity"
-          label={t('config_management.visual.sections.network.session_affinity')}
-          checked={values.routingSessionAffinity}
-          disabled={disabled}
-          onChange={(routingSessionAffinity) => onChange({ routingSessionAffinity })}
-        />
-        <ToggleSetting
-          fieldId="wsAuth"
-          label={t('config_management.visual.sections.network.ws_auth')}
-          description={t('config_management.visual.sections.network.ws_auth_desc')}
-          checked={values.wsAuth}
-          disabled={disabled}
-          onChange={(wsAuth) => onChange({ wsAuth })}
         />
       </SettingList>
     </Section>

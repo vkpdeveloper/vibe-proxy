@@ -4,12 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowDown01Icon, ArrowUp01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import type { UseSourceSearchResult } from '../hooks/useSourceSearch';
 import { Hint } from '@/components/ui/tooltip';
 
@@ -30,15 +25,14 @@ export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
     handleSearchChange,
     executeSearch,
     handleSearchKeyDown,
-    handlePrevMatch,
-    handleNextMatch,
   } = search;
   const searched = Boolean(searchQuery) && lastSearchedQuery === searchQuery;
-  const stepDisabled = !searched || searchResults.total === 0;
+  // Enter or the arrows run the search, so the field needs no search button of its own.
+  const stepDisabled = !searchQuery || disabled;
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <InputGroup className="h-9 min-w-0 flex-1">
+      <InputGroup className="h-9 min-w-0 flex-1 max-sm:h-10">
         <InputGroupAddon>
           <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
         </InputGroupAddon>
@@ -48,33 +42,26 @@ export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
           onKeyDown={handleSearchKeyDown}
           placeholder={t('config_management.search_placeholder')}
           aria-label={t('config_management.search_placeholder')}
+          enterKeyHint="search"
           disabled={disabled}
         />
-        <InputGroupAddon align="inline-end">
-          {searched ? (
-            <span className="font-mono text-xs text-muted-foreground tabular-nums">
+        {searched ? (
+          <InputGroupAddon align="inline-end">
+            <span className="text-xs text-muted-foreground">
               {searchResults.total > 0
                 ? `${searchResults.current} / ${searchResults.total}`
                 : t('config_management.search_no_results')}
             </span>
-          ) : null}
-          <InputGroupButton
-            size="icon-xs"
-            onClick={() => executeSearch('next')}
-            disabled={!searchQuery || disabled}
-            aria-label={t('config_management.search_button')}
-            title={t('config_management.search_button')}
-          >
-            <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
-          </InputGroupButton>
-        </InputGroupAddon>
+          </InputGroupAddon>
+        ) : null}
       </InputGroup>
       <ButtonGroup>
         <Hint label={t('config_management.search_prev')}>
           <Button
             variant="outline"
             size="icon-lg"
-            onClick={handlePrevMatch}
+            className="max-sm:size-10"
+            onClick={() => executeSearch('prev')}
             disabled={stepDisabled}
             aria-label={t('config_management.search_prev')}
           >
@@ -85,7 +72,8 @@ export function SourceSearchBar({ search, disabled }: SourceSearchBarProps) {
           <Button
             variant="outline"
             size="icon-lg"
-            onClick={handleNextMatch}
+            className="max-sm:size-10"
+            onClick={() => executeSearch('next')}
             disabled={stepDisabled}
             aria-label={t('config_management.search_next')}
           >

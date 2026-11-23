@@ -8,7 +8,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import {
-  COMMON_FIELD_IDS,
   CONFIG_SECTION_IDS,
   CONFIG_TAB_IDS,
   FIELD_VALUE_KEYS,
@@ -115,8 +114,8 @@ describe('JSX anchor parity (source scan)', () => {
 });
 
 describe('registry consistency', () => {
-  test('tab id registry is common + the canonical sections', () => {
-    expect([...CONFIG_TAB_IDS]).toEqual(['common', ...CONFIG_SECTION_IDS]);
+  test('tab id registry is the canonical sections', () => {
+    expect([...CONFIG_TAB_IDS]).toEqual([...CONFIG_SECTION_IDS]);
   });
 
   test('every validation field path lives in exactly one section bucket', () => {
@@ -129,12 +128,6 @@ describe('registry consistency', () => {
   test('validation field paths are real value keys', () => {
     for (const path of Object.values(SECTION_VALIDATION_FIELDS).flat()) {
       expect(LEAF_VALUE_KEYS.has(path)).toBe(true);
-    }
-  });
-
-  test('common tab fields are a subset of the index', () => {
-    for (const fieldId of COMMON_FIELD_IDS) {
-      expect(INDEX_FIELD_ID_SET.has(fieldId)).toBe(true);
     }
   });
 });

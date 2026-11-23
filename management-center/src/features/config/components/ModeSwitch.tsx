@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { ConfigEditorMode } from '../constants';
 
 export type ModeSwitchProps = {
@@ -18,19 +17,24 @@ const MODES: readonly ConfigEditorMode[] = ['visual', 'source'];
 export function ModeSwitch({ mode, disabled = false, onChange }: ModeSwitchProps) {
   const { t } = useTranslation();
   return (
-    <ButtonGroup aria-label={t('config_management.mode.label')}>
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      spacing={0}
+      value={mode}
+      // Radix sends an empty value when the active item is pressed again; keep the current mode.
+      onValueChange={(value) => {
+        const next = MODES.find((entry) => entry === value);
+        if (next) onChange(next);
+      }}
+      disabled={disabled}
+      aria-label={t('config_management.mode.label')}
+    >
       {MODES.map((entry) => (
-        <Button
-          key={entry}
-          variant={mode === entry ? 'secondary' : 'outline'}
-          className="h-9 px-3"
-          aria-pressed={mode === entry}
-          disabled={disabled}
-          onClick={() => onChange(entry)}
-        >
+        <ToggleGroupItem key={entry} value={entry} className="h-9 px-3 max-sm:h-10 max-sm:px-2.5">
           {t(`config_management.mode.${entry}`)}
-        </Button>
+        </ToggleGroupItem>
       ))}
-    </ButtonGroup>
+    </ToggleGroup>
   );
 }

@@ -30,6 +30,13 @@ const addedFieldIds = [
   'codexLiveMediaRelayICEServers',
 ];
 
+// The label says enough for these, so they carry no help line.
+const withoutHint = new Set([
+  'routingSessionAffinitySubagents',
+  'antigravityConnectionPoolEnabled',
+  'codexLiveMediaRelayUDPPortMax',
+]);
+
 function resolveKey(root: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((node, key) => {
     if (node && typeof node === 'object') return (node as Record<string, unknown>)[key];
@@ -45,8 +52,12 @@ describe('added configuration field localization', () => {
         const entry = CONFIG_FIELD_SEARCH_INDEX.find((item) => item.fieldId === fieldId);
         expect(entry).toBeDefined();
         expect(entry?.labelKey).toBe(`config_management.visual.additions.${fieldId}.label`);
-        expect(entry?.hintKey).toBe(`config_management.visual.additions.${fieldId}.hint`);
         expect(resolveKey(messages, entry!.labelKey)).toBeString();
+        if (withoutHint.has(fieldId)) {
+          expect(entry?.hintKey).toBeUndefined();
+          continue;
+        }
+        expect(entry?.hintKey).toBe(`config_management.visual.additions.${fieldId}.hint`);
         expect(resolveKey(messages, entry!.hintKey!)).toBeString();
       }
       for (const key of [

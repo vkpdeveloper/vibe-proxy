@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
+  CheckmarkSquare02Icon,
   Delete02Icon,
+  MoreHorizontalIcon,
   RefreshIcon,
+  SortByDown02Icon,
   UserLock01Icon,
   Upload04Icon,
 } from '@hugeicons/core-free-icons';
@@ -12,6 +15,13 @@ import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Empty,
   EmptyContent,
@@ -29,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Page } from '@/components/layout/Page';
+import { usePhone } from '@/components/layout/pageBar';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
@@ -66,6 +77,7 @@ import {
   type AuthFilesStatusFilterMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
+import { cn } from '@/lib/utils';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { Hint } from '@/components/ui/tooltip';
 
@@ -86,6 +98,26 @@ const normalizePersistedStatusFilterMode = (value: unknown): AuthFilesStatusFilt
   return isAuthFilesStatusFilterMode(value) ? value : null;
 };
 
+// Links (e.g. from Home) use ?status=problem|active|disabled and ?provider=<id>.
+const STATUS_URL_VALUES = {
+  problem: 'problem',
+  enabled: 'active',
+  disabled: 'disabled',
+} satisfies Partial<Record<AuthFilesStatusFilterMode, string>>;
+
+const statusFromUrl = (value: string | null): AuthFilesStatusFilterMode => {
+  if (value === 'active') return 'enabled';
+  if (value === 'problem' || value === 'disabled') return value;
+  return 'all';
+};
+
+const filterSearchParams = (provider: string, status: AuthFilesStatusFilterMode) => {
+  const params = new URLSearchParams();
+  if (status !== 'all') params.set('status', STATUS_URL_VALUES[status]);
+  if (provider !== 'all') params.set('provider', provider);
+  return params;
+};
+
 export function AuthFilesPage() {
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
@@ -96,6 +128,7 @@ export function AuthFilesPage() {
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
+  const phone = usePhone();
 
   const [filter, setFilter] = useState<'all' | string>('all');
   const [statusFilterMode, setStatusFilterMode] = useState<AuthFilesStatusFilterMode>('all');
@@ -103,6 +136,8 @@ export function AuthFilesPage() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
+  // Phones show selection checkboxes only in select mode; desktop always shows them.
+  const [selectMode, setSelectMode] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
 
   const {
@@ -197,24 +232,30 @@ export function AuthFilesPage() {
 
   /* ---------- uiState 水合与持久化（localStorage key/形状与旧版完全一致） ---------- */
 
+  // The filters to remember. Filters from a link (e.g. Home's "1 problem") apply once and are not
+  // saved; once the user picks a filter on this page, what they see becomes the saved filters.
+  const savedFiltersRef = useRef<{ filter: string; statusFilterMode: AuthFilesStatusFilterMode }>({
+    filter: 'all',
+    statusFilterMode: 'all',
+  });
+  const filtersPickedRef = useRef(false);
+
   useEffect(() => {
     const persisted = readAuthFilesUiState();
     if (persisted) {
       if (typeof persisted.filter === 'string' && persisted.filter.trim()) {
-        setFilter(normalizeProviderKey(persisted.filter));
+        const persistedFilter = normalizeProviderKey(persisted.filter);
+        savedFiltersRef.current.filter = persistedFilter;
+        setFilter(persistedFilter);
       }
-      const persistedStatusFilterMode = normalizePersistedStatusFilterMode(
-        persisted.statusFilterMode
-      );
+      const persistedStatusFilterMode =
+        normalizePersistedStatusFilterMode(persisted.statusFilterMode) ??
+        (typeof persisted.problemOnly === 'boolean' || typeof persisted.disabledOnly === 'boolean'
+          ? resolveStatusFilterMode(persisted.problemOnly === true, persisted.disabledOnly === true)
+          : null);
       if (persistedStatusFilterMode) {
+        savedFiltersRef.current.statusFilterMode = persistedStatusFilterMode;
         setStatusFilterMode(persistedStatusFilterMode);
-      } else if (
-        typeof persisted.problemOnly === 'boolean' ||
-        typeof persisted.disabledOnly === 'boolean'
-      ) {
-        setStatusFilterMode(
-          resolveStatusFilterMode(persisted.problemOnly === true, persisted.disabledOnly === true)
-        );
       }
       if (typeof persisted.search === 'string') {
         setSearch(persisted.search);
@@ -233,25 +274,55 @@ export function AuthFilesPage() {
   useEffect(() => {
     if (!uiStateHydrated) return;
 
+    if (filtersPickedRef.current) savedFiltersRef.current = { filter, statusFilterMode };
+    const saved = savedFiltersRef.current;
     writeAuthFilesUiState({
-      filter,
-      statusFilterMode,
-      problemOnly,
-      disabledOnly,
+      filter: saved.filter,
+      statusFilterMode: saved.statusFilterMode,
+      problemOnly: saved.statusFilterMode === 'problem',
+      disabledOnly: saved.statusFilterMode === 'disabled',
       search,
       page,
       sortMode,
     });
-  }, [
-    disabledOnly,
-    filter,
-    page,
-    problemOnly,
-    search,
-    sortMode,
-    statusFilterMode,
-    uiStateHydrated,
-  ]);
+  }, [filter, page, search, sortMode, statusFilterMode, uiStateHydrated]);
+
+  // A filter change made on this page, as opposed to one from a link.
+  const pickFilters = useCallback(
+    (next: { filter?: string; statusFilterMode?: AuthFilesStatusFilterMode }) => {
+      filtersPickedRef.current = true;
+      if (next.filter !== undefined) setFilter(next.filter);
+      if (next.statusFilterMode !== undefined) setStatusFilterMode(next.statusFilterMode);
+    },
+    []
+  );
+
+  // A link carrying filter params overrides the remembered filters. This runs after hydration, so
+  // its values win on mount, and depends only on the URL so it never undoes a user change.
+  const [searchParams] = useSearchParams();
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+    if (!isCurrentLayer) return;
+    const status = searchParams.get('status');
+    const provider = searchParams.get('provider');
+    if (status === null && provider === null) return;
+    // Our own URL updates come back through here too; the state already matches them.
+    filtersPickedRef.current = false;
+    setStatusFilterMode(statusFromUrl(status));
+    setFilter(provider?.trim() ? normalizeProviderKey(provider) : 'all');
+    setPage(1);
+  }, [isCurrentLayer, searchParams]);
+
+  // Mirror filter changes into the URL (replace, so filters don't pile up in history). It depends
+  // only on the filters, never the URL, so an incoming link is applied by the effect above before
+  // this writes back. setSearchParams changes with every URL, hence the stable navigate.
+  useEffect(() => {
+    if (!uiStateHydrated || !isCurrentLayer) return;
+    const next = filterSearchParams(normalizedFilter, statusFilterMode).toString();
+    if (next === searchParamsRef.current.toString()) return;
+    void navigate({ search: next ? `?${next}` : '' }, { replace: true });
+  }, [isCurrentLayer, navigate, normalizedFilter, statusFilterMode, uiStateHydrated]);
 
   const handleSortModeChange = useCallback(
     (value: string) => {
@@ -262,10 +333,13 @@ export function AuthFilesPage() {
     [sortMode]
   );
 
-  const handleStatusFilterModeChange = useCallback((nextMode: AuthFilesStatusFilterMode) => {
-    setStatusFilterMode(nextMode);
-    setPage(1);
-  }, []);
+  const handleStatusFilterModeChange = useCallback(
+    (nextMode: AuthFilesStatusFilterMode) => {
+      pickFilters({ statusFilterMode: nextMode });
+      setPage(1);
+    },
+    [pickFilters]
+  );
 
   /* ---------- 数据加载：首载前台（骨架屏），此后一律后台（不清空网格） ---------- */
 
@@ -359,6 +433,25 @@ export function AuthFilesPage() {
 
   const sorted = useMemo(() => sortAuthFiles(filtered, sortMode), [filtered, sortMode]);
 
+  // What each status tab would show with the current provider and search.
+  const statusCounts = useMemo(() => {
+    const counts: Record<AuthFilesStatusFilterMode, number> = {
+      all: 0,
+      enabled: 0,
+      disabled: 0,
+      problem: 0,
+    };
+    files.forEach((file) => {
+      const type = normalizeProviderKey(String(file.type ?? file.provider ?? ''));
+      if (normalizedFilter !== 'all' && type !== normalizedFilter) return;
+      if (!matchesAuthFileSearch(file, normalizedSearch, wildcardSearch)) return;
+      counts.all += 1;
+      counts[file.disabled === true ? 'disabled' : 'enabled'] += 1;
+      if (isProblemAuthFile(file)) counts.problem += 1;
+    });
+    return counts;
+  }, [files, normalizedFilter, normalizedSearch, wildcardSearch]);
+
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
@@ -437,11 +530,10 @@ export function AuthFilesPage() {
   );
 
   const clearFilters = useCallback(() => {
-    setFilter('all');
-    setStatusFilterMode('all');
+    pickFilters({ filter: 'all', statusFilterMode: 'all' });
     setSearch('');
     setPage(1);
-  }, []);
+  }, [pickFilters]);
 
   const deleteAllButtonLabel = (() => {
     if (enabledOnly || disabledOnly) {
@@ -459,6 +551,54 @@ export function AuthFilesPage() {
       : `${t('common.delete')} ${getTypeLabel(t, normalizedFilter)}`;
   })();
 
+  const deleteAll = () =>
+    handleDeleteAll({
+      filter,
+      problemOnly,
+      disabledOnly,
+      enabledOnly,
+      onResetFilterToAll: () => pickFilters({ filter: 'all' }),
+      onResetProblemOnly: () => pickFilters({ statusFilterMode: 'all' }),
+      onResetDisabledOnly: () => pickFilters({ statusFilterMode: 'all' }),
+      onResetEnabledOnly: () => pickFilters({ statusFilterMode: 'all' }),
+    });
+
+  const listFiltered = statusFilterMode !== 'all' || normalizedFilter !== 'all';
+  const selecting = selectMode || selectionCount > 0;
+  const toggleSelectMode = () => {
+    if (selecting) deselectAll();
+    setSelectMode(!selecting);
+  };
+  const refreshAllDisabled =
+    disableControls ||
+    loading ||
+    refreshingAllCredentials ||
+    Object.keys(manualRefreshing).length > 0;
+
+  const changeSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+  const changeProvider = (type: string) => {
+    pickFilters({ filter: type });
+    setPage(1);
+  };
+  const changeStatusFilter = (value: string) => {
+    if (isAuthFilesStatusFilterMode(value)) handleStatusFilterModeChange(value);
+  };
+  // Phones skip the provider picker with a single provider, and tabs that would show nothing new:
+  // an empty tab, or one matching every credential that All already shows. Problems always
+  // appear when there are any.
+  const showProviderPicker = existingTypes.length > 2 || normalizedFilter !== 'all';
+  const visibleStatusOptions = statusFilterOptions.filter((option) => {
+    const count = statusCounts[option.value];
+    if (option.value === 'all' || option.value === statusFilterMode) return true;
+    if (option.value === 'problem') return count > 0;
+    return count > 0 && count < statusCounts.all;
+  });
+  // A lone "All" tab filters nothing, so the strip drops it.
+  const showStatusTabs = visibleStatusOptions.length > 1;
+
   const isFirstRunEmpty = !loading && files.length === 0 && !error;
   const isNoResults = !loading && files.length > 0 && pageItems.length === 0;
 
@@ -467,11 +607,12 @@ export function AuthFilesPage() {
       wide
       title={t('nav.auth_files')}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-sm:gap-0">
           <Hint label={t('common.refresh')}>
             <Button
               variant="ghost"
               size="icon-lg"
+              className="max-sm:size-10"
               onClick={() => void handleHeaderRefresh()}
               disabled={loading || refreshing}
               aria-label={t('common.refresh')}
@@ -483,32 +624,79 @@ export function AuthFilesPage() {
             <Button
               variant="outline"
               size="lg"
-              className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
+              className="h-9 px-3 max-sm:hidden"
               onClick={handleRefreshAllCredentials}
-              disabled={
-                disableControls ||
-                loading ||
-                refreshingAllCredentials ||
-                Object.keys(manualRefreshing).length > 0
-              }
+              disabled={refreshAllDisabled}
               aria-label={t('auth_files.refresh_all_button')}
             >
               <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} data-icon="inline-start" />
-              <span className="max-sm:hidden">{t('auth_files.refresh_all_button')}</span>
+              {t('auth_files.refresh_all_button')}
             </Button>
           </Hint>
           <Hint label={t('auth_files.upload_button')}>
             <Button
               size="lg"
-              className="h-9 px-4 max-sm:w-9 max-sm:px-0!"
+              className="h-9 px-4 max-sm:hidden"
               onClick={handleUploadClick}
               disabled={disableControls || uploading}
               aria-label={t('auth_files.upload_button')}
             >
               <HugeiconsIcon icon={Upload04Icon} strokeWidth={1.75} data-icon="inline-start" />
-              <span className="max-sm:hidden">{t('auth_files.upload_button')}</span>
+              {t('auth_files.upload_button')}
             </Button>
           </Hint>
+          {/* Phones fold the occasional page actions into one menu; select mode swaps it for Done. */}
+          {phone && selecting ? (
+            <Button variant="ghost" className="h-10 px-3 font-medium" onClick={toggleSelectMode}>
+              {t('auth_files.select_done')}
+            </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-10 sm:hidden"
+                  aria-label={t('common.more')}
+                >
+                  <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" collisionPadding={16} className="w-auto min-w-52">
+                <DropdownMenuItem
+                  onSelect={handleUploadClick}
+                  disabled={disableControls || uploading}
+                >
+                  <HugeiconsIcon icon={Upload04Icon} strokeWidth={1.75} />
+                  {t('auth_files.upload_button')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={handleRefreshAllCredentials}
+                  disabled={refreshAllDisabled}
+                >
+                  <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} />
+                  {t('auth_files.refresh_all_button')}
+                </DropdownMenuItem>
+                {files.length > 0 && (
+                  <>
+                    <DropdownMenuItem onSelect={toggleSelectMode}>
+                      <HugeiconsIcon icon={CheckmarkSquare02Icon} strokeWidth={1.75} />
+                      {t('auth_files.select_mode')}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={deleteAll}
+                      disabled={disableControls || deletingAll}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                      {deleteAllButtonLabel}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       }
     >
@@ -522,68 +710,133 @@ export function AuthFilesPage() {
       />
 
       <section className="flex flex-col gap-4" aria-label={t('auth_files.title_section')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchField
-            className="basis-full"
-            value={search}
-            onChange={(value) => {
-              setSearch(value);
-              setPage(1);
-            }}
-            placeholder={t('auth_files.search_placeholder')}
-            label={t('auth_files.search_label')}
-            clearLabel={t('quota_management.search_clear')}
-          />
-          <ProviderFilter
-            className="max-sm:flex-1"
-            types={existingTypes}
-            counts={typeCounts}
-            active={normalizedFilter}
-            onChange={(type) => {
-              setFilter(type);
-              setPage(1);
-            }}
-          />
-          <Select value={sortMode} onValueChange={handleSortModeChange}>
-            <SelectTrigger
-              aria-label={t('auth_files.sort_label')}
-              className="data-[size=default]:h-9 max-sm:flex-1"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" align="start">
-              {sortOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            spacing={0}
-            aria-label={t('auth_files.problem_filter_label')}
-            className="max-sm:w-full sm:ml-auto"
-            value={statusFilterMode}
-            onValueChange={(value) => {
-              if (isAuthFilesStatusFilterMode(value)) handleStatusFilterModeChange(value);
-            }}
-          >
-            {statusFilterOptions.map((option) => (
-              <ToggleGroupItem
-                key={option.value}
-                value={option.value}
-                className="h-9 px-3 max-sm:flex-1"
+        {phone ? (
+          <div className="flex flex-col gap-2">
+            {/* Search, provider and sort share one row, like Quota; sort shrinks to an icon. */}
+            <div className="flex items-center gap-2">
+              <SearchField
+                className="h-10 min-w-0 flex-1 [&_input]:text-ellipsis"
+                value={search}
+                onChange={changeSearch}
+                placeholder={t('auth_files.search_placeholder_short')}
+                label={t('auth_files.search_label')}
+                clearLabel={t('quota_management.search_clear')}
+              />
+              {showProviderPicker && (
+                <ProviderFilter
+                  types={existingTypes}
+                  counts={typeCounts}
+                  active={normalizedFilter}
+                  onChange={changeProvider}
+                  align="end"
+                />
+              )}
+              <Select value={sortMode} onValueChange={handleSortModeChange}>
+                <SelectTrigger
+                  aria-label={t('auth_files.sort_label')}
+                  className="size-10 justify-center p-0 data-[size=default]:h-10 *:data-[slot=select-value]:sr-only [&>svg:last-child]:hidden"
+                >
+                  <HugeiconsIcon
+                    icon={SortByDown02Icon}
+                    strokeWidth={1.75}
+                    className={sortMode === 'default' ? undefined : 'text-primary'}
+                  />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper" align="end" collisionPadding={16}>
+                  {sortOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {showStatusTabs && (
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                spacing={0}
+                aria-label={t('auth_files.problem_filter_label')}
+                className="w-full"
+                value={statusFilterMode}
+                onValueChange={changeStatusFilter}
               >
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
+                {visibleStatusOptions.map((option) => (
+                  <ToggleGroupItem
+                    key={option.value}
+                    value={option.value}
+                    className="min-w-0 flex-1 gap-1.5 px-2"
+                  >
+                    {option.label}
+                    <span
+                      // Muted grey on the raised selected tile falls under 4.5:1, so the selected
+                      // count takes a dimmed foreground instead.
+                      className={cn(
+                        'text-[13px]',
+                        option.value === 'problem' && statusCounts.problem > 0
+                          ? 'text-warning'
+                          : 'text-muted-foreground in-data-[state=on]:text-foreground/70'
+                      )}
+                    >
+                      {statusCounts[option.value]}
+                    </span>
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchField
+              className="basis-full"
+              value={search}
+              onChange={changeSearch}
+              placeholder={t('auth_files.search_placeholder')}
+              label={t('auth_files.search_label')}
+              clearLabel={t('quota_management.search_clear')}
+            />
+            <ProviderFilter
+              types={existingTypes}
+              counts={typeCounts}
+              active={normalizedFilter}
+              onChange={changeProvider}
+            />
+            <Select value={sortMode} onValueChange={handleSortModeChange}>
+              <SelectTrigger
+                aria-label={t('auth_files.sort_label')}
+                className="data-[size=default]:h-9"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              spacing={0}
+              aria-label={t('auth_files.problem_filter_label')}
+              className="sm:ml-auto"
+              value={statusFilterMode}
+              onValueChange={changeStatusFilter}
+            >
+              {statusFilterOptions.map((option) => (
+                <ToggleGroupItem key={option.value} value={option.value} className="h-9 px-3">
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+        )}
 
         {!loading && files.length > 0 && (
-          <div className="flex min-h-8 items-center justify-between gap-3">
+          <div className="flex min-h-8 items-center justify-between gap-3 max-sm:hidden">
             <p className="flex flex-wrap items-center gap-x-3 font-mono text-xs text-muted-foreground tabular-nums">
               <span>{t('auth_files.meta_total', { count: files.length })}</span>
               <span className="inline-flex items-center gap-1.5">
@@ -602,18 +855,7 @@ export function AuthFilesPage() {
               size="sm"
               className="-mr-2 shrink-0 text-muted-foreground hover:text-destructive"
               disabled={disableControls || deletingAll}
-              onClick={() =>
-                handleDeleteAll({
-                  filter,
-                  problemOnly,
-                  disabledOnly,
-                  enabledOnly,
-                  onResetFilterToAll: () => setFilter('all'),
-                  onResetProblemOnly: () => setStatusFilterMode('all'),
-                  onResetDisabledOnly: () => setStatusFilterMode('all'),
-                  onResetEnabledOnly: () => setStatusFilterMode('all'),
-                })
-              }
+              onClick={deleteAll}
             >
               <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} data-icon="inline-start" />
               {deleteAllButtonLabel}
@@ -654,6 +896,11 @@ export function AuthFilesPage() {
               </Button>
             </EmptyContent>
           </Empty>
+        ) : isNoResults && problemOnly && !normalizedSearch ? (
+          // Nothing to fix is good news, not an empty search.
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {t('auth_files.no_problems')}
+          </p>
         ) : isNoResults ? (
           <Empty className="border border-dashed">
             <EmptyHeader>
@@ -676,6 +923,7 @@ export function AuthFilesPage() {
                 key={getQuotaCacheKey(file)}
                 file={file}
                 selected={selectedFiles.has(file.name)}
+                selecting={selecting}
                 disableControls={disableControls}
                 deleting={deleting}
                 statusUpdating={statusUpdating}
@@ -708,33 +956,38 @@ export function AuthFilesPage() {
         )}
       </section>
 
-      <OAuthExcludedCard
-        disableControls={disableControls}
-        excludedError={excludedError}
-        excluded={excluded}
-        onRetry={loadExcluded}
-        onAdd={() => openExcludedEditor()}
-        onEdit={openExcludedEditor}
-        onDelete={deleteExcluded}
-      />
+      {/* The config sections cover every account, so they step aside while the list is filtered. */}
+      {!listFiltered && (
+        <>
+          <OAuthExcludedCard
+            disableControls={disableControls}
+            excludedError={excludedError}
+            excluded={excluded}
+            onRetry={loadExcluded}
+            onAdd={() => openExcludedEditor()}
+            onEdit={openExcludedEditor}
+            onDelete={deleteExcluded}
+          />
 
-      <OAuthModelAliasCard
-        disableControls={disableControls}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onRetry={loadModelAlias}
-        onAdd={() => openModelAliasEditor()}
-        onEditProvider={openModelAliasEditor}
-        onDeleteProvider={deleteModelAlias}
-        modelAliasError={modelAliasError}
-        modelAlias={modelAlias}
-        allProviderModels={allProviderModels}
-        onUpdate={handleMappingUpdate}
-        onDeleteLink={handleDeleteLink}
-        onToggleFork={handleToggleFork}
-        onRenameAlias={handleRenameAlias}
-        onDeleteAlias={handleDeleteAlias}
-      />
+          <OAuthModelAliasCard
+            disableControls={disableControls}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onRetry={loadModelAlias}
+            onAdd={() => openModelAliasEditor()}
+            onEditProvider={openModelAliasEditor}
+            onDeleteProvider={deleteModelAlias}
+            modelAliasError={modelAliasError}
+            modelAlias={modelAlias}
+            allProviderModels={allProviderModels}
+            onUpdate={handleMappingUpdate}
+            onDeleteLink={handleDeleteLink}
+            onToggleFork={handleToggleFork}
+            onRenameAlias={handleRenameAlias}
+            onDeleteAlias={handleDeleteAlias}
+          />
+        </>
+      )}
 
       {/* Room for the floating selection toolbar so it never covers the last row. */}
       <div aria-hidden="true" className="-mt-10 h-(--auth-files-action-bar-height,0px) shrink-0" />
@@ -755,10 +1008,13 @@ export function AuthFilesPage() {
       <AuthFileDetailsSheet
         disableControls={disableControls}
         editor={prefixProxyEditor}
+        file={files.find((item) => item.name === prefixProxyEditor?.fileName) ?? null}
         dirty={prefixProxyDirty}
         onClose={closePrefixProxyEditor}
         onSave={handlePrefixProxySave}
         onChange={handlePrefixProxyChange}
+        onManualRefresh={handleManualRefresh}
+        manualRefreshing={manualRefreshing}
       />
 
       <BatchActionBar

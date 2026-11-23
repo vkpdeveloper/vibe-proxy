@@ -19,7 +19,6 @@ const keys = [
   'all_levels',
   'view_request',
   'copy_line',
-  'request_log_missing',
   'download_cached',
   'clear_application_confirm',
   'clear_search',

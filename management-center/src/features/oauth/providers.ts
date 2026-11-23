@@ -2,7 +2,8 @@ import type { BuiltInOAuthProvider } from '@/services/api';
 import type { PluginListEntry } from '@/types';
 import { resolvePluginAssetURL } from '@/utils/connection';
 import iconMeta from '@/assets/icons/meta.svg';
-import iconCodex from '@/assets/icons/codex.svg';
+// Codex's own artwork is a white tile; the bare glyph sits on the dark tile like every other logo.
+import iconCodex from './codex-glyph.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconAntigravity from '@/assets/icons/antigravity.svg';
 import iconGrok from '@/assets/icons/grok.svg';
@@ -18,13 +19,9 @@ export type OAuthFlowKind = 'device' | 'browser';
 export interface BuiltInOAuthProviderCard {
   kind: 'builtin';
   id: BuiltInOAuthProvider;
-  /** 磁贴短名：品牌名是常量（与仪表盘 providerLabel 一致）。 */
+  /** 磁贴与对话框标题共用的品牌名（与仪表盘 providerLabel 一致）。 */
   label: string;
-  /** 对话框标题，沿用 `auth_login.<id>_oauth_title`。 */
-  titleKey: string;
   icon: ThemedIcon;
-  /** The artwork carries its own rounded tile, so it fills the logo tile instead of being inset. */
-  flush?: boolean;
   flow: OAuthFlowKind;
 }
 
@@ -43,7 +40,6 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'meta',
     label: 'Muse (Meta)',
-    titleKey: 'auth_login.meta_oauth_title',
     icon: iconMeta,
     flow: 'device',
   },
@@ -51,16 +47,13 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'codex',
     label: 'Codex',
-    titleKey: 'auth_login.codex_oauth_title',
     icon: iconCodex,
-    flush: true,
     flow: 'browser',
   },
   {
     kind: 'builtin',
     id: 'anthropic',
     label: 'Claude',
-    titleKey: 'auth_login.anthropic_oauth_title',
     icon: iconClaude,
     flow: 'browser',
   },
@@ -68,7 +61,6 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'antigravity',
     label: 'Antigravity',
-    titleKey: 'auth_login.antigravity_oauth_title',
     icon: iconAntigravity,
     flow: 'browser',
   },
@@ -76,7 +68,6 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'xai',
     label: 'xAI',
-    titleKey: 'auth_login.xai_oauth_title',
     icon: { light: iconGrok, dark: iconGrokDark },
     flow: 'browser',
   },
@@ -84,7 +75,6 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'devin',
     label: 'Devin',
-    titleKey: 'auth_login.devin_oauth_title',
     icon: { light: iconDevin, dark: iconDevinDark },
     flow: 'browser',
   },

@@ -133,7 +133,7 @@ export function ModelDiscoveryPanel({
                 ? t('providersPage.discovery.clearAll')
                 : t('providersPage.discovery.selectAll')}
             </label>
-            <span className="font-mono text-xs text-muted-foreground tabular-nums">
+            <span className="text-xs text-muted-foreground">
               {t('providersPage.discovery.selectedCount', {
                 selected: selected.size,
                 total: selectable.length,
@@ -174,12 +174,20 @@ export function ModelDiscoveryPanel({
       )}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={mutating}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="max-sm:h-10"
+          onClick={onClose}
+          disabled={mutating}
+        >
           {t('providersPage.discovery.close')}
         </Button>
         <Button
           type="button"
           size="sm"
+          className="max-sm:h-10"
           onClick={handleApply}
           disabled={mutating || selected.size === 0}
         >

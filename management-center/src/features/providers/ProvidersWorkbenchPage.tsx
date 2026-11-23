@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { usePageBar, usePhone } from '@/components/layout/pageBar';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import { Add01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { Page, type Tab } from '@/components/layout/Page';
@@ -12,7 +13,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
@@ -46,8 +54,14 @@ import { Hint } from '@/components/ui/tooltip';
  */
 const logoIcon = (brand: ProviderBrand): IconSvgElement => {
   const logo = PROVIDER_LOGOS[brand];
-  return [['image', { href: logo.darkSrc ?? logo.src, x: 2, y: 2, width: 20, height: 20 }]];
+  // HugeiconsIcon uses each element's `key` as its React key.
+  return [
+    ['image', { key: 'logo', href: logo.darkSrc ?? logo.src, x: 2, y: 2, width: 20, height: 20 }],
+  ];
 };
+
+/** The providers named in the empty state's line, plus Gemini. */
+const EMPTY_STATE_BRANDS: ProviderBrand[] = ['openaiCompatibility', 'claude', 'gemini'];
 
 type SheetMode = 'detail' | 'create' | 'edit';
 
@@ -370,29 +384,44 @@ export function ProvidersWorkbenchPage() {
     });
   };
 
-  const newMenu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" size="lg" className="h-9 px-4" disabled={disableMutations}>
-          <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
-          {t('providersPage.actions.new')}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-auto min-w-52">
-        {PROVIDER_BRAND_ORDER.map((brand) => (
-          <DropdownMenuItem
-            key={brand}
-            className="gap-2.5 py-1.5"
-            onSelect={() => openCreate(brand)}
-          >
-            <ProviderLogo brand={brand} className="size-5" />
-            {t(`providersPage.providerNames.${brand}`)}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const phone = usePhone();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Phones pick the provider from a bottom sheet (rendered once, below) instead of a dropdown.
+  const newMenu = (label: string) => {
+    const trigger = (
+      <Button
+        type="button"
+        size="lg"
+        className="h-9 px-4 max-sm:h-10"
+        disabled={disableMutations}
+        onClick={phone ? () => setPickerOpen(true) : undefined}
+      >
+        <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+        {label}
+      </Button>
+    );
+    if (phone) return trigger;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent align="end" collisionPadding={16} className="w-auto min-w-52">
+          {PROVIDER_BRAND_ORDER.map((brand) => (
+            <DropdownMenuItem
+              key={brand}
+              className="gap-2.5 py-1.5"
+              onSelect={() => openCreate(brand)}
+            >
+              <ProviderLogo brand={brand} className="size-5" />
+              {t(`providersPage.providerNames.${brand}`)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const pageBar = usePageBar();
   const refreshLabel = workbench.isFetching
     ? t('providersPage.actions.syncing')
     : t('providersPage.actions.refresh');
@@ -401,18 +430,18 @@ export function ProvidersWorkbenchPage() {
       <Hint label={t('providersPage.header.updatedAt', { time: updatedAtLabel })}>
         <Button
           type="button"
-          variant="outline"
+          variant={pageBar ? 'ghost' : 'outline'}
           size="lg"
-          className="h-9 px-3 sm:px-4"
+          className="h-9 px-3 max-sm:size-10 max-sm:px-0 sm:px-4"
           onClick={() => void handleRefresh()}
           disabled={workbench.isFetching}
-          aria-label={refreshLabel}
+          aria-label={t('common.refresh')}
         >
           <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
           <span className="max-sm:hidden">{refreshLabel}</span>
         </Button>
       </Hint>
-      {activeGroup ? newMenu : null}
+      {activeGroup ? newMenu(t('providersPage.actions.new')) : null}
     </div>
   );
 
@@ -458,12 +487,46 @@ export function ProvidersWorkbenchPage() {
         <Page title={pageTitle} actions={actions}>
           {errorBanner}
           {workbench.snapshot ? (
-            <Empty className="rounded-xl border border-dashed py-10">
-              <EmptyDescription>{t('providersPage.table.empty')}</EmptyDescription>
-              <EmptyContent>{newMenu}</EmptyContent>
+            <Empty className="flex-none border border-solid bg-card px-5 py-8">
+              <EmptyHeader>
+                <div className="mb-2 flex gap-2" aria-hidden="true">
+                  {EMPTY_STATE_BRANDS.map((brand) => (
+                    <ProviderLogo key={brand} brand={brand} className="size-9 rounded-lg" />
+                  ))}
+                </div>
+                <EmptyTitle className="text-base">{t('providersPage.table.emptyTitle')}</EmptyTitle>
+                <EmptyDescription>{t('providersPage.table.empty')}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>{newMenu(t('providersPage.actions.addKey'))}</EmptyContent>
             </Empty>
           ) : null}
         </Page>
+      )}
+
+      {phone && (
+        <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
+          <SheetContent side="bottom" className="gap-0" aria-describedby={undefined}>
+            <SheetHeader className="pt-1 pr-14">
+              <SheetTitle>{t('providersPage.actions.addKey')}</SheetTitle>
+            </SheetHeader>
+            <div className="flex min-h-0 flex-col overflow-y-auto px-2 pb-3">
+              {PROVIDER_BRAND_ORDER.map((brand) => (
+                <button
+                  key={brand}
+                  type="button"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-medium outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onClick={() => {
+                    setPickerOpen(false);
+                    openCreate(brand);
+                  }}
+                >
+                  <ProviderLogo brand={brand} className="size-7 rounded-md" />
+                  {t(`providersPage.providerNames.${brand}`)}
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
 
       <ProviderSheet

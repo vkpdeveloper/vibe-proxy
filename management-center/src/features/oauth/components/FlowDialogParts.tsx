@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CheckmarkCircle02Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
@@ -21,8 +20,6 @@ export interface DialogHeading {
   title: string;
   caption: string;
   icon: string;
-  /** The icon already carries its own rounded tile. */
-  flush?: boolean;
 }
 
 /** Dialog frame shared by every sign-in and import dialog: brand header, body, optional footer. */
@@ -53,16 +50,17 @@ export function FlowDialog({
 /** One dialog view (form, steps, result). Keyed by the caller so a switch replays a short fade. */
 export function FlowView({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-5 duration-150 ease-out animate-in fade-in-0 motion-reduce:animate-none">
+    // min-w-0: the dialog is a grid, so without it a long sign-in link widens the view past the edge.
+    <div className="flex min-w-0 flex-col gap-5 duration-150 ease-out animate-in fade-in-0 motion-reduce:animate-none">
       {children}
     </div>
   );
 }
 
-function FlowDialogHeader({ title, caption, icon, flush }: DialogHeading) {
+function FlowDialogHeader({ title, caption, icon }: DialogHeading) {
   return (
     <DialogHeader className="flex-row items-center gap-3 pr-8">
-      <ProviderLogo src={icon} flush={flush} className="size-9 rounded-lg" />
+      <ProviderLogo src={icon} className="size-9 rounded-lg" />
       <div className="flex min-w-0 flex-col gap-1.5">
         <DialogTitle className="truncate">{title}</DialogTitle>
         <DialogDescription className="truncate">{caption}</DialogDescription>
@@ -82,11 +80,6 @@ export function FlowAlert({ children }: { children: ReactNode }) {
   );
 }
 
-export function OptionalTag() {
-  const { t } = useTranslation();
-  return <span className="font-normal text-muted-foreground">{t('auth_login.optional_step')}</span>;
-}
-
 /** Numbered steps; the numbers come from a CSS counter so conditional steps stay in order. */
 export function Steps({ children }: { children: ReactNode }) {
   return <ol className="flex flex-col gap-5 [counter-reset:step]">{children}</ol>;
@@ -95,12 +88,10 @@ export function Steps({ children }: { children: ReactNode }) {
 export function Step({
   title,
   titleFor,
-  aside,
   children,
 }: {
   title: string;
   titleFor?: string;
-  aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -110,13 +101,12 @@ export function Step({
         aria-hidden="true"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <div className="flex min-h-5 items-center justify-between gap-2">
+        <div className="flex min-h-5 items-center">
           {titleFor ? (
             <Label htmlFor={titleFor}>{title}</Label>
           ) : (
             <span className="text-sm leading-none font-medium">{title}</span>
           )}
-          {aside}
         </div>
         {children}
       </div>
@@ -157,7 +147,7 @@ export function OpenLinkButton({ url, label }: { url?: string; label: string }) 
   return (
     <Button
       size="lg"
-      className="h-9 w-fit px-4"
+      className="h-9 px-4 max-sm:h-10 max-sm:w-full sm:w-fit"
       disabled={!url}
       onClick={() => url && window.open(url, '_blank', 'noopener,noreferrer')}
     >
@@ -220,24 +210,27 @@ const FOOTER_DOT: Record<FooterTone, string> = {
 export function FlowFooter({
   tone,
   label,
+  hint,
   children,
 }: {
   tone: FooterTone;
   label: string;
+  /** A quiet line under the label, for footers without a button. */
+  hint?: string;
   children?: ReactNode;
 }) {
   return (
     <DialogFooter className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:justify-between">
-      <p
-        className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
+      {/* On phones the hint sits under the label and the row is button height, so every footer
+          is as tall as the others; wider screens keep the hint at the far end. */}
+      <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground max-sm:min-h-10">
         <span className={cn('size-2 shrink-0 rounded-full', FOOTER_DOT[tone])} aria-hidden="true" />
-        <span className={cn('min-w-0 break-words', tone === 'error' && 'text-destructive')}>
-          {label}
-        </span>
-      </p>
+        <p className="flex min-w-0 flex-col" role="status" aria-live="polite">
+          <span className={cn('break-words', tone === 'error' && 'text-destructive')}>{label}</span>
+          {hint && <span className="text-xs text-faint sm:hidden">{hint}</span>}
+        </p>
+      </div>
+      {hint && <span className="text-xs text-faint max-sm:hidden">{hint}</span>}
       {children}
     </DialogFooter>
   );

@@ -95,13 +95,27 @@ const getRelativeFormatter = (locale?: string) =>
     (l) => new Intl.RelativeTimeFormat(l, { numeric: 'always' })
   );
 
-const getUnitFormatter = (unit: RelativeUnit, locale?: string) =>
+const getUnitFormatter = (
+  unit: RelativeUnit,
+  locale?: string,
+  unitDisplay: 'long' | 'narrow' = 'long'
+) =>
   cachedFormatter(
     unitFormatters,
-    `${unit}:${locale ?? ''}`,
+    `${unit}:${unitDisplay}:${locale ?? ''}`,
     locale,
-    (l) => new Intl.NumberFormat(l, { style: 'unit', unit, unitDisplay: 'long' })
+    (l) => new Intl.NumberFormat(l, { style: 'unit', unit, unitDisplay })
   );
+
+/**
+ * Narrow countdown with no direction words, e.g. `3d 13h` / `3天 13小时`, for
+ * phone lines whose sentence ("Resets in …") already supplies the direction.
+ */
+export function formatDurationNarrow(targetMs: number, nowMs: number, locale?: string): string {
+  return relativeTimeParts(targetMs, nowMs)
+    .components.map(({ value, unit }) => getUnitFormatter(unit, locale, 'narrow').format(value))
+    .join(' ');
+}
 
 /**
  * Localized relative phrase, e.g. `in 1 hour 25 minutes` / `1小时 25分钟后` /
@@ -134,19 +148,24 @@ export function formatRelativeInstant(targetMs: number, nowMs: number, locale?: 
 }
 
 /**
- * Absolute instant in the shape every quota row already uses (`MM-DD HH:mm`,
- * browser-local, 24-hour). Kept in one place so the reset labels baked at fetch
+ * Short absolute instant every quota row uses, e.g. `Nov 29, 2:09 PM`: the app's
+ * date style without the year, and the locale's own 12/24-hour clock like
+ * `formatDateTimeValue`. Kept in one place so the reset labels baked at fetch
  * time and the ones formatted at render time can never drift apart.
  */
-export function formatInstantShort(ms: number): string {
+export function formatInstantShort(ms: number, locale?: string): string {
   if (!Number.isFinite(ms)) return '-';
-  return new Date(ms).toLocaleString(undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
     minute: '2-digit',
-    hour12: false,
-  });
+  };
+  try {
+    return new Date(ms).toLocaleString(locale, options);
+  } catch {
+    return new Date(ms).toLocaleString(undefined, options);
+  }
 }
 
 /** A readable, localized alternative for the click-to-cycle reset label. */
@@ -171,17 +190,19 @@ export interface ResetDisplay {
   relative: string | null;
   /** Null alongside relative when the reset instant itself is unavailable. */
   full: string | null;
+  /** Narrow countdown (`3d 13h`) for a future instant; null when past or unknown. */
+  span: string | null;
+  /** Narrow time since (`12m`) for a past instant; null when future or unknown. */
+  ago: string | null;
 }
 
 /**
- * Pair an already-formatted absolute label with a freshly computed relative one.
+ * Absolute and relative halves of one reset instant.
  *
- * The absolute label wins when present because providers bake it at fetch time
- * and some of them cannot be reproduced at render (`formatCodexResetLabel`
- * resolves `reset_after_seconds` against the fetch-time clock). The instant is
- * only used for the relative half, and its absence degrades to exactly the
- * pre-existing rendering — which is what a store entry cached by an older
- * build, with no `resetAtMs` field, will hit.
+ * The absolute half is always formatted here from the instant, so every time on
+ * the page shares one format and locale. Labels baked at fetch time (or cached by
+ * an older build, such as `11/27, 07:30`) are only a fallback for an entry with no
+ * usable instant, which then renders exactly as before.
  *
  * Returns null when there is nothing worth rendering at all.
  */
@@ -195,11 +216,18 @@ export function buildResetDisplay(
   const absolute = trimmed && trimmed !== '-' ? trimmed : null;
   const usableMs = typeof atMs === 'number' && Number.isFinite(atMs) ? atMs : null;
 
-  if (absolute === null && usableMs === null) return null;
+  if (usableMs === null) {
+    return absolute === null
+      ? null
+      : { absolute, relative: null, full: null, span: null, ago: null };
+  }
 
+  const narrow = formatDurationNarrow(usableMs, nowMs, locale);
   return {
-    absolute: absolute ?? formatInstantShort(usableMs as number),
-    relative: usableMs === null ? null : formatRelativeInstant(usableMs, nowMs, locale),
-    full: usableMs === null ? null : formatInstantFull(usableMs, locale),
+    absolute: formatInstantShort(usableMs, locale),
+    relative: formatRelativeInstant(usableMs, nowMs, locale),
+    full: formatInstantFull(usableMs, locale),
+    span: usableMs <= nowMs ? null : narrow,
+    ago: usableMs <= nowMs ? narrow : null,
   };
 }

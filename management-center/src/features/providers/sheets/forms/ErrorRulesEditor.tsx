@@ -87,6 +87,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
                       type="button"
                       variant="ghost"
                       size="icon-sm"
+                      className="max-sm:size-10"
                       disabled={
                         disabled || (direction === -1 ? index === 0 : index === rules.length - 1)
                       }
@@ -108,7 +109,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive max-sm:size-10"
                     disabled={disabled}
                     aria-label={t(`${key}.removeRule`)}
                     onClick={() => {
@@ -129,7 +130,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
                   id={statusId(rule.id)}
                   type="text"
                   inputMode="numeric"
-                  className="font-mono"
+                  className="font-mono placeholder:font-sans"
                   value={rule.status}
                   disabled={disabled}
                   aria-invalid={statusError || undefined}
@@ -196,7 +197,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
                     <FieldLabel htmlFor={matchId(match.id)}>{t(`${key}.matchValue`)}</FieldLabel>
                     <Textarea
                       id={matchId(match.id)}
-                      className="min-h-8 resize-y py-1.5 font-mono"
+                      className="min-h-8 resize-y py-1.5 font-mono placeholder:font-sans max-sm:min-h-10 max-sm:py-2"
                       rows={1}
                       value={match.value}
                       disabled={disabled}
@@ -256,7 +257,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
               type="button"
               variant="ghost"
               size="sm"
-              className="self-start"
+              className="self-start max-sm:h-10"
               disabled={disabled}
               onClick={() => {
                 const match = createErrorMatch(nextId());
@@ -280,7 +281,7 @@ export function ErrorRulesEditor({ rules, onChange, disabled }: ErrorRulesEditor
         type="button"
         variant="outline"
         size="sm"
-        className="self-start"
+        className="self-start max-sm:h-10"
         disabled={disabled}
         onClick={() => {
           const rule = createErrorRule(nextId());

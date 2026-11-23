@@ -59,7 +59,7 @@ export function OptionSelect<T extends string>({
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
-        className={cn('w-full data-[size=default]:h-9', className)}
+        className={cn('w-full data-[size=default]:h-9 max-sm:data-[size=default]:h-10', className)}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

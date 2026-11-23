@@ -80,6 +80,14 @@ describe('auth file row', () => {
     );
   });
 
+  test('hides the selection cell on phones until select mode', () => {
+    // The label around the checkbox is the phone tap target, so it carries the visibility.
+    const cell = (markup: string) =>
+      markup.match(/<label[^>]*>(?=<button[^>]*role="checkbox")/)?.[0] ?? '';
+    expect(cell(render())).toContain('max-sm:hidden');
+    expect(cell(render({ selecting: true }))).not.toContain('max-sm:hidden');
+  });
+
   test('locks the actions while controls are disabled', () => {
     const markup = render({ disableControls: true });
     const label = i18n.t('auth_files.delete_button');
@@ -89,5 +97,49 @@ describe('auth file row', () => {
       )
     );
     expect(markup).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
+  });
+
+  test('shows the last known quota even when stale or when no window routes', () => {
+    const past = '2020-06-01T00:00:00Z';
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const window = (id: string, remaining: number, routing: boolean) => ({
+      id,
+      label: id,
+      used_percent: 100 - remaining,
+      remaining_percent: remaining,
+      reset_at: future,
+      known: true,
+      routing,
+    });
+    const percent = (remaining: number) =>
+      i18n.t('auth_files.quota_drain_remaining', { percent: remaining });
+    // A poll past its stale time still reads as a percentage, not "stale".
+    const stale = render({
+      file: {
+        ...file,
+        quota_capacity: {
+          provider: 'claude',
+          supported: true,
+          fetched_at: past,
+          stale_at: past,
+          windows: [window('weekly', 94, true)],
+        },
+      } as AuthFileItem,
+    });
+    expect(stale).toContain(percent(94));
+    // OpenCode Go marks no window as routing: fall back to the tightest known one.
+    const noRouting = render({
+      file: {
+        ...file,
+        type: 'opencode-go',
+        quota_capacity: {
+          provider: 'opencode-go',
+          supported: true,
+          windows: [window('rolling', 100, false), window('monthly', 63, false)],
+        },
+      } as AuthFileItem,
+    });
+    expect(noRouting).toContain(percent(63));
+    expect(noRouting).not.toContain(i18n.t('auth_files.quota_drain_unavailable'));
   });
 });

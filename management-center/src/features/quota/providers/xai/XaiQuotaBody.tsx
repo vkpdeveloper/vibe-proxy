@@ -3,10 +3,12 @@
  * 周/月账单水位条、按量付费余额。
  */
 
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import type { XaiBillingSummary, XaiQuotaState } from '@/types';
 import { buildResetDisplay, formatQuotaResetTime, parseIsoToMs } from '@/utils/quota';
+import { formatPercent } from '@/utils/format';
 import { useNow } from '@/hooks/useNow';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
@@ -48,11 +50,6 @@ const formatXaiOnDemandAmount = (billing: XaiBillingSummary): string => {
   return `${remaining} / ${cap}`;
 };
 
-const formatXaiPercent = (value: number | null): string => {
-  if (value === null) return '--';
-  return `${Math.round(value)}%`;
-};
-
 const XAI_SUPERGROK_LIMIT_CENTS = 15_000;
 const XAI_SUPERGROK_HEAVY_LIMIT_CENTS = 150_000;
 
@@ -91,6 +88,8 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
   const weeklySoon = urgentRowId === XAI_WEEKLY_ROW_ID;
   const grokBotSoon = urgentRowId === XAI_GROK_BOT_ROW_ID;
   const billing = quota.billing;
+  const formatLeft = (value: number | null): string =>
+    value === null ? '--' : t('auth_files.quota_drain_remaining', { percent: Math.round(value) });
   const grokBot = quota.grokBot;
   const grokBotUsed =
     grokBot?.usedPercent == null ? null : Math.max(0, Math.min(100, grokBot.usedPercent));
@@ -124,7 +123,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
   const clampedUsed =
     billing.usedPercent === null ? null : Math.max(0, Math.min(100, billing.usedPercent));
   const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
-  const percentLabel = formatXaiPercent(remaining);
+  const percentLabel = formatLeft(remaining);
   const amountLabel = formatXaiRemainingAmount(billing);
   const resetLabel = formatQuotaResetTime(billing.billingPeriodEnd);
   // The monthly row is a billing cycle, so it carries no resetAtMs (that field
@@ -143,7 +142,7 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
       : Math.max(0, Math.min(100, billing.onDemandUsedPercent));
   const onDemandRemaining =
     clampedOnDemandUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedOnDemandUsed));
-  const onDemandPercentLabel = formatXaiPercent(onDemandRemaining);
+  const onDemandPercentLabel = formatLeft(onDemandRemaining);
   const onDemandAmountLabel = formatXaiOnDemandAmount(billing);
   const plan = resolveXaiPlan(billing.monthlyLimitCents);
   const weeklyUsed =
@@ -151,9 +150,8 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
       ? Math.max(0, Math.min(100, billing.usagePercent))
       : null;
   const weeklyRemaining = weeklyUsed === null ? null : Math.max(0, Math.min(100, 100 - weeklyUsed));
-  const weeklyResetLabel = formatQuotaResetTime(billing.periodEnd);
   const weeklyResetDisplay = buildResetDisplay(
-    weeklyResetLabel === '-' ? null : t('xai_quota.reset_at', { time: weeklyResetLabel }),
+    formatQuotaResetTime(billing.periodEnd),
     billing.resetAtMs,
     now,
     locale
@@ -190,8 +188,9 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               <span className={subscriptionClass}>{subscriptionLabel}</span>
             </span>
           )}
+          {/* Phones skip chips that repeat a row below or report something switched off. */}
           {onDemandCap <= 0 && (
-            <span className={classes.codexPlanItem}>
+            <span className={`${classes.codexPlanItem} max-sm:hidden`}>
               <span className={classes.codexPlanLabel}>{t('xai_quota.pay_as_you_go_label')}</span>
               <span className={classes.codexPlanValue}>
                 {t('xai_quota.pay_as_you_go_disabled')}
@@ -199,11 +198,24 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
             </span>
           )}
           {headerReset && (
-            <span className={classes.codexPlanItem}>
+            <span
+              className={
+                hasWeeklyData || hasMonthlyData
+                  ? `${classes.codexPlanItem} max-sm:hidden`
+                  : classes.codexPlanItem
+              }
+            >
               <span className={classes.codexPlanLabel}>{t('xai_quota.resets_label')}</span>
               <span className={classes.codexPlanValue}>{headerReset.absolute}</span>
               {headerReset.relative && (
-                <span className={classes.quotaResetRelative}>{headerReset.relative}</span>
+                <span className={`${classes.quotaResetRelative} max-sm:hidden`}>
+                  {headerReset.relative}
+                </span>
+              )}
+              {headerReset.span && (
+                <span className={`${classes.quotaResetRelative} sm:hidden`}>
+                  {t('quota_management.in_span', { span: headerReset.span })}
+                </span>
               )}
             </span>
           )}
@@ -228,16 +240,45 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               <span className={classes.quotaPercent}>
                 {weeklyRemaining === null
                   ? t('xai_quota.usage_unavailable')
-                  : formatXaiPercent(weeklyRemaining)}
+                  : formatLeft(weeklyRemaining)}
               </span>
               {weeklyResetDisplay && (
-                <QuotaResetLabel display={weeklyResetDisplay} classes={classes} soon={weeklySoon} />
+                <QuotaResetLabel
+                  display={weeklyResetDisplay}
+                  classes={classes}
+                  remainingPercent={weeklyRemaining}
+                />
               )}
             </div>
           </div>
           {weeklyRemaining !== null && (
             <QuotaMeter percent={weeklyRemaining} classes={classes} index={0} />
           )}
+        </div>
+      )}
+      {/* Each product's share of the shared weekly limit above. These are amounts used, not
+          separate allowances, so they read "Used by Grok Bot 6%" rather than "% left".
+          One label/value pair like Plan; phones let the list wrap between products. */}
+      {billing.productUsage.length > 0 && (
+        <div className={classes.codexPlan}>
+          <span className={cn(classes.codexPlanItem, 'max-sm:whitespace-normal')}>
+            <span className={cn(classes.codexPlanLabel, 'shrink-0 max-sm:self-start')}>
+              {t('xai_quota.used_by')}
+            </span>
+            <span className={classes.codexPlanValue}>
+              {billing.productUsage.map((item, index) => (
+                <Fragment key={item.product}>
+                  {index > 0 && ' · '}
+                  <span className="whitespace-nowrap">
+                    {item.product.replace(/([a-z])([A-Z])/g, '$1 $2')}{' '}
+                    {item.usagePercent === null
+                      ? '--'
+                      : formatPercent(Math.max(0, Math.min(100, item.usagePercent)), 0)}
+                  </span>
+                </Fragment>
+              ))}
+            </span>
+          </span>
         </div>
       )}
       {grokBot && (
@@ -251,33 +292,17 @@ export function XaiQuotaBody({ quota, classes }: QuotaBodyProps<XaiQuotaState>) 
               <span className={classes.quotaDescription}>{t('xai_quota.grok_bot_desc')}</span>
             </span>
             <div className={classes.quotaMeta}>
-              <span className={classes.quotaPercent}>
-                {t('xai_quota.used_percent', { percent: formatXaiPercent(grokBotUsed) })}
-              </span>
+              <span className={classes.quotaPercent}>{formatLeft(grokBotRemaining)}</span>
               {grokBotResetDisplay && (
                 <QuotaResetLabel
                   display={grokBotResetDisplay}
                   classes={classes}
-                  soon={grokBotSoon}
+                  remainingPercent={grokBotRemaining}
                 />
               )}
             </div>
           </div>
           <QuotaMeter percent={grokBotRemaining} classes={classes} index={0.5} />
-        </div>
-      )}
-      {billing.productUsage.length > 0 && (
-        <div className={classes.quotaMessage}>
-          <div>{t('xai_quota.usage_breakdown')}</div>
-          {billing.productUsage.map((item) => (
-            <div key={`product-${item.product}`}>
-              {t('xai_quota.product_usage', { product: item.product })}
-              {': '}
-              {item.usagePercent === null
-                ? t('xai_quota.usage_unavailable')
-                : formatXaiPercent(Math.max(0, Math.min(100, item.usagePercent)))}
-            </div>
-          ))}
         </div>
       )}
       {onDemandCap > 0 && (

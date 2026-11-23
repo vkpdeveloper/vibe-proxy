@@ -19,6 +19,10 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
+/** Number inputs without the browser's step arrows, which are too small to tap and rarely used. */
+export const NO_SPINNER =
+  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
 export interface FormSelectOption {
   value: string;
   label: string;
@@ -98,7 +102,10 @@ interface SwitchFieldProps {
   onCheckedChange: (checked: boolean) => void;
 }
 
-/** A labelled on/off setting: label and optional hint on the left, switch on the right. */
+/**
+ * A labelled on/off setting: label and optional hint on the left, switch on the right.
+ * The label stretches over the whole row, so a tap anywhere on it toggles the switch.
+ */
 export function SwitchField({
   id,
   label,
@@ -109,9 +116,15 @@ export function SwitchField({
 }: SwitchFieldProps) {
   const descriptionId = description ? `${id}-description` : undefined;
   return (
-    <Field orientation="horizontal" data-disabled={disabled ? 'true' : undefined}>
+    <Field
+      orientation="horizontal"
+      className="relative min-h-10"
+      data-disabled={disabled ? 'true' : undefined}
+    >
       <FieldContent>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <FieldLabel htmlFor={id} className="after:absolute after:inset-0">
+          {label}
+        </FieldLabel>
         {description ? <FieldDescription id={descriptionId}>{description}</FieldDescription> : null}
       </FieldContent>
       <Switch
@@ -152,7 +165,7 @@ export function SecretInput({
     ? t('providersPage.form.hideApiKey')
     : t('providersPage.form.showApiKey');
   return (
-    <InputGroup className={className}>
+    <InputGroup className={cn('max-sm:h-10', className)}>
       <InputGroupInput
         id={id}
         type={visible ? 'text' : 'password'}
@@ -166,8 +179,10 @@ export function SecretInput({
         disabled={disabled}
       />
       <InputGroupAddon align="inline-end">
+        {/* 40px on phones; it overlaps the field's 1px border, which is invisible. */}
         <InputGroupButton
           size="icon-xs"
+          className="max-sm:-mr-1.5 max-sm:size-10"
           aria-label={toggleLabel}
           title={toggleLabel}
           disabled={disabled}

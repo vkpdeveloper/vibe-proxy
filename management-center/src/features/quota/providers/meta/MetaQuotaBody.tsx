@@ -1,20 +1,14 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MetaQuotaState } from '@/types';
 import { useNow } from '@/hooks/useNow';
 import { buildResetDisplay } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
-import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 
 export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>) {
   const { t, i18n } = useTranslation();
   const now = useNow();
-  const soonestRowId = useMemo(
-    () => pickUrgentRowId(collectQuotaRowInstants('meta', quota), now),
-    [quota, now]
-  );
   const data = quota.data;
   if (!data) return <div className={classes.quotaMessage}>{t('meta_quota.empty_data')}</div>;
 
@@ -39,7 +33,6 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
           now,
           i18n.resolvedLanguage
         );
-        const soon = window.id === soonestRowId;
         const label =
           window.id === 'window' && window.durationMinutes
             ? window.durationMinutes % 60 === 0
@@ -57,7 +50,11 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
                     : t('meta_quota.remaining', { percent: Number(remaining.toFixed(1)) })}
                 </span>
                 {resetDisplay && (
-                  <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
+                  <QuotaResetLabel
+                    display={resetDisplay}
+                    classes={classes}
+                    remainingPercent={remaining}
+                  />
                 )}
               </div>
             </div>

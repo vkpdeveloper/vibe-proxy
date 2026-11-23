@@ -6,11 +6,11 @@ import type { CodexUsageWindow } from '@/types';
 import { normalizeNumberValue } from './parsers';
 import { formatInstantShort } from './relativeTime';
 
-export function formatQuotaResetTime(value?: string): string {
+export function formatQuotaResetTime(value?: string, locale?: string): string {
   if (!value) return '-';
   const ms = new Date(value).getTime();
   if (Number.isNaN(ms)) return '-';
-  return formatInstantShort(ms);
+  return formatInstantShort(ms, locale);
 }
 
 export function formatUnixSeconds(value: number | null): string {

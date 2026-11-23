@@ -100,7 +100,11 @@ export function ProviderResourceList({
       tags.push(t('providersPage.table.cliProfileTag'));
     }
 
-    return { title, subtitle, baseUrl, tags, metrics };
+    // Mono is for keys and URLs, not for names or the "not set" placeholder.
+    const titleIsKey = r.brand !== 'openaiCompatibility';
+    const baseUrlIsUrl = Boolean(r.baseUrl) || r.brand === 'claude';
+
+    return { title, titleIsKey, subtitle, baseUrl, baseUrlIsUrl, tags, metrics };
   };
 
   const iconButton = (
@@ -117,7 +121,7 @@ export function ProviderResourceList({
         aria-label={label}
         disabled={options.disabled}
         onClick={onClick}
-        className={cn(options.destructive && 'hover:text-destructive')}
+        className={cn('max-sm:size-10', options.destructive && 'hover:text-destructive')}
       >
         <HugeiconsIcon icon={icon} strokeWidth={1.75} />
       </Button>
@@ -143,21 +147,31 @@ export function ProviderResourceList({
             )}
           >
             <ItemHeader className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2 max-sm:items-start">
                 <span
                   className={cn(
-                    'size-2 shrink-0 rounded-full',
+                    'size-2 shrink-0 rounded-full max-sm:mt-1.5',
                     resource.disabled ? 'bg-faint' : 'bg-success'
                   )}
                   title={statusLabel}
                 />
                 <span className="sr-only">{statusLabel}</span>
-                <span className="min-w-0 truncate font-mono text-sm font-medium">{row.title}</span>
-                {row.subtitle ? (
-                  <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                    {row.subtitle}
+                {/* Phones stack the subtitle so the 40px actions leave the title room. */}
+                <span className="flex min-w-0 items-center gap-2 max-sm:flex-col max-sm:items-start max-sm:gap-0">
+                  <span
+                    className={cn(
+                      'max-w-full min-w-0 truncate text-sm font-medium',
+                      row.titleIsKey && 'font-mono'
+                    )}
+                  >
+                    {row.title}
                   </span>
-                ) : null}
+                  {row.subtitle ? (
+                    <span className="max-w-full min-w-0 truncate font-mono text-xs text-muted-foreground">
+                      {row.subtitle}
+                    </span>
+                  ) : null}
+                </span>
               </div>
               <ItemActions className="shrink-0 gap-1">
                 {onToggleDisabled ? (
@@ -190,7 +204,7 @@ export function ProviderResourceList({
             </ItemHeader>
 
             <ItemContent className="min-w-0 basis-full gap-1.5">
-              <ItemDescription className="truncate font-mono text-xs">
+              <ItemDescription className={cn('truncate text-xs', row.baseUrlIsUrl && 'font-mono')}>
                 {row.baseUrl}
               </ItemDescription>
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
@@ -201,7 +215,7 @@ export function ProviderResourceList({
                 ) : null}
                 {row.metrics.map(([label, value]) => (
                   <span key={label} className="whitespace-nowrap">
-                    {label} <span className="font-mono text-foreground tabular-nums">{value}</span>
+                    {label} <span className="text-foreground">{value}</span>
                   </span>
                 ))}
                 {row.tags.map((tag) => (
@@ -214,7 +228,7 @@ export function ProviderResourceList({
 
             {usage ? (
               <ItemFooter className="flex-wrap gap-x-4 gap-y-2">
-                <span className="flex shrink-0 items-center gap-3 font-mono text-xs tabular-nums">
+                <span className="flex shrink-0 items-center gap-3 text-xs">
                   <span className="text-success">
                     {t('stats.success')} {usage.totals.success}
                   </span>

@@ -43,7 +43,7 @@ export function ModelAdvancedFields({
       <FieldLabel htmlFor={`${id}-${key}`}>{t(`providersPage.modelOptions.${key}`)}</FieldLabel>
       <Input
         id={`${id}-${key}`}
-        className={numeric ? 'font-mono' : undefined}
+        className={numeric ? 'font-mono placeholder:font-sans' : undefined}
         value={entry[key] ?? ''}
         inputMode={numeric ? 'numeric' : undefined}
         disabled={disabled || (budget && !enabled)}

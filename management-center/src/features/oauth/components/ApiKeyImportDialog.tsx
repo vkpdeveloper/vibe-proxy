@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -57,12 +58,36 @@ export function ApiKeyImportDialog({
   const { t } = useTranslation();
   const idPrefix = useId();
   const keyId = `${idPrefix}-key`;
+  const formId = `${idPrefix}-form`;
   const toggleLabel = state.showKey
     ? t('login.hide_key', { defaultValue: 'Hide key' })
     : t('login.show_key', { defaultValue: 'Show key' });
 
   return (
-    <FlowDialog open={open} heading={heading} onClose={onClose}>
+    <FlowDialog
+      open={open}
+      heading={heading}
+      onClose={onClose}
+      footer={
+        !state.success && (
+          <DialogFooter>
+            <Button variant="outline" size="lg" className="h-9 px-4" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            {/* Outside the form, so it submits through the form attribute. */}
+            <Button
+              type="submit"
+              form={formId}
+              size="lg"
+              className="h-9 px-4"
+              disabled={state.loading || !state.apiKey.trim()}
+            >
+              {t(`${namespace}.add_button`)}
+            </Button>
+          </DialogFooter>
+        )
+      }
+    >
       <FlowView key={state.success ? 'result' : 'form'}>
         {state.success ? (
           <ResultView
@@ -80,6 +105,7 @@ export function ApiKeyImportDialog({
           />
         ) : (
           <form
+            id={formId}
             className="flex flex-col gap-5"
             noValidate
             onSubmit={(event) => {
@@ -104,8 +130,10 @@ export function ApiKeyImportDialog({
                     onChange={(event) => onApiKeyChange(event.target.value)}
                   />
                   <InputGroupAddon align="inline-end">
+                    {/* 40px on phones; it overlaps the field's 1px border, which is invisible. */}
                     <InputGroupButton
                       size="icon-xs"
+                      className="max-sm:-mr-1.5 max-sm:size-10"
                       onClick={onToggleShowKey}
                       aria-label={toggleLabel}
                       title={toggleLabel}
@@ -140,10 +168,6 @@ export function ApiKeyImportDialog({
             </FieldGroup>
 
             {state.error && <FlowAlert>{state.error}</FlowAlert>}
-
-            <Button type="submit" size="lg" className="h-9 w-fit px-4" disabled={state.loading}>
-              {t(`${namespace}.add_button`)}
-            </Button>
           </form>
         )}
       </FlowView>

@@ -19,19 +19,7 @@ import { axisMax } from '../utils';
 /** Gridlines including zero, so TICK_COUNT - 1 intervals. */
 const TICK_COUNT = 4;
 
-/**
- * Bucket label. The backend sends server-local strings ("15:04-15:14"); prefer them over the
- * browser clock so time zones never disagree.
- */
-function bucketRangeLabel(time: string | undefined, index: number, count: number): string {
-  if (time) return time;
-  return `-${(count - index) * TRAFFIC_BUCKET_MINUTES}m`;
-}
-
-function bucketStartLabel(time: string | undefined, index: number, count: number): string {
-  if (!time) return bucketRangeLabel(time, index, count);
-  return time.split('-')[0]?.trim() || time;
-}
+const BUCKET_MS = TRAFFIC_BUCKET_MINUTES * 60_000;
 
 export function ThroughputChart({
   traffic,
@@ -40,10 +28,26 @@ export function ThroughputChart({
   traffic: TrafficWindow;
   windowLabel: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showTable, setShowTable] = useState(false);
   const { buckets, totalSuccess, totalFailure, total, peakIndex, peakTotal } = traffic;
   const scaleMax = useMemo(() => axisMax(peakTotal, TICK_COUNT - 1), [peakTotal]);
+
+  // The server labels buckets in its own time zone; show the viewer's clock instead.
+  const timeFormat = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.language, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }),
+    [i18n.language]
+  );
+  const bucketStart = (index: number) =>
+    traffic.lastBucketStart - (buckets.length - 1 - index) * BUCKET_MS;
+  const startLabel = (index: number) => timeFormat.format(bucketStart(index));
+  const rangeLabel = (index: number) =>
+    timeFormat.formatRange(bucketStart(index), bucketStart(index) + BUCKET_MS);
 
   const ticks = Array.from({ length: TICK_COUNT }, (_, index) => {
     const ratio = 1 - index / (TICK_COUNT - 1);
@@ -72,18 +76,18 @@ export function ThroughputChart({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-destructive" aria-hidden="true" />
-            {t('stats.failure')}
+            {t('dashboard.failed_attempts')}
           </span>
         </span>
-        <span className="font-mono text-faint">{windowLabel}</span>
+        <span className="text-faint">{windowLabel}</span>
       </figcaption>
 
       <div className="flex gap-2 px-4 pt-5">
-        <div className="relative w-7 shrink-0 font-mono text-[11px] text-faint" aria-hidden="true">
+        <div className="relative w-7 shrink-0 text-xs text-faint" aria-hidden="true">
           {ticks.map((tick) => (
             <span
               key={tick.ratio}
-              className="absolute right-0 -translate-y-1/2 tabular-nums"
+              className="absolute right-0 -translate-y-1/2"
               style={{ top: `${(1 - tick.ratio) * 100}%` }}
             >
               {tick.value.toLocaleString()}
@@ -113,12 +117,12 @@ export function ThroughputChart({
             {buckets.map((bucket, index) => {
               const bucketTotal = bucket.success + bucket.failed;
               return (
-                <Tooltip key={bucket.time ?? index}>
+                <Tooltip key={index}>
                   <TooltipTrigger asChild>
                     <div className="group relative flex h-full flex-1 flex-col justify-end">
                       {index === peakIndex && peakTotal > 0 && (
                         <span
-                          className="absolute left-1/2 -translate-x-1/2 pb-1 font-mono text-[11px] text-muted-foreground tabular-nums"
+                          className="absolute left-1/2 -translate-x-1/2 pb-1 text-xs text-muted-foreground"
                           style={{ bottom: `${Math.min(100, (bucketTotal / scaleMax) * 100)}%` }}
                         >
                           {peakTotal.toLocaleString()}
@@ -144,12 +148,12 @@ export function ThroughputChart({
                       )}
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent className="flex flex-col gap-0.5 font-mono">
-                    <span>{bucketRangeLabel(bucket.time, index, buckets.length)}</span>
+                  <TooltipContent className="flex flex-col gap-0.5">
+                    <span>{rangeLabel(index)}</span>
                     <span>
                       {bucket.success.toLocaleString()} {t('stats.success').toLowerCase()}
                       {bucket.failed > 0 &&
-                        `, ${bucket.failed.toLocaleString()} ${t('stats.failure').toLowerCase()}`}
+                        `, ${bucket.failed.toLocaleString()} ${t('dashboard.failed_attempts').toLowerCase()}`}
                     </span>
                     {bucketTotal > 0 && (
                       <span>{formatPercent((bucket.success / bucketTotal) * 100)}</span>
@@ -169,7 +173,7 @@ export function ThroughputChart({
 
       <div className="flex gap-2 px-4 pt-2 pb-3" aria-hidden="true">
         <span className="w-7 shrink-0" />
-        <div className="relative h-4 min-w-0 flex-1 font-mono text-[11px] text-faint">
+        <div className="relative h-4 min-w-0 flex-1 text-xs text-faint">
           {xTicks.map((index) => (
             <span
               key={index}
@@ -182,7 +186,7 @@ export function ThroughputChart({
                     : { left: `${((index + 0.5) / buckets.length) * 100}%`, translate: '-50% 0' }
               }
             >
-              {bucketStartLabel(buckets[index]?.time, index, buckets.length)}
+              {startLabel(index)}
             </span>
           ))}
         </div>
@@ -192,7 +196,7 @@ export function ThroughputChart({
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground"
+          className="text-muted-foreground max-sm:h-10"
           aria-expanded={showTable}
           onClick={() => setShowTable((current) => !current)}
         >
@@ -201,24 +205,25 @@ export function ThroughputChart({
         </Button>
       </div>
 
+      {/* Phones scroll the page instead of a box inside it. */}
       {showTable && (
-        <div className="max-h-72 overflow-y-auto border-t">
+        <div className="border-t sm:max-h-72 sm:overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="px-4">{t('dashboard.traffic_table_window')}</TableHead>
                 <TableHead className="text-right">{t('stats.success')}</TableHead>
-                <TableHead className="text-right">{t('stats.failure')}</TableHead>
-                <TableHead className="px-4 text-right">{t('dashboard.success_rate')}</TableHead>
+                <TableHead className="text-right">{t('dashboard.failed_attempts')}</TableHead>
+                <TableHead className="px-4 text-right">{t('dashboard.col_rate')}</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="font-mono text-xs">
+            <TableBody className="text-xs tabular-nums">
               {buckets.map((bucket, index) => {
                 const bucketTotal = bucket.success + bucket.failed;
                 return (
-                  <TableRow key={bucket.time ?? index}>
+                  <TableRow key={index}>
                     <TableCell className="px-4 text-muted-foreground">
-                      {bucketRangeLabel(bucket.time, index, buckets.length)}
+                      {rangeLabel(index)}
                     </TableCell>
                     <TableCell className="text-right">{bucket.success.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{bucket.failed.toLocaleString()}</TableCell>

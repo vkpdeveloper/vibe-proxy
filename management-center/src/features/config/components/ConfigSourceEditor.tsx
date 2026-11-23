@@ -3,8 +3,17 @@ import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { yaml } from '@codemirror/lang-yaml';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { EditorView, keymap, scrollPastEnd } from '@codemirror/view';
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  keymap,
+  scrollPastEnd,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { usePhone } from '@/components/layout/pageBar';
 
 type ConfigSourceEditorProps = {
   value: string;
@@ -98,6 +107,55 @@ const highlight = syntaxHighlighting(
   ])
 );
 
+/** Wrapped rows line up two characters past the line's own indent, so a wrapped value reads as one. */
+function hangingIndents(view: EditorView): DecorationSet {
+  const ranges = [];
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to;) {
+      const line = view.state.doc.lineAt(pos);
+      const hang = line.text.length - line.text.trimStart().length + 2;
+      ranges.push(
+        Decoration.line({
+          // 6px is CodeMirror's own line padding.
+          attributes: { style: `padding-left: calc(${hang}ch + 6px); text-indent: -${hang}ch` },
+        }).range(line.from)
+      );
+      pos = line.to + 1;
+    }
+  }
+  return Decoration.set(ranges);
+}
+
+// 16px text so iOS doesn't zoom in on focus, right padding so wrapped lines don't run to the
+// screen edge, and a slim gutter (smaller numbers, no fold column) to leave room for the text.
+// The extra class in each selector outranks the base theme.
+const phoneTheme = EditorView.theme({
+  '&.cm-editor': { fontSize: '16px' },
+  '.cm-scroller .cm-content': { paddingRight: '16px' },
+  '.cm-scroller .cm-gutters': { paddingLeft: '4px' },
+  // The line height matches the 16px text so the smaller numbers stay on its baseline.
+  '.cm-gutters .cm-lineNumbers .cm-gutterElement': {
+    fontSize: '13px',
+    lineHeight: `${16 * 1.65}px`,
+    padding: '0 6px 0 2px',
+  },
+});
+
+const hangingIndent = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = hangingIndents(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = hangingIndents(update.view);
+      }
+    }
+  },
+  { decorations: (plugin) => plugin.decorations }
+);
+
 export default function ConfigSourceEditor({
   value,
   onChange,
@@ -105,6 +163,7 @@ export default function ConfigSourceEditor({
   editable,
   placeholder,
 }: ConfigSourceEditorProps) {
+  const phone = usePhone();
   const extensions = useMemo(
     () => [
       yaml(),
@@ -115,8 +174,10 @@ export default function ConfigSourceEditor({
       keymap.of(searchKeymap),
       // Lets the last lines scroll clear of the floating save bar.
       scrollPastEnd(),
+      // Phones are too narrow for long values; wrap instead of clipping them off the edge.
+      ...(phone ? [EditorView.lineWrapping, hangingIndent, phoneTheme] : []),
     ],
-    []
+    [phone]
   );
 
   return (
@@ -134,7 +195,7 @@ export default function ConfigSourceEditor({
         lineNumbers: true,
         highlightActiveLineGutter: true,
         highlightActiveLine: true,
-        foldGutter: true,
+        foldGutter: !phone,
         dropCursor: true,
         allowMultipleSelections: true,
         indentOnInput: true,

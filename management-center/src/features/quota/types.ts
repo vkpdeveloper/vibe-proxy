@@ -20,7 +20,8 @@ export interface QuotaClassMap {
   quotaReset: string;
   quotaResetCycle: string;
   quotaResetRelative: string;
-  quotaResetRelativeSoon: string;
+  quotaResetMedium: string;
+  quotaResetLow: string;
   quotaAmount: string;
   quotaMessage: string;
   // 套餐 chip 行（codex 命名，claude/antigravity/xai 复用；
@@ -64,7 +65,8 @@ export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'quotaReset',
   'quotaResetCycle',
   'quotaResetRelative',
-  'quotaResetRelativeSoon',
+  'quotaResetMedium',
+  'quotaResetLow',
   'quotaAmount',
   'quotaMessage',
   'codexPlan',
@@ -108,8 +110,6 @@ export function bindQuotaClasses(module: Record<string, string>, source: string)
 export interface QuotaBodyProps<TState> {
   quota: TState;
   classes: QuotaClassMap;
-  /** Host-owned chips appended to the provider's plan row (`codexPlanItem` spans). */
-  planItems?: ReactNode;
   /** Host-owned content placed right after the plan row, before usage rows. */
   afterPlan?: ReactNode;
   /** Spends one specific reset credit; omitted on read-only hosts. */

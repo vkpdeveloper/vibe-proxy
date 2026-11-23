@@ -7,17 +7,13 @@ import { useTranslation } from 'react-i18next';
 import type { ClaudeQuotaState } from '@/types';
 import { buildResetDisplay, formatQuotaResetTime, resolveResetMs } from '@/utils/quota';
 import { useNow } from '@/hooks/useNow';
+import { formatDateTimeValue } from '@/utils/format';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 
-export function ClaudeQuotaBody({
-  quota,
-  classes,
-  planItems,
-  afterPlan,
-}: QuotaBodyProps<ClaudeQuotaState>) {
+export function ClaudeQuotaBody({ quota, classes, afterPlan }: QuotaBodyProps<ClaudeQuotaState>) {
   const { t, i18n } = useTranslation();
   const now = useNow();
   const soonestRowId = useMemo(
@@ -55,11 +51,11 @@ export function ClaudeQuotaBody({
       {quota.stale && (
         <div role="status" className={classes.codexResetCreditsError}>
           {t('claude_quota.stale_snapshot', {
-            time: quota.observedAt ? new Date(quota.observedAt).toLocaleString(language) : '--',
+            time: formatDateTimeValue(quota.observedAt, language) || '--',
           })}
         </div>
       )}
-      {(planType || planItems || quota.noSessionLimit) && (
+      {(planType || quota.noSessionLimit) && (
         <div className={classes.codexPlan}>
           {planType && (
             <span className={classes.codexPlanItem}>
@@ -68,18 +64,22 @@ export function ClaudeQuotaBody({
             </span>
           )}
           {quota.noSessionLimit && (
-            <span className={classes.codexPlanItem}>
+            <span className={`${classes.codexPlanItem} max-sm:hidden`}>
               <span className={classes.codexPlanValue}>{t('claude_quota.no_session_limit')}</span>
             </span>
           )}
-          {planItems}
         </div>
       )}
       {afterPlan}
       {/* Extra usage and dollar balances share the window-row anatomy:
           label + mono telemetry header, then one mono detail line. */}
       {extraUsage && (
-        <div className={classes.quotaRow}>
+        // Disabled extra usage has nothing to act on, so phones skip the row to save space.
+        <div
+          className={
+            extraUsage.isEnabled === false ? `${classes.quotaRow} max-sm:hidden` : classes.quotaRow
+          }
+        >
           <div className={classes.quotaRowHeader}>
             <span className={classes.quotaModel}>{t('claude_quota.extra_usage_label')}</span>
             <div className={classes.quotaMeta}>
@@ -150,7 +150,7 @@ export function ClaudeQuotaBody({
             <div className={classes.quotaMeta}>
               <span className={classes.quotaReset}>{t('claude_quota.balance_reset')}</span>
               {resetDisplay ? (
-                <QuotaResetLabel display={resetDisplay} classes={classes} />
+                <QuotaResetLabel display={resetDisplay} classes={classes} kind="plain" />
               ) : (
                 <span className={classes.quotaReset}>
                   {t('claude_quota.balance_reset_unknown')}
@@ -160,6 +160,17 @@ export function ClaudeQuotaBody({
           </div>
         );
       })}
+      {/* Phones show the missing 5-hour window as a row beside the others, not a bare chip. */}
+      {quota.noSessionLimit && (
+        <div className={`${classes.quotaRow} sm:hidden`}>
+          <div className={classes.quotaRowHeader}>
+            <span className={classes.quotaModel}>{t('claude_quota.five_hour')}</span>
+            <div className={classes.quotaMeta}>
+              <span className={classes.quotaReset}>{t('claude_quota.no_limit')}</span>
+            </div>
+          </div>
+        </div>
+      )}
       {windows.length === 0 && !extraUsage && !quota.dollarWindows?.length ? (
         <div className={classes.quotaMessage}>{t('claude_quota.empty_windows')}</div>
       ) : (
@@ -168,7 +179,10 @@ export function ClaudeQuotaBody({
           const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
           const remaining =
             clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
-          const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
+          const percentLabel =
+            remaining === null
+              ? '--'
+              : t('auth_files.quota_drain_remaining', { percent: Math.round(remaining) });
           const windowLabel = window.labelKey ? t(window.labelKey) : window.label;
           const resetDisplay = buildResetDisplay(
             window.resetLabel,
@@ -190,7 +204,11 @@ export function ClaudeQuotaBody({
                 <div className={classes.quotaMeta}>
                   <span className={classes.quotaPercent}>{percentLabel}</span>
                   {resetDisplay && (
-                    <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
+                    <QuotaResetLabel
+                      display={resetDisplay}
+                      classes={classes}
+                      remainingPercent={remaining}
+                    />
                   )}
                 </div>
               </div>

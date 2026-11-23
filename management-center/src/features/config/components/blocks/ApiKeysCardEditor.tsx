@@ -156,23 +156,23 @@ function ScopedApiKeysCardEditor({
     setFormError('');
   };
 
-  const iconButtonClass = 'text-muted-foreground';
+  // 40px tap targets on phones.
+  const iconButtonClass = 'text-muted-foreground max-sm:size-10';
+  const addButton = (className: string, variant?: 'outline') => (
+    <Button variant={variant} className={className} onClick={openAddModal} disabled={disabled}>
+      <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
+      {t('config_management.visual.api_keys.add')}
+    </Button>
+  );
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-sm font-medium">
-            {t('config_management.visual.api_keys.label')}
-          </span>
-          <span className="text-[13px] leading-normal text-muted-foreground">
-            {t('config_management.visual.api_keys.hint')}
-          </span>
-        </div>
-        <Button className="shrink-0" onClick={openAddModal} disabled={disabled}>
-          <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
-          {t('config_management.visual.api_keys.add')}
-        </Button>
+      <div className="flex items-center justify-between gap-4">
+        <span className="min-w-0 text-sm font-medium">
+          {t('config_management.visual.api_keys.label')}
+        </span>
+        {/* Phones get a full-width button under the list instead, so the title keeps the row. */}
+        {addButton('shrink-0 max-sm:hidden')}
       </div>
 
       {apiKeys.length === 0 ? (
@@ -180,66 +180,75 @@ function ScopedApiKeysCardEditor({
           {t('config_management.visual.api_keys.empty')}
         </div>
       ) : (
-        <ol className="divide-y overflow-hidden rounded-lg border">
-          {apiKeys.map((key, index) => (
-            <li
-              key={renderApiKeyIds[index] ?? `${key}-${index}`}
-              className="flex items-center gap-3 py-1.5 pr-1.5 pl-3"
-            >
-              <span className="w-6 shrink-0 font-mono text-xs text-faint tabular-nums">
-                {index + 1}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
-                <span className="truncate text-sm">
-                  {names[nameFingerprints[index]] ??
-                    t('config_management.visual.api_keys.input_label')}
+        // On phones the keys run edge to edge in the setting row instead of a box inside a box.
+        <ol className="divide-y overflow-hidden rounded-lg border max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
+          {apiKeys.map((key, index) => {
+            const name = names[nameFingerprints[index]];
+            const masked = maskApiKey(String(key || ''));
+            return (
+              <li
+                key={renderApiKeyIds[index] ?? `${key}-${index}`}
+                className="flex items-center gap-3 py-1.5 pr-1.5 pl-3 max-sm:py-1 max-sm:pr-2 max-sm:pl-4"
+              >
+                <span className="w-6 shrink-0 font-mono text-xs text-faint tabular-nums max-sm:hidden">
+                  {index + 1}
                 </span>
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {maskApiKey(String(key || ''))}
+                {/* Unnamed keys show only the masked key, not a generic "API Key" label. */}
+                {name ? (
+                  <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                    <span className="truncate text-sm">{name}</span>
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {masked}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{masked}</span>
+                )}
+                <span className="flex shrink-0 items-center">
+                  <Hint label={t('common.copy')}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className={iconButtonClass}
+                      onClick={() => handleCopy(key)}
+                      disabled={disabled}
+                      aria-label={t('common.copy')}
+                    >
+                      <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
+                    </Button>
+                  </Hint>
+                  <Hint label={t('config_management.visual.common.edit')}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className={iconButtonClass}
+                      onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
+                      disabled={disabled}
+                      aria-label={t('config_management.visual.common.edit')}
+                    >
+                      <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
+                    </Button>
+                  </Hint>
+                  <Hint label={t('config_management.visual.common.delete')}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:text-destructive max-sm:size-10"
+                      onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
+                      disabled={disabled}
+                      aria-label={t('config_management.visual.common.delete')}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
+                    </Button>
+                  </Hint>
                 </span>
-              </span>
-              <span className="flex shrink-0 items-center">
-                <Hint label={t('common.copy')}>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className={iconButtonClass}
-                    onClick={() => handleCopy(key)}
-                    disabled={disabled}
-                    aria-label={t('common.copy')}
-                  >
-                    <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
-                  </Button>
-                </Hint>
-                <Hint label={t('config_management.visual.common.edit')}>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className={iconButtonClass}
-                    onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
-                    disabled={disabled}
-                    aria-label={t('config_management.visual.common.edit')}
-                  >
-                    <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
-                  </Button>
-                </Hint>
-                <Hint label={t('config_management.visual.common.delete')}>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
-                    disabled={disabled}
-                    aria-label={t('config_management.visual.common.delete')}
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />
-                  </Button>
-                </Hint>
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
+
+      {addButton('h-10 w-full sm:hidden', 'outline')}
 
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="sm:max-w-md">

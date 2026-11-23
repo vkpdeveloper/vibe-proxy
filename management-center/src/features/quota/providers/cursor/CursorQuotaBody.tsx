@@ -81,7 +81,11 @@ export function CursorQuotaBody({ quota, classes }: QuotaBodyProps<CursorQuotaSt
                 </span>
                 {amount && <span className={classes.quotaAmount}>{amount}</span>}
                 {resetDisplay && (
-                  <QuotaResetLabel display={resetDisplay} classes={classes} soon={urgent} />
+                  <QuotaResetLabel
+                    display={resetDisplay}
+                    classes={classes}
+                    remainingPercent={remaining}
+                  />
                 )}
               </div>
             </div>

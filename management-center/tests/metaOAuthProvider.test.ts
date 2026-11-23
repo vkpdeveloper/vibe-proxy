@@ -97,7 +97,7 @@ describe('Muse (Meta) provider and device OAuth', () => {
           createElement(OAuthFlowContent, {
             open: true,
             providerId: 'meta',
-            heading: { title: en.auth_login.meta_oauth_title, caption: 'Device code', icon: '' },
+            heading: { title: 'Muse', caption: 'Device code', icon: '' },
             state: { status: 'waiting', url: 'https://meta.example/device', userCode: 'WDJB-MJHT' },
             text: (suffix: string) => i18n.t(`auth_login.meta_${suffix}`),
             supportsCallback: false,
@@ -119,7 +119,6 @@ describe('Muse (Meta) provider and device OAuth', () => {
     for (const locale of ['en', 'zh-CN', 'zh-TW', 'ru']) {
       const translations = JSON.parse(readFileSync(`src/i18n/locales/${locale}.json`, 'utf8'));
       for (const suffix of [
-        'oauth_title',
         'oauth_button',
         'oauth_hint',
         'open_link',

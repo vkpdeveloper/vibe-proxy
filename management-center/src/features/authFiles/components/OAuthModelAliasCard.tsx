@@ -22,6 +22,7 @@ import { Section } from '@/components/layout/Page';
 import { ModelMappingDiagram, type ModelMappingDiagramRef } from '@/components/modelAlias';
 import type { OAuthModelAliasEntry } from '@/types';
 import type { AuthFileModelItem, OAuthConfigLoadError } from '@/features/authFiles/constants';
+import { getTypeLabel } from '@/features/authFiles/constants';
 import { OAuthConfigEmpty } from './OAuthConfigEmpty';
 import { ProviderLogo } from './ProviderLogo';
 import { Hint } from '@/components/ui/tooltip';
@@ -79,8 +80,10 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
       title={t('oauth_model_alias.title')}
       actions={
         <div className="flex items-center gap-2">
+          {/* The diagram needs more width than a phone has, so phones stay on the list. */}
           <ToggleGroup
             type="single"
+            className="max-sm:hidden"
             variant="outline"
             spacing={0}
             value={viewMode}
@@ -97,10 +100,10 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
           <Button
             variant="outline"
             size="icon"
-            className="sm:hidden"
+            className="size-10 sm:hidden"
             onClick={onAdd}
             disabled={unavailable}
-            aria-label={t('oauth_model_alias.add')}
+            aria-label={t('oauth_model_alias.add_title')}
           >
             <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
           </Button>
@@ -157,25 +160,29 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
       ) : (
         <ItemGroup className="gap-0 overflow-hidden rounded-xl border">
           {entries.map(([provider, mappings]) => (
-            <Item key={provider} className="rounded-none border-0 not-last:border-b">
+            <Item key={provider} className="rounded-none border-0 not-last:border-b max-sm:p-4">
               <ItemMedia>
                 <ProviderLogo type={provider} className="size-8 rounded-lg" />
               </ItemMedia>
               <ItemContent className="min-w-0">
-                <ItemTitle className="font-mono">{provider}</ItemTitle>
+                {/* Phones show the provider's display name; desktop keeps the config key. */}
+                <ItemTitle className="font-mono max-sm:font-sans">
+                  <span className="max-sm:hidden">{provider}</span>
+                  <span className="sm:hidden">{getTypeLabel(t, provider)}</span>
+                </ItemTitle>
                 <ItemDescription>
                   {mappings?.length
                     ? t('oauth_model_alias.model_count', { count: mappings.length })
                     : t('oauth_model_alias.no_models')}
                 </ItemDescription>
               </ItemContent>
-              <ItemActions className="gap-0">
+              <ItemActions className="gap-0 max-sm:-mr-3">
                 <Hint label={t('common.edit')}>
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('common.edit')}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground max-sm:size-10"
                     onClick={() => onEditProvider(provider)}
                   >
                     <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
@@ -186,7 +193,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('oauth_model_alias.delete')}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive max-sm:size-10"
                     onClick={() => onDeleteProvider(provider)}
                   >
                     <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />

@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { useNow } from '@/hooks/useNow';
 import type { AnthropicResetGrant } from '@/services/api/claudeResetGrants';
 import { buildResetDisplay, parseIsoToMs } from '@/utils/quota';
-import { resolveTimeZoneLabel } from '@/utils/time/timezone';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { ResetExpirySection } from '../../components/ResetExpirySection';
 import type { QuotaClassMap } from '../../types';
@@ -33,7 +32,8 @@ export function ClaudeResetGrantDetails({
   return (
     <ResetExpirySection
       classes={classes}
-      title={t('claude_reset.expiry_title', { timezone: resolveTimeZoneLabel() })}
+      title={t('quota_management.saved_resets')}
+      count={remaining.reduce((sum, grant) => sum + grant.resetsLeft, 0)}
     >
       {remaining.map((grant, index) => {
         const display = buildResetDisplay(
@@ -46,12 +46,13 @@ export function ClaudeResetGrantDetails({
           <div key={grant.id} className={classes.codexResetCreditRow}>
             <span className={classes.codexResetCreditLabel}>
               {grant.label || t('claude_reset.grant_number', { index: index + 1 })}
-              {' · '}
-              {t('claude_reset.count', { left: grant.resetsLeft, total: grant.resetsTotal })}
             </span>
+            {/* The count leads the grey line so a long title never strands "· 1 left" alone. */}
             <span className={classes.codexResetCreditTime}>
+              {t('claude_reset.count', { left: grant.resetsLeft })}
+              {' · '}
               {display ? (
-                <QuotaResetLabel display={display} classes={classes} />
+                <QuotaResetLabel display={display} classes={classes} kind="expiry" />
               ) : (
                 <span className={classes.quotaReset}>{t('claude_reset.expiry_unknown')}</span>
               )}

@@ -65,8 +65,8 @@ describe('OAuth editor UI', () => {
 
   test('mapping fields have persistent accessible names and a contextual delete name', () => {
     const markup = renderMapping();
-    expect(markup).toContain('aria-label="Alias mapping 2"');
-    expect(markup).toContain('aria-label="Delete alias mapping 2"');
+    expect(markup).toContain('aria-label="Alias 2"');
+    expect(markup).toContain('aria-label="Delete alias 2"');
     for (const [value, label] of [
       ['source-model', en.oauth_model_alias.alias_name_placeholder],
       ['client-model', en.oauth_model_alias.alias_placeholder],
@@ -90,7 +90,7 @@ describe('OAuth editor UI', () => {
     const controls = [
       ...(disabledRow.match(/<input[^>]*value="(source|client)-model"[^>]*>/g) ?? []),
       ...(disabledRow.match(/<button[^>]*role="switch"[^>]*>/g) ?? []),
-      ...(disabledRow.match(/<button[^>]*aria-label="Delete alias mapping 2"[^>]*>/g) ?? []),
+      ...(disabledRow.match(/<button[^>]*aria-label="Delete alias 2"[^>]*>/g) ?? []),
     ];
     expect(controls).toHaveLength(4);
     for (const tag of controls) expect(tag).toMatch(/\sdisabled=""/);
@@ -98,7 +98,7 @@ describe('OAuth editor UI', () => {
 
   test('all four locales include the editor title and accessible row labels', () => {
     for (const locale of [en, zhCN, zhTW, ru]) {
-      expect(locale.oauth_model_alias.edit_title).toContain('{{provider}}');
+      expect(locale.oauth_model_alias.edit_title).toBeTruthy();
       expect(locale.oauth_model_alias.mapping_row).toContain('{{number}}');
       expect(locale.oauth_model_alias.remove_mapping).toContain('{{number}}');
     }

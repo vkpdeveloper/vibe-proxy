@@ -11,7 +11,7 @@ import { Hint } from '@/components/ui/tooltip';
 const EXPAND_THRESHOLD = 30;
 
 const toggleClass =
-  'absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50';
+  'absolute top-1.5 right-1.5 grid size-6 max-sm:top-2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50';
 
 /** Auto-expanding textarea that collapses back to a single-line input on demand. */
 export function ExpandableInput({
@@ -61,7 +61,7 @@ export function ExpandableInput({
     return (
       <div className="relative min-w-0 flex-1">
         <Input
-          className={cn('h-9', expandable && 'pr-9', className)}
+          className={cn('h-9 max-sm:h-10', expandable && 'pr-9', className)}
           placeholder={placeholder}
           aria-label={ariaLabel}
           value={value}
@@ -94,7 +94,7 @@ export function ExpandableInput({
     <div className="relative min-w-0 flex-1">
       <Textarea
         ref={textareaRef}
-        className={cn('min-h-9 resize-none pr-9 break-all', className)}
+        className={cn('min-h-9 resize-none pr-9 break-all max-sm:min-h-10', className)}
         placeholder={placeholder}
         aria-label={ariaLabel}
         value={value}

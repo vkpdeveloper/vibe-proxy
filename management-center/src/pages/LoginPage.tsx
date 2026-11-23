@@ -30,7 +30,10 @@ import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
 
 type RedirectState = { from?: { pathname?: string } };
 
-/** Turns a login failure into a localized message, keeping the HTTP status and backend detail. */
+/**
+ * Turns a login failure into a localized message. A wrong key reads plainly; other HTTP errors
+ * keep the status and backend detail for troubleshooting.
+ */
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
   if (error instanceof LegacyBackendError) return t('login.error_legacy_backend');
   const apiError = error as Partial<ApiError>;
@@ -56,12 +59,15 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
     return `HTTP ${status}: ${summary}${backendDetail}`;
   };
 
-  if (status === 401) return withHttpStatus(t('login.error_unauthorized'));
+  const lower = message.toLowerCase();
+  // A wrong key is the common case, so it gets plain words with no status or backend detail.
+  if (status === 401 || /invalid (management )?key/.test(lower)) {
+    return t('login.error_unauthorized');
+  }
   if (status === 403) return withHttpStatus(t('login.error_forbidden'));
   if (status === 404) return withHttpStatus(t('login.error_not_found'));
   if (status && status >= 500) return withHttpStatus(t('login.error_server'));
 
-  const lower = message.toLowerCase();
   if (code === 'ECONNABORTED' || lower.includes('timeout')) return t('login.error_timeout');
   if (code === 'ERR_NETWORK' || lower.includes('network error')) return t('login.error_network');
   if (code === 'ERR_CERT_AUTHORITY_INVALID' || lower.includes('certificate')) {
@@ -161,7 +167,8 @@ export function LoginPage() {
         </div>
 
         <FieldGroup>
-          <Field data-invalid={Boolean(error)}>
+          {/* On error only the border and the message turn red, not the label or the typed key. */}
+          <Field data-invalid={Boolean(error)} className="data-[invalid=true]:text-foreground">
             <FieldLabel htmlFor="management-key">{t('login.management_key_label')}</FieldLabel>
             <InputGroup className="h-10">
               <InputGroupInput
@@ -176,8 +183,10 @@ export function LoginPage() {
                 onChange={(event) => setManagementKey(event.target.value)}
               />
               <InputGroupAddon align="inline-end">
+                {/* A full 40px target; it overlaps the field's 1px border, which is invisible. */}
                 <InputGroupButton
-                  size="icon-xs"
+                  size="icon-sm"
+                  className="-mr-1.5 size-10"
                   aria-label={keyLabel}
                   title={keyLabel}
                   onClick={() => setShowKey((shown) => !shown)}
@@ -189,20 +198,84 @@ export function LoginPage() {
             {error && <FieldError>{error}</FieldError>}
           </Field>
 
-          <Field orientation="horizontal">
+          <Field orientation="horizontal" className="min-h-10 items-center">
             <Checkbox
               id="remember-password"
               checked={rememberPassword}
               onCheckedChange={(checked) => setRememberPassword(checked === true)}
             />
-            <FieldLabel htmlFor="remember-password" className="font-normal">
+            {/* The label fills the row, so a tap anywhere on it toggles the checkbox. */}
+            <FieldLabel
+              htmlFor="remember-password"
+              className="flex-1 items-center self-stretch font-normal"
+            >
               {t('login.remember_password_label')}
             </FieldLabel>
           </Field>
 
+          <Button type="submit" size="lg" className="h-10" disabled={loading}>
+            {loading ? t('login.submitting') : t('login.submit_button')}
+          </Button>
+        </FieldGroup>
+
+        <div className="relative -mt-2">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <button
+              type="button"
+              aria-expanded={showServer}
+              onClick={() => setShowServer((shown) => !shown)}
+              className="flex min-w-0 items-center gap-1.5 rounded-md text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:min-h-10"
+            >
+              {/* On phones the address gets its own line and wraps instead of losing its end. */}
+              <span className="flex min-w-0 flex-col max-sm:py-1 sm:block sm:truncate">
+                {t('login.custom_connection_label')}
+                {!showServer && (
+                  <span className="font-mono [overflow-wrap:anywhere] text-faint sm:ml-1.5">
+                    {serverAddress}
+                  </span>
+                )}
+              </span>
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                strokeWidth={1.75}
+                className={cn(
+                  'size-3.5 shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
+                  showServer && 'rotate-180'
+                )}
+              />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="shrink-0 text-muted-foreground max-sm:-mr-2.5 max-sm:h-10 max-sm:px-2.5"
+                  aria-label={t('language.switch')}
+                >
+                  <HugeiconsIcon icon={GlobeIcon} strokeWidth={1.75} />
+                  {t(LANGUAGE_LABEL_KEYS[language])}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
+                  {LANGUAGE_ORDER.map((lang) => (
+                    <DropdownMenuRadioItem key={lang} value={lang}>
+                      {t(LANGUAGE_LABEL_KEYS[lang])}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Opens under its toggle, which already names it. It sits outside the flow so the
+              centred form doesn't shift and the toggle stays put. */}
           {showServer && (
-            <Field>
-              <FieldLabel htmlFor="server-address">{t('login.custom_connection_label')}</FieldLabel>
+            <Field className="absolute inset-x-0 top-full mt-2">
+              <FieldLabel htmlFor="server-address" className="sr-only">
+                {t('login.custom_connection_label')}
+              </FieldLabel>
               <Input
                 id="server-address"
                 className="h-10 font-mono"
@@ -215,55 +288,6 @@ export function LoginPage() {
               <FieldDescription>{t('login.custom_connection_hint')}</FieldDescription>
             </Field>
           )}
-
-          <Button type="submit" size="lg" className="h-10" disabled={loading}>
-            {loading ? t('login.submitting') : t('login.submit_button')}
-          </Button>
-        </FieldGroup>
-
-        <div className="-mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-          <button
-            type="button"
-            aria-expanded={showServer}
-            onClick={() => setShowServer((shown) => !shown)}
-            className="flex min-w-0 items-center gap-1.5 rounded-md outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <span className="truncate">
-              {t('login.custom_connection_label')}
-              {!showServer && <span className="ml-1.5 font-mono text-faint">{serverAddress}</span>}
-            </span>
-            <HugeiconsIcon
-              icon={ArrowDown01Icon}
-              strokeWidth={1.75}
-              className={cn(
-                'size-3.5 shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
-                showServer && 'rotate-180'
-              )}
-            />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="shrink-0 text-muted-foreground"
-                aria-label={t('language.switch')}
-              >
-                <HugeiconsIcon icon={GlobeIcon} strokeWidth={1.75} />
-                {t(LANGUAGE_LABEL_KEYS[language])}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
-                {LANGUAGE_ORDER.map((lang) => (
-                  <DropdownMenuRadioItem key={lang} value={lang}>
-                    {t(LANGUAGE_LABEL_KEYS[lang])}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </form>
     </main>

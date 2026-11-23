@@ -54,6 +54,8 @@ export function ProviderSheet({
   const formId = useId();
   const [submitting, setSubmitting] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  // Not reset with the dirty flag: the form reports it on every mount, and its effect runs first.
+  const [isReady, setIsReady] = useState(true);
 
   // Reset dirty flag whenever the sheet is closed or the editing target
   // (brand / resource / mode) changes; the child form will re-mount and
@@ -69,7 +71,7 @@ export function ProviderSheet({
   const descriptor = PROVIDER_DESCRIPTORS[state.brand];
   const isEditingForm = state.mode === 'create' || state.mode === 'edit';
   const formMutating = submitting || mutationDisabled;
-  const submitDisabled = formMutating || (state.mode === 'edit' && !isDirty);
+  const submitDisabled = formMutating || !isReady || (state.mode === 'edit' && !isDirty);
 
   const confirmDiscardIfDirty = useCallback((): Promise<boolean> => {
     if (!isEditingForm || !isDirty || submitting) {
@@ -153,6 +155,7 @@ export function ProviderSheet({
         formId={formId}
         onSubmit={state.mode === 'create' ? handleCreate : handleUpdate}
         onDirtyChange={handleDirtyChange}
+        onReadyChange={setIsReady}
       />
     );
   };
@@ -228,11 +231,15 @@ export function ProviderSheet({
             : 'data-[side=right]:sm:max-w-2xl'
         )}
       >
-        <SheetHeader className="border-b px-6 py-5 pr-14">
+        <SheetHeader className="px-6 py-5 pr-14 max-sm:px-4 max-sm:pr-14 sm:border-b">
           <SheetTitle className="truncate">{titleText}</SheetTitle>
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">{renderBody()}</div>
-        <SheetFooter className="mt-0 flex-row justify-end border-t px-6 py-4">{footer}</SheetFooter>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 max-sm:px-4 max-sm:py-4">
+          {renderBody()}
+        </div>
+        <SheetFooter className="mt-0 flex-row justify-end border-t px-6 py-4 max-sm:px-4">
+          {footer}
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

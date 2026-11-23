@@ -5,7 +5,6 @@ import type { useTranslation } from 'react-i18next';
 import type { Tab } from '@/components/layout/Page';
 import type { VisualConfigValidationErrors } from '@/types/visualConfig';
 import {
-  COMMON_FIELD_IDS,
   CONFIG_SECTION_IDS,
   CONFIG_TAB_ICONS,
   CONFIG_TAB_IDS,
@@ -32,14 +31,7 @@ const FIELD_ID_TO_SECTION: ReadonlyMap<string, VisualSectionId> = new Map(
   CONFIG_FIELD_SEARCH_INDEX.map((entry) => [entry.fieldId, entry.sectionId])
 );
 
-const COMMON_FIELD_ID_SET: ReadonlySet<string> = new Set<string>(COMMON_FIELD_IDS);
-
-/** 常用 tab 渲染的字段对应的叶值键集合（校验错误归属常用 tab 时用）。 */
-const COMMON_VALUE_KEYS: ReadonlySet<string> = new Set(
-  COMMON_FIELD_IDS.flatMap((fieldId) => [...(FIELD_VALUE_KEYS[fieldId] ?? [])])
-);
-
-/** 脏字段集合 → 点亮脏点的 tabs。常用字段同时点亮 common 与其正典分区（两处都渲染它）。 */
+/** 脏字段集合 → 点亮脏点的 tabs。 */
 export function resolveDirtyTabs(dirtyFields: ReadonlySet<string>): ReadonlySet<ConfigTabId> {
   const tabs = new Set<ConfigTabId>();
   for (const valueKey of dirtyFields) {
@@ -47,7 +39,6 @@ export function resolveDirtyTabs(dirtyFields: ReadonlySet<string>): ReadonlySet<
     if (!fieldId) continue;
     const sectionId = FIELD_ID_TO_SECTION.get(fieldId);
     if (sectionId) tabs.add(sectionId);
-    if (COMMON_FIELD_ID_SET.has(fieldId)) tabs.add('common');
   }
   return tabs;
 }
@@ -68,10 +59,6 @@ export function countSectionErrors(
     );
   }
   if (hasPayloadValidationErrors) counts.payload += 1;
-  counts.common = Object.entries(validationErrors ?? {}).reduce(
-    (total, [field, error]) => total + (error && COMMON_VALUE_KEYS.has(field) ? 1 : 0),
-    0
-  );
   return counts;
 }
 
@@ -289,5 +276,5 @@ export function readSavedMode(raw: string | null): ConfigEditorMode {
 export function readSavedSection(raw: string | null): ConfigTabId {
   return raw !== null && (CONFIG_TAB_IDS as readonly string[]).includes(raw)
     ? (raw as ConfigTabId)
-    : 'common';
+    : 'connectivity';
 }

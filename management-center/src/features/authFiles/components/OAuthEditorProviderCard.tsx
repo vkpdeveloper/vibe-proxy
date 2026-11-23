@@ -24,9 +24,20 @@ export function OAuthEditorProviderCard({
   const { t } = useTranslation();
   const id = useId();
   const label = t(`${translationPrefix}.provider_label`);
+  // Known providers read as their display name, like the chips; typing a name or id picks it.
+  const providerKey = normalizeProviderKey(provider);
+  const shownValue = options.includes(providerKey) ? getTypeLabel(t, providerKey) : provider;
+  const handleInput = (text: string) => {
+    const typed = text.trim().toLowerCase();
+    const match = options.find(
+      (option) =>
+        option === normalizeProviderKey(text) || getTypeLabel(t, option).toLowerCase() === typed
+    );
+    onChange(match ?? text);
+  };
 
   return (
-    <section className="flex flex-col gap-5">
+    <section className="flex flex-col gap-3 sm:gap-5">
       <div className="flex min-h-9 items-center">
         <label htmlFor={id} className="text-lg font-semibold tracking-tight">
           {label}
@@ -35,18 +46,18 @@ export function OAuthEditorProviderCard({
       <div className="flex flex-col gap-3">
         <Input
           id={id}
-          className="h-9"
+          className="h-9 max-sm:h-10"
           list={`${id}-options`}
           placeholder={t(`${translationPrefix}.provider_placeholder`)}
-          value={provider}
-          onChange={(event) => onChange(event.target.value)}
+          value={shownValue}
+          onChange={(event) => handleInput(event.target.value)}
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
         />
         <datalist id={`${id}-options`}>
           {options.map((option) => (
-            <option key={option} value={option} />
+            <option key={option} value={getTypeLabel(t, option)} />
           ))}
         </datalist>
         <p className="text-sm text-muted-foreground">{t(`${translationPrefix}.provider_hint`)}</p>
@@ -62,7 +73,7 @@ export function OAuthEditorProviderCard({
                   onClick={() => onChange(option)}
                   disabled={disabled}
                   className={cn(
-                    'inline-flex h-8 items-center gap-2 rounded-lg border bg-transparent py-1 pr-3 pl-1 text-sm text-muted-foreground transition-colors duration-150 ease-out outline-none hover:bg-muted/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none',
+                    'inline-flex h-8 items-center max-sm:h-10 gap-2 rounded-lg border bg-transparent py-1 pr-3 pl-1 text-sm text-muted-foreground transition-colors duration-150 ease-out outline-none hover:bg-muted/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none',
                     active && 'border-primary/60 bg-primary/10 text-foreground hover:bg-primary/10'
                   )}
                 >

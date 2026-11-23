@@ -12,7 +12,7 @@ import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import type { ApiKeyEntryInput } from '../../types';
 import type { ConnectivityState, ConnectivityStatus } from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
-import { SecretInput } from './FormControls';
+import { NO_SPINNER, SecretInput } from './FormControls';
 import { Hint } from '@/components/ui/tooltip';
 
 const COLLAPSED_LIMIT = 10;
@@ -100,7 +100,14 @@ export function ApiKeyEntriesEditor({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={mutating} onClick={handleAdd}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="max-sm:h-10"
+          disabled={mutating}
+          onClick={handleAdd}
+        >
           <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} />
           {t('providersPage.form.addApiKeyEntry')}
         </Button>
@@ -108,6 +115,7 @@ export function ApiKeyEntriesEditor({
           type="button"
           variant="outline"
           size="sm"
+          className="max-sm:h-10"
           disabled={mutating || isTestingAny}
           onClick={onTestAll}
         >
@@ -150,6 +158,7 @@ export function ApiKeyEntriesEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="max-sm:h-10"
                 disabled={mutating || status.state === 'loading'}
                 onClick={() => onTest(idx)}
               >
@@ -160,6 +169,7 @@ export function ApiKeyEntriesEditor({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
+                  className="max-sm:size-10"
                   onClick={() => setExpandedIdx(expanded ? null : idx)}
                   aria-label={expanded ? t('common.collapse') : t('common.expand')}
                 >
@@ -178,7 +188,7 @@ export function ApiKeyEntriesEditor({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive max-sm:size-10"
                   disabled={mutating || removeDisabled}
                   aria-label={t('common.delete')}
                   onClick={() => handleRemove(idx)}
@@ -218,7 +228,7 @@ export function ApiKeyEntriesEditor({
                   </FieldLabel>
                   <Input
                     id={`${entryId}-proxy`}
-                    className="font-mono"
+                    className="font-mono placeholder:font-sans"
                     value={entry.proxyUrl}
                     onChange={(e) => onUpdate(idx, { proxyUrl: e.target.value })}
                     disabled={mutating}
@@ -234,6 +244,7 @@ export function ApiKeyEntriesEditor({
                     type="number"
                     step="1"
                     max={MAX_CREDENTIAL_WEIGHT}
+                    className={NO_SPINNER}
                     value={entry.weight ?? ''}
                     onChange={(e) =>
                       onUpdate(idx, {
@@ -257,7 +268,7 @@ export function ApiKeyEntriesEditor({
           type="button"
           variant="ghost"
           size="sm"
-          className="self-start"
+          className="self-start max-sm:h-10"
           onClick={() => setShowAll((v) => !v)}
         >
           {showAll

@@ -87,13 +87,14 @@ export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string)
 }
 
 /**
- * Order the grid by whichever credential recovers first.
+ * Order the grid by an ascending per-credential key: the next recovery
+ * instant for "soonest", the lowest percent left for "least_left".
  *
- * The instant is injected rather than read here: quota lives in the store and
+ * The key is injected rather than read here: quota lives in the store and
  * arrives asynchronously, and keeping this function store-free is what makes
  * the ordering rules directly testable.
  *
- * Credentials with no instant — not loaded yet, failed, or reporting no
+ * Credentials with no key — not loaded yet, failed, or reporting no
  * upcoming reset — sink to the bottom rather than sorting as "now". They keep
  * their incoming provider-grouped order, so the unloaded tail still reads like
  * the default view instead of an arbitrary shuffle. Because loading is
@@ -105,20 +106,30 @@ export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string)
 export function sortQuotaEntries(
   entries: QuotaFileEntry[],
   mode: QuotaSortMode,
-  resolveNextRecoveryMs: (entry: QuotaFileEntry) => number | null
+  resolveSortKey: (entry: QuotaFileEntry) => number | null
 ): QuotaFileEntry[] {
-  if (mode !== 'soonest') return [...entries];
+  if (mode === 'default') return [...entries];
 
   // Decorate once — resolving pokes at provider-shaped state per entry.
   return entries
-    .map((entry, index) => ({ entry, index, atMs: resolveNextRecoveryMs(entry) }))
+    .map((entry, index) => ({ entry, index, key: resolveSortKey(entry) }))
     .sort((a, b) => {
-      if (a.atMs === null && b.atMs === null) return a.index - b.index;
-      if (a.atMs === null) return 1;
-      if (b.atMs === null) return -1;
-      return a.atMs - b.atMs || a.index - b.index;
+      if (a.key === null && b.key === null) return a.index - b.index;
+      if (a.key === null) return 1;
+      if (b.key === null) return -1;
+      return a.key - b.key || a.index - b.index;
     })
     .map((decorated) => decorated.entry);
+}
+
+/** Lowest known percent left in the server's stored quota snapshot, or null without one. */
+export function lowestStoredRemainingPercent({ file }: QuotaFileEntry): number | null {
+  const state = file.quota_capacity ?? file.quotaCapacity;
+  const windows = state && Array.isArray(state.windows) ? state.windows : [];
+  const values = windows
+    .filter((window) => window?.known === true && Number.isFinite(window.remaining_percent))
+    .map((window) => window.remaining_percent);
+  return values.length > 0 ? Math.min(...values) : null;
 }
 
 export function buildTabCounts(entries: QuotaFileEntry[]): Record<string, number> {

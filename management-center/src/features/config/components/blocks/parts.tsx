@@ -56,7 +56,10 @@ export function RemoveButton({
         type="button"
         variant="ghost"
         size="icon-lg"
-        className={cn('shrink-0 text-muted-foreground hover:text-destructive', className)}
+        className={cn(
+          'shrink-0 text-muted-foreground hover:text-destructive max-sm:size-10',
+          className
+        )}
         onClick={onClick}
         disabled={disabled}
         aria-label={label}
@@ -78,7 +81,13 @@ export function AddButton({
 }) {
   return (
     <div>
-      <Button type="button" variant="outline" onClick={onClick} disabled={disabled}>
+      <Button
+        type="button"
+        variant="outline"
+        className="max-sm:h-10"
+        onClick={onClick}
+        disabled={disabled}
+      >
         <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" strokeWidth={2} />
         {children}
       </Button>

@@ -22,6 +22,7 @@ import {
   formatRelativeInstant,
   getStatusFromError,
 } from '@/utils/quota';
+import { formatDateTimeValue } from '@/utils/format';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { ClaudeQuotaState } from '@/types';
 import fixture from './fixtures/claude-oauth-usage.json';
@@ -228,7 +229,11 @@ describe('Claude quota usage reads', () => {
       } else {
         expect(state.noSessionLimit).toBe(true);
         expect(markup).toContain('No 5-hour limit');
-        expect(markup).not.toContain('>5-hour limit<');
+        // Only the phone row names the missing window, and it has no meter.
+        expect(markup.split('>5-hour limit<')).toHaveLength(2);
+        expect(markup).toContain(
+          '<div class="quotaRow sm:hidden"><div class="quotaRowHeader"><span class="quotaModel">5-hour limit</span><div class="quotaMeta"><span class="quotaReset">No limit</span></div></div></div>'
+        );
       }
     }
   );
@@ -483,7 +488,7 @@ describe('Claude usage snapshot rendering and retention', () => {
     );
   });
 
-  test('host chips join the plan row and host content follows it', () => {
+  test('host content follows the plan row', () => {
     const markup = renderToStaticMarkup(
       createElement(
         I18nextProvider,
@@ -491,32 +496,16 @@ describe('Claude usage snapshot rendering and retention', () => {
         createElement(ClaudeQuotaBody, {
           quota: { ...quota, planType: 'plan_max' },
           classes,
-          planItems: createElement('span', { 'data-slot': 'chip' }),
           afterPlan: createElement('div', { 'data-slot': 'after' }),
         })
       )
     );
     const plan = markup.indexOf('class="codexPlan"');
-    const chip = markup.indexOf('data-slot="chip"');
     const after = markup.indexOf('data-slot="after"');
     const extra = markup.indexOf('Extra Usage');
     expect(plan).toBeGreaterThanOrEqual(0);
-    expect(chip).toBeGreaterThan(plan);
-    expect(after).toBeGreaterThan(chip);
+    expect(after).toBeGreaterThan(plan);
     expect(extra).toBeGreaterThan(after);
-    // Without a plan type the host chips still get a plan row.
-    const chipOnly = renderToStaticMarkup(
-      createElement(
-        I18nextProvider,
-        { i18n: translations },
-        createElement(ClaudeQuotaBody, {
-          quota,
-          classes,
-          planItems: createElement('span', { 'data-slot': 'chip' }),
-        })
-      )
-    );
-    expect(chipOnly).toContain('<div class="codexPlan"><span data-slot="chip"></span></div>');
   });
 
   test('renders disabled extra usage, reasons, and zero amounts', () => {
@@ -544,7 +533,7 @@ describe('Claude usage snapshot rendering and retention', () => {
     const markup = render({ ...quota, status: 'error', stale: true });
     expect(markup).toContain('role="status"');
     expect(markup).toContain('Showing last successful check:');
-    expect(markup).toContain(new Date(observedAt).toLocaleString('en'));
+    expect(markup).toContain(formatDateTimeValue(observedAt, 'en'));
     expect(markup).toContain('$94.96 remaining');
   });
 

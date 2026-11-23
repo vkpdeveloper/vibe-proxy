@@ -62,6 +62,8 @@
   --popover-foreground: #ededed;
   --primary: #8b5cf6;
   --primary-foreground: #ffffff;
+  /* Filled primary surfaces with white text. --primary is 4.2:1 against white; this is 5.7:1. */
+  --primary-solid: #7c3aed;
   --secondary: #161616;
   --secondary-foreground: #ededed;
   --muted: #141414;
@@ -69,12 +71,15 @@
   --accent: #1a1a1a;
   --accent-foreground: #ededed;
   --destructive: #f2555a;
+  /* Text on the destructive tint (buttons, badges): 4.5:1 or more where --destructive is 4.3:1. */
+  --destructive-foreground: #ff7b80;
   --border: #1f1f1f;
   --input: #2a2a2a;
   --ring: #8b5cf6;
   --success: #3ecf8e;
   --warning: #f5b74e;
-  --faint: #5c5c5c;
+  /* Dimmer than muted text but still 4.5:1 on cards, popovers and sheets (muted). */
+  --faint: #808080;
 }
 
 @theme inline {
@@ -89,6 +94,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-solid: var(--primary-solid);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -96,6 +102,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -148,6 +155,115 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--input) transparent;
+  }
+}
+
+/* Scrolling strips and lists fade an edge only while there is more to scroll that way. A scroll-driven
+   animation moves the fade lengths, so a strip that fits has no fade and nothing runs on the main
+   thread. Without scroll timelines (Firefox) the strip keeps a static end fade, with end padding so
+   the last item clears it. */
+@property --fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade {
+  0% {
+    --fade-start: 0px;
+    --fade-end: 2rem;
+  }
+  10% {
+    --fade-start: 2rem;
+  }
+  90% {
+    --fade-end: 2rem;
+  }
+  100% {
+    --fade-start: 2rem;
+    --fade-end: 0px;
+  }
+}
+
+@utility scroll-fade-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-inline-end: 2rem;
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  @supports (animation-timeline: scroll()) {
+    padding-inline-end: 0;
+    /* The outer quarter of each fade is fully clear, so a few pixels of a cut-off item never read
+       as a stray character at the edge. */
+    mask-image: linear-gradient(
+      to right,
+      transparent calc(var(--fade-start) / 4),
+      #000 var(--fade-start),
+      #000 calc(100% - var(--fade-end)),
+      transparent calc(100% - var(--fade-end) / 4)
+    );
+    animation: scroll-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+
+/* The vertical version, for menus. Browsers without scroll timelines get no fade. */
+@utility scroll-fade-y {
+  @supports (animation-timeline: scroll()) {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--fade-start),
+      #000 calc(100% - var(--fade-end)),
+      transparent
+    );
+    animation: scroll-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+
+/*
+ * Phone sheets and dialogs: a hairline under the header only while the body is scrolled. Dialog
+ * headers stick inside their scrolling body, so they follow it directly. A sheet's header sits
+ * beside its scrolling body, so the sheet names that body's timeline for the header to follow.
+ * Without scroll timelines (or with no single scrolling body) there is simply no line.
+ */
+@keyframes header-divider {
+  from {
+    box-shadow: 0 1px 0 transparent;
+  }
+  to {
+    box-shadow: 0 1px 0 var(--border);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  @media (width < 40rem) {
+    [data-slot='dialog-header'],
+    [data-slot='alert-dialog-header'] {
+      animation: header-divider linear both;
+      animation-timeline: scroll(nearest block);
+      animation-range: 0 0.5rem;
+    }
+    [data-slot='sheet-content'] {
+      timeline-scope: --sheet-body;
+    }
+    [data-slot='sheet-content'] > [data-slot='sheet-header'] ~ .overflow-y-auto {
+      scroll-timeline: --sheet-body block;
+    }
+    [data-slot='sheet-content'] > [data-slot='sheet-header'] {
+      /* Above the body, so scrolled content doesn't paint over the line. */
+      position: relative;
+      z-index: 1;
+      animation: header-divider linear both;
+      animation-timeline: --sheet-body;
+      animation-range: 0 0.5rem;
+    }
   }
 }
 

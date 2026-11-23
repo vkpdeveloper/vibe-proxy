@@ -113,7 +113,8 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
             })}
           </ul>
         )}
-        <DialogFooter>
+        {/* Phones close with the corner X (or a swipe on the sheet); one close control is enough. */}
+        <DialogFooter className="max-sm:hidden">
           <DialogClose asChild>
             <Button variant="outline">{t('common.close')}</Button>
           </DialogClose>

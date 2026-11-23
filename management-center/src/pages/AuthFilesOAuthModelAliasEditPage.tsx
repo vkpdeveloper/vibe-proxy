@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { Add01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Empty,
   EmptyContent,
@@ -12,6 +13,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { Page, Section } from '@/components/layout/Page';
+import { usePhone } from '@/components/layout/pageBar';
 import { OAuthEditorProviderCard } from '@/features/authFiles/components/OAuthEditorProviderCard';
 import { OAuthAliasMappingRow } from '@/features/authFiles/components/OAuthAliasMappingRow';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
@@ -19,10 +21,7 @@ import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { authFilesApi } from '@/services/api';
 import { buildOAuthProviderOptions, normalizeProviderKey } from '@/features/authFiles/constants';
-import {
-  getModelAliasDraftSignature,
-  isOAuthEditorDirty,
-} from '@/features/authFiles/oauthEditorState';
+import { getModelAliasDraftSignature } from '@/features/authFiles/oauthEditorState';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { generateId, getErrorMessage } from '@/utils/helpers';
 
@@ -56,6 +55,7 @@ const normalizeMappingEntries = (
 
 export function AuthFilesOAuthModelAliasEditPage() {
   const { t } = useTranslation();
+  const phone = usePhone();
   const navigate = useNavigate();
   const location = useLocation();
   const { showConfirmation, showNotification } = useNotificationStore();
@@ -64,7 +64,6 @@ export function AuthFilesOAuthModelAliasEditPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const providerFromParams = searchParams.get('provider') ?? '';
-  const [initialProviderKey] = useState(() => normalizeProviderKey(providerFromParams));
 
   const [provider, setProvider] = useState(providerFromParams);
   const [files, setFiles] = useState<AuthFileItem[]>([]);
@@ -88,21 +87,14 @@ export function AuthFilesOAuthModelAliasEditPage() {
     setProvider(providerFromParams);
   }, [providerFromParams]);
 
-  const providerOptions = useMemo(() => {
-    const extraProviders = new Set<string>();
-    Object.keys(excluded).forEach((value) => extraProviders.add(value));
-    Object.keys(modelAlias).forEach((value) => extraProviders.add(value));
-    files.forEach((file) => {
-      if (typeof file.type === 'string') {
-        extraProviders.add(file.type);
-      }
-      if (typeof file.provider === 'string') {
-        extraProviders.add(file.provider);
-      }
-    });
-
-    return buildOAuthProviderOptions(extraProviders);
-  }, [excluded, files, modelAlias]);
+  const providerOptions = useMemo(
+    () =>
+      buildOAuthProviderOptions(
+        [...Object.keys(excluded), ...Object.keys(modelAlias)],
+        files.flatMap((file) => [file.type, file.provider])
+      ),
+    [excluded, files, modelAlias]
+  );
 
   const resolvedProviderKey = useMemo(() => normalizeProviderKey(provider), [provider]);
   const isEditing = useMemo(() => {
@@ -115,12 +107,6 @@ export function AuthFilesOAuthModelAliasEditPage() {
   );
   const mappingsSignature = useMemo(() => getModelAliasDraftSignature(mappings), [mappings]);
   const contentDirty = baselineMappingsSignature !== mappingsSignature;
-  const isDirty = isOAuthEditorDirty(
-    initialProviderKey,
-    provider,
-    baselineMappingsSignature,
-    mappingsSignature
-  );
   const unsavedChangesDialog = useMemo(
     () => ({
       title: t('common.unsaved_changes_title'),
@@ -131,7 +117,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
     [t]
   );
   const { allowNextNavigation, allowNavigationTo } = useUnsavedChangesGuard({
-    shouldBlock: isDirty,
+    shouldBlock: contentDirty,
     dialog: unsavedChangesDialog,
   });
   const title = isEditing
@@ -389,7 +375,9 @@ export function AuthFilesOAuthModelAliasEditPage() {
     }
   }, [allowNextNavigation, handleBack, isEditing, mappings, provider, showNotification, t]);
 
+  // Save stays off until something changed, so it never reads as an action waiting to happen.
   const canSave =
+    contentDirty &&
     !disableControls &&
     !saving &&
     baselineReady &&
@@ -400,22 +388,19 @@ export function AuthFilesOAuthModelAliasEditPage() {
     <div ref={swipeRef} className="h-full">
       <Page
         title={title}
+        onBack={handleBack}
         actions={
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              size="lg"
-              className="h-9 px-3 max-sm:w-9 max-sm:px-0!"
-              onClick={handleBack}
-              aria-label={t('common.back')}
-            >
-              <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={1.75} data-icon="inline-start" />
-              <span className="max-sm:hidden">{t('common.back')}</span>
-            </Button>
-            <Button size="lg" className="h-9 px-4" onClick={handleSave} disabled={!canSave}>
-              {t('oauth_model_alias.save')}
-            </Button>
-          </div>
+          // Phones use a plain text Save in the top bar; purple is kept for create actions.
+          <Button
+            size="lg"
+            variant={phone ? 'ghost' : 'default'}
+            className="h-9 px-4 max-sm:h-10 max-sm:px-3 max-sm:font-medium"
+            onClick={handleSave}
+            disabled={!canSave}
+          >
+            <span className="sm:hidden">{t('common.save')}</span>
+            <span className="max-sm:hidden">{t('oauth_model_alias.save')}</span>
+          </Button>
         }
       >
         {initialLoading ? (
@@ -455,6 +440,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
               actions={
                 <Button
                   variant="outline"
+                  className="max-sm:hidden"
                   onClick={addMappingEntry}
                   disabled={disableControls || saving || modelAliasUnsupported}
                 >
@@ -464,7 +450,15 @@ export function AuthFilesOAuthModelAliasEditPage() {
               }
             >
               <div className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">{headerHint}</p>
+                {/* Without a provider this repeats the provider hint above; phones skip it. */}
+                <p
+                  className={cn(
+                    'text-sm text-muted-foreground',
+                    !provider.trim() && 'max-sm:hidden'
+                  )}
+                >
+                  {headerHint}
+                </p>
                 <div className="flex flex-col divide-y rounded-xl border">
                   {mappings.map((entry, index) => (
                     <OAuthAliasMappingRow
@@ -479,12 +473,25 @@ export function AuthFilesOAuthModelAliasEditPage() {
                             : undefined,
                       }))}
                       disabled={disableControls || saving}
-                      canRemove={mappings.length > 1}
+                      // The last row can still be cleared once it has content.
+                      canRemove={
+                        mappings.length > 1 || Boolean(entry.name.trim() || entry.alias.trim())
+                      }
                       onChange={(field, value) => updateMappingEntry(index, field, value)}
                       onRemove={() => removeMappingEntry(index)}
                     />
                   ))}
                 </div>
+                {/* Phones add the next row below the last one, where the thumb already is. */}
+                <Button
+                  variant="outline"
+                  className="h-10 self-start sm:hidden"
+                  onClick={addMappingEntry}
+                  disabled={disableControls || saving || modelAliasUnsupported}
+                >
+                  <HugeiconsIcon icon={Add01Icon} strokeWidth={1.75} data-icon="inline-start" />
+                  {t('oauth_model_alias.add_alias')}
+                </Button>
               </div>
             </Section>
           </>

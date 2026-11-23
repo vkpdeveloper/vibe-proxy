@@ -85,7 +85,7 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                       {entry.proxyUrl}
                     </span>
                   ) : null}
-                  <span className="ml-auto flex items-center gap-3 font-mono text-xs tabular-nums">
+                  <span className="ml-auto flex items-center gap-3 text-xs">
                     <span className="flex items-center gap-1 text-success">
                       <HugeiconsIcon icon={Tick02Icon} strokeWidth={1.75} className="size-3.5" />
                       {entryStats.success}

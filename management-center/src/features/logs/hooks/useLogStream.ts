@@ -12,6 +12,7 @@ import {
   INITIAL_VISIBLE_LINES,
 } from '../model/logBuffer';
 import { createLogRequestGuard, createLogRequestQueue } from '../model/logRequests';
+import { serverUtcOffset } from '../model/logTime';
 
 const INITIAL_DISPLAY_LINES = INITIAL_VISIBLE_LINES;
 
@@ -54,6 +55,8 @@ export function useLogStream({ active, isFollowing, onFollow }: LogStreamOptions
   const loggingToFileEnabled = useConfigStore((state) => state.config?.loggingToFile ?? false);
   const cpaNeedsFileLogging = !loggingToFileEnabled;
   const [fileLoggingRequired, setFileLoggingRequired] = useState(false);
+  // Minutes east of UTC; null until a logs response proves it.
+  const [serverOffset, setServerOffset] = useState<number | null>(null);
   const showFileLoggingRequired = cpaNeedsFileLogging || fileLoggingRequired;
   const [requests] = useState(() => ({
     session: createLogRequestGuard(),
@@ -117,6 +120,8 @@ export function useLogStream({ active, isFollowing, onFollow }: LogStreamOptions
         if (!requests.logs.isCurrent(request)) return;
         const stickToBottom = isFollowing();
         const next = applyLogPage(logBufferRef.current, data, cursor);
+        const offset = serverUtcOffset(data.lines, data.latestAfter);
+        if (offset !== null) setServerOffset(offset);
         const added = next.nextId - logBufferRef.current.nextId;
         logBufferRef.current = next;
         setLogBuffer(next);
@@ -263,6 +268,7 @@ export function useLogStream({ active, isFollowing, onFollow }: LogStreamOptions
 
   return {
     logBuffer,
+    serverOffset,
     visibleCount,
     setVisibleCount,
     lastUpdated,

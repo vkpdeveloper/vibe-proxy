@@ -46,7 +46,23 @@ export interface ExcludedModelsPickerProps {
 
   labelledBy?: string;
   className?: string;
+  /** Trigger wording; the OAuth pages call these models "disabled" rather than "excluded". */
+  summaryKeys?: ExcludedModelsSummaryKeys;
 }
+
+export type ExcludedModelsSummaryKeys = {
+  empty: string;
+  /** Interpolates {{excluded}} and {{available}}. */
+  summary: string;
+  /** Interpolates {{n}}, used when there is no model catalog. */
+  rules: string;
+};
+
+const DEFAULT_SUMMARY_KEYS: ExcludedModelsSummaryKeys = {
+  empty: 'excluded_models.trigger_empty',
+  summary: 'excluded_models.trigger_summary',
+  rules: 'excluded_models.trigger_summary_rules',
+};
 
 export function ExcludedModelsPicker({
   value,
@@ -60,6 +76,7 @@ export function ExcludedModelsPicker({
   showRuleEditor = true,
   labelledBy,
   className,
+  summaryKeys = DEFAULT_SUMMARY_KEYS,
 }: ExcludedModelsPickerProps) {
   const { t } = useTranslation();
   const baseId = useId();
@@ -141,15 +158,15 @@ export function ExcludedModelsPicker({
   const summaryText = () => {
     if (catalogState === 'loading') return t('excluded_models.catalog_loading');
     if (hasCatalog) {
-      if (stats.excluded === 0 && rules.length === 0) return t('excluded_models.trigger_empty');
-      return t('excluded_models.trigger_summary', {
+      if (stats.excluded === 0 && rules.length === 0) return t(summaryKeys.empty);
+      return t(summaryKeys.summary, {
         excluded: stats.excluded,
         available: stats.available,
       });
     }
     // 无目录：只能诚实地报规则条数，不能假装知道「还剩几个可用」。
-    if (rules.length === 0) return t('excluded_models.trigger_empty');
-    return t('excluded_models.trigger_summary_rules', { n: rules.length });
+    if (rules.length === 0) return t(summaryKeys.empty);
+    return t(summaryKeys.rules, { n: rules.length });
   };
 
   return (
@@ -157,7 +174,7 @@ export function ExcludedModelsPicker({
       <button
         ref={triggerRef}
         type="button"
-        className="relative flex h-9 w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-input bg-input/30 px-2.5 text-left text-sm transition-colors outline-none hover:bg-input/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative flex h-9 w-full items-center max-sm:h-10 justify-between gap-2 overflow-hidden rounded-lg border border-input bg-input/30 px-2.5 text-left text-sm transition-colors outline-none hover:bg-input/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' && !open) {
@@ -244,7 +261,13 @@ export function ExcludedModelsPicker({
                     : t('excluded_models.catalog_unavailable')}
               </span>
               {onRetryCatalog && catalogState !== 'loading' ? (
-                <Button type="button" variant="outline" size="xs" onClick={onRetryCatalog}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="max-sm:h-10 max-sm:px-3"
+                  onClick={onRetryCatalog}
+                >
                   {t('excluded_models.catalog_retry')}
                 </Button>
               ) : null}
@@ -300,7 +323,7 @@ export function ExcludedModelsPicker({
           </label>
           <Textarea
             id={`${baseId}-rules`}
-            className="font-mono text-xs md:text-xs"
+            className="font-mono text-xs placeholder:font-sans max-sm:text-base md:text-xs"
             value={formatExcludedRulesText(customRules)}
             placeholder={t('excluded_models.rules_placeholder')}
             rows={3}

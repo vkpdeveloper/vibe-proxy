@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Loading03Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { prefersReducedMotion } from '@/hooks/motion';
+import { useToastLift } from '@/hooks/useToastLift';
 import { cn } from '@/lib/utils';
 import type { ConfigStatusTone } from '../uiState';
 
@@ -50,6 +51,8 @@ export function FloatingSaveBar({
     setWasVisible(visible);
     setLeaving(!visible && !prefersReducedMotion());
   }
+  const barRef = useRef<HTMLDivElement>(null);
+  useToastLift(barRef, visible);
 
   if ((!visible && !leaving) || typeof document === 'undefined') return null;
 
@@ -61,29 +64,36 @@ export function FloatingSaveBar({
       )}
     >
       <div
+        ref={barRef}
         role="group"
         aria-label={t('config_management.status_dirty')}
         onAnimationEnd={() => {
           if (!visible) setLeaving(false);
         }}
         className={cn(
-          'pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border bg-popover py-2 pr-2 pl-3.5 shadow-lg shadow-black/60 motion-reduce:animate-none',
+          'pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border bg-popover py-2 pr-2 pl-3.5 shadow-lg max-sm:gap-2 max-sm:pl-2 shadow-black/60 motion-reduce:animate-none',
           visible
             ? 'animate-in fade-in-0 slide-in-from-bottom-4 duration-200 ease-out'
             : 'animate-out fade-out-0 slide-out-to-bottom-4 fill-mode-forwards duration-150 ease-in'
         )}
       >
+        {/* Phones have no room for the status beside both buttons, which already say what is pending. */}
         <span
-          className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted-foreground"
+          className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-muted-foreground max-sm:sr-only"
           aria-live="polite"
         >
           <span className={cn('size-2 shrink-0 rounded-full', toneDot[statusTone])} />
-          <span className="truncate max-sm:sr-only">{statusText}</span>
+          <span className="truncate">{statusText}</span>
         </span>
-        <Button variant="ghost" className="h-8" onClick={onDiscard} disabled={discardDisabled}>
+        <Button
+          variant="ghost"
+          className="h-8 max-sm:flex-1"
+          onClick={onDiscard}
+          disabled={discardDisabled}
+        >
           {t('config_management.actions.discard')}
         </Button>
-        <Button className="h-8" onClick={onSave} disabled={saveDisabled}>
+        <Button className="h-8 max-sm:flex-1" onClick={onSave} disabled={saveDisabled}>
           <HugeiconsIcon
             icon={saving ? Loading03Icon : Tick02Icon}
             data-icon="inline-start"

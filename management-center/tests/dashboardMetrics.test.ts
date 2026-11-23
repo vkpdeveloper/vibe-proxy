@@ -15,10 +15,12 @@ describe('formatCompactNumber', () => {
     expect(formatCompactNumber(999)).toBe('999');
   });
 
-  test('compacts with a single decimal and no redundant .0', () => {
+  test('keeps three significant digits and no redundant zeros', () => {
     expect(formatCompactNumber(1000)).toBe('1K');
-    expect(formatCompactNumber(1284)).toBe('1.3K');
+    expect(formatCompactNumber(1284)).toBe('1.28K');
     expect(formatCompactNumber(12_900)).toBe('12.9K');
+    expect(formatCompactNumber(845_400)).toBe('845K');
+    expect(formatCompactNumber(1_150_000_000)).toBe('1.15B');
     expect(formatCompactNumber(1_500_000)).toBe('1.5M');
   });
 
@@ -127,6 +129,7 @@ describe('providerLabel', () => {
     expect(providerLabel('xai', 'Unattributed')).toBe('xAI');
     expect(providerLabel('aistudio', 'Unattributed')).toBe('AI Studio');
     expect(providerLabel('gemini-interactions', 'Unattributed')).toBe('Interactions API');
+    expect(providerLabel('opencode-go', 'Unattributed')).toBe('OpenCode Go');
   });
 
   test('falls back to a capitalised id, and localises unknown', () => {

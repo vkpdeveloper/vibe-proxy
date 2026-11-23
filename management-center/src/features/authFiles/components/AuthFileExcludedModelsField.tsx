@@ -8,7 +8,10 @@ import {
 } from '@/components/excludedModels';
 import { authFilesApi } from '@/services/api';
 import { Field, FieldLabel } from '@/components/ui/field';
-import type { AuthFileModelItem } from '@/features/authFiles/constants';
+import {
+  DISABLED_MODELS_SUMMARY_KEYS,
+  type AuthFileModelItem,
+} from '@/features/authFiles/constants';
 
 interface AuthFileExcludedModelsFieldProps {
   fileName: string;
@@ -96,6 +99,7 @@ export function AuthFileExcludedModelsField({
         catalogState={catalogState}
         disabled={disabled}
         labelledBy={labelId}
+        summaryKeys={DISABLED_MODELS_SUMMARY_KEYS}
       />
     </Field>
   );

@@ -71,13 +71,18 @@ export type LogRowItem =
 
 /**
  * Rows only show the time, so a date divider opens the list and marks every date change.
- * Lines without a timestamp stay under the last seen date.
+ * `dateOf` names an entry's date (the server's date by default); lines without one stay
+ * under the last seen date.
  */
-export function withDateDividers(entries: LogEntry[]): LogRowItem[] {
+export function withDateDividers(
+  entries: LogEntry[],
+  dateOf: (entry: LogEntry) => string | undefined = (entry) =>
+    entry.timestamp && splitLogTimestamp(entry.timestamp).date
+): LogRowItem[] {
   const items: LogRowItem[] = [];
   let currentDate: string | undefined;
   for (const entry of entries) {
-    const date = entry.timestamp && splitLogTimestamp(entry.timestamp).date;
+    const date = dateOf(entry);
     if (date && date !== currentDate) {
       items.push({ kind: 'date', date, key: `date-${entry.id}` });
       currentDate = date;

@@ -9,7 +9,6 @@ import type { AntigravityQuotaState, AntigravityQuotaSubscription } from '@/type
 import { buildResetDisplay } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
-import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 import { getNextAntigravityCountdownUpdateDelay } from './countdown';
 import {
@@ -89,13 +88,6 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
     };
   }, [resetTimestamps, serverTimeOffsetMs]);
 
-  // Ranked against this provider's own server-corrected clock rather than the
-  // shared one, so the final-hour warning and the countdown always agree.
-  const soonestRowId = useMemo(
-    () => pickUrgentRowId(collectQuotaRowInstants('antigravity', quota), nowMs),
-    [quota, nowMs]
-  );
-
   return (
     <>
       {planLabel && (
@@ -159,8 +151,6 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                   t
                 );
 
-                const soon = bucket.id === soonestRowId;
-
                 return (
                   <div key={bucket.id} className={classes.quotaRow}>
                     <div className={classes.quotaRowHeader}>
@@ -170,7 +160,11 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                       <div className={classes.quotaMeta}>
                         <span className={classes.quotaPercent}>{percentLabel}</span>
                         {resetDisplay && (
-                          <QuotaResetLabel display={resetDisplay} classes={classes} soon={soon} />
+                          <QuotaResetLabel
+                            display={resetDisplay}
+                            classes={classes}
+                            remainingPercent={percent}
+                          />
                         )}
                       </div>
                     </div>

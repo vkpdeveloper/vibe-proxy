@@ -22,6 +22,7 @@ import {
   ItemTitle,
 } from '@/components/ui/item';
 import { Page, Section } from '@/components/layout/Page';
+import { usePhone } from '@/components/layout/pageBar';
 import { cn } from '@/lib/utils';
 import { clientApiKeysApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
@@ -31,10 +32,22 @@ import { useDashboardOverview } from './hooks/useDashboardOverview';
 import { Meter } from './components/Meter';
 import { formatUsd, spendToday } from './components/spend';
 import { Sparkline } from './components/Sparkline';
+import { ProviderLogo } from '@/features/authFiles/components/ProviderLogo';
 import { ThroughputChart } from './components/ThroughputChart';
 import { providerLabel, splitWindowMinutes, toneForSuccessRate, type MeterTone } from './utils';
 
 const DASH = '-';
+
+// The same labels Config shows for each strategy.
+const ROUTING_LABEL_KEYS: Record<string, string> = {
+  'round-robin': 'config_management.visual.sections.network.strategy_round_robin',
+  'weighted-round-robin': 'config_management.visual.sections.network.strategy_weighted_round_robin',
+  'fill-first': 'config_management.visual.sections.network.strategy_fill_first',
+  'quota-drain': 'config_management.visual.sections.network.strategy_quota_drain',
+};
+
+// On phones the link's arrow lines up with the gutter and the button is a 40px target.
+const sectionLink = 'text-muted-foreground max-sm:-mr-1.5 max-sm:h-10';
 
 const TONE_TEXT: Record<MeterTone, string> = {
   good: 'text-success',
@@ -58,22 +71,49 @@ function Stat({
   label,
   value,
   hint,
+  to,
   children,
   className,
 }: {
   label: string;
   value: string;
   hint: string;
+  /** Where the tile leads; it then shows a chevron and a press state. */
+  to?: string;
   children?: ReactNode;
   className?: string;
 }) {
-  return (
-    <div className={cn('flex min-w-0 flex-col gap-1.5 bg-card p-4', className)}>
-      <span className="text-[13px] text-muted-foreground">{label}</span>
-      <span className="font-mono text-2xl tracking-tight tabular-nums">{value}</span>
+  const body = (
+    <>
+      <span className="flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
+        {label}
+        {to && (
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            strokeWidth={2}
+            aria-hidden
+            className="size-4 shrink-0 text-faint transition-colors group-hover:text-muted-foreground"
+          />
+        )}
+      </span>
+      <span className="text-2xl font-medium tracking-tight">{value}</span>
       {children}
-      <span className="text-xs text-faint">{hint}</span>
-    </div>
+      {/* Phones keep the tiles to label, number and meter; the sections below carry the detail. */}
+      <span className="text-xs text-faint max-sm:hidden">{hint}</span>
+    </>
+  );
+  const tile = cn('flex min-w-0 flex-col gap-1.5 bg-card p-4', className);
+  if (!to) return <div className={tile}>{body}</div>;
+  return (
+    <Link
+      to={to}
+      className={cn(
+        tile,
+        'group transition-colors duration-150 outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:bg-muted'
+      )}
+    >
+      {body}
+    </Link>
   );
 }
 
@@ -84,6 +124,7 @@ export function DashboardPage() {
 
   const { connected, config, counts, traffic, providers, credentials, refresh } =
     useDashboardOverview();
+  const phone = usePhone();
 
   // Same source as the Client API Keys page, so both show the same number.
   const [spend, setSpend] = useState<number | null>(null);
@@ -115,30 +156,22 @@ export function DashboardPage() {
     return t('dashboard.window_hm', { hours, minutes });
   }, [traffic.windowMinutes, t]);
 
-  const routingStrategy = useMemo(() => {
-    const raw = config?.routingStrategy?.trim() ?? '';
-    if (!raw) return DASH;
-    if (raw === 'round-robin') return t('basic_settings.routing_strategy_round_robin');
-    if (raw === 'weighted-round-robin') {
-      return t('basic_settings.routing_strategy_weighted_round_robin');
-    }
-    if (raw === 'fill-first') return t('basic_settings.routing_strategy_fill_first');
-    if (raw === 'quota-drain') return t('basic_settings.routing_strategy_quota_drain');
-    return raw;
-  }, [config?.routingStrategy, t]);
-
   const unknownProviderLabel = t('dashboard.provider_unknown');
   const successRateTone = toneForSuccessRate(traffic.successRate);
 
-  const runtimeRows: Array<{ label: string; value: string; mono?: boolean }> = [
-    { label: t('dashboard.runtime_routing'), value: routingStrategy },
-    { label: t('dashboard.runtime_retry'), value: String(config?.requestRetry ?? 0), mono: true },
+  const routing = config?.routingStrategy?.trim() ?? '';
+  const runtimeRows: Array<{ label: string; value: string; mono?: boolean; to?: string }> = [
     {
-      label: t('dashboard.runtime_management_keys'),
-      value: counts.managementKeys === null ? DASH : String(counts.managementKeys),
-      mono: true,
+      label: t('dashboard.runtime_routing'),
+      value: routing in ROUTING_LABEL_KEYS ? t(ROUTING_LABEL_KEYS[routing]) : routing || DASH,
     },
-    { label: t('dashboard.runtime_version'), value: serverVersion?.trim() || DASH, mono: true },
+    { label: t('dashboard.runtime_retry'), value: String(config?.requestRetry ?? 0) },
+    {
+      label: t('nav_short.api_keys'),
+      value: counts.apiKeys === null ? DASH : String(counts.apiKeys),
+      to: '/api-keys',
+    },
+    { label: t('system_info.proxy_version'), value: serverVersion?.trim() || DASH, mono: true },
     {
       label: t('dashboard.runtime_build'),
       value: formatDateValue(serverBuildDate, i18n.language) || DASH,
@@ -201,6 +234,13 @@ export function DashboardPage() {
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] text-muted-foreground">
                 {t('dashboard.hero_requests_label')}
+                {/* Phones hide the window line below, so the label carries the period. */}
+                {traffic.windowMinutes > 0 && (
+                  <span className="sm:hidden">
+                    {' · '}
+                    {t('dashboard.window_last', { window: windowLabel })}
+                  </span>
+                )}
               </span>
               {connected && (
                 <Badge variant="secondary" className="gap-1.5">
@@ -209,7 +249,7 @@ export function DashboardPage() {
                 </Badge>
               )}
             </div>
-            <span className="font-mono text-4xl tracking-tight tabular-nums">
+            <span className="text-4xl font-medium tracking-tight">
               {connected ? formatHeadline(traffic.total) : DASH}
             </span>
             {traffic.total > 0 && (
@@ -230,19 +270,15 @@ export function DashboardPage() {
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-success" />
                   {t('stats.success')}
-                  <span className="font-mono text-foreground tabular-nums">
-                    {traffic.totalSuccess.toLocaleString()}
-                  </span>
+                  <span className="text-foreground">{traffic.totalSuccess.toLocaleString()}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-destructive" />
-                  {t('stats.failure')}
-                  <span className="font-mono text-foreground tabular-nums">
-                    {traffic.totalFailure.toLocaleString()}
-                  </span>
+                  {t('dashboard.failed_attempts')}
+                  <span className="text-foreground">{traffic.totalFailure.toLocaleString()}</span>
                 </span>
               </span>
-              <span className="text-faint">
+              <span className="text-faint max-sm:hidden">
                 {t('dashboard.hero_window_meta', { window: windowLabel })}
               </span>
             </div>
@@ -250,6 +286,7 @@ export function DashboardPage() {
 
           <Stat
             label={t('dashboard.success_rate')}
+            to="/logs"
             value={traffic.successRate === null ? DASH : formatPercent(traffic.successRate)}
             hint={t('dashboard.stat_success_hint', { total: traffic.total.toLocaleString() })}
           >
@@ -261,30 +298,35 @@ export function DashboardPage() {
           </Stat>
           <Stat
             label={t('dashboard.stat_credentials')}
+            // The tile is one link, so with problems it opens straight on them.
+            to={
+              credentials && credentials.problem > 0 ? '/auth-files?status=problem' : '/auth-files'
+            }
             value={credentials ? credentials.total.toLocaleString() : DASH}
             hint={
               credentials
                 ? t('dashboard.stat_credentials_hint', {
                     active: credentials.active,
-                    disabled: credentials.disabled + credentials.unavailable,
+                    disabled: credentials.disabled + credentials.problem,
                   })
                 : t('dashboard.stat_credentials_empty')
             }
           >
-            {credentials && credentials.total > 0 && (
-              <Meter
-                value={(credentials.active / credentials.total) * 100}
-                ariaLabel={t('dashboard.stat_credentials')}
-              />
+            {credentials && credentials.problem > 0 && (
+              <span className="text-xs text-warning">
+                {t('dashboard.stat_problems', { count: credentials.problem })}
+              </span>
             )}
           </Stat>
           <Stat
             label={t('dashboard.stat_spend_today')}
+            to="/usage?range=today"
             value={spend === null ? DASH : formatUsd(spend)}
             hint={t('dashboard.stat_spend_today_hint')}
           />
           <Stat
             label={t('dashboard.stat_models')}
+            to="/system?tab=models"
             value={counts.models === null ? DASH : counts.models.toLocaleString()}
             hint={t('dashboard.stat_models_hint')}
           />
@@ -298,7 +340,18 @@ export function DashboardPage() {
 
         <Section
           title={t('dashboard.providers_title')}
-          actions={providers.length > 0 && <Badge variant="secondary">{providers.length}</Badge>}
+          actions={
+            providers.length > 0 &&
+            (phone ? (
+              traffic.windowMinutes > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {t('dashboard.window_last', { window: windowLabel })}
+                </span>
+              )
+            ) : (
+              <Badge variant="secondary">{providers.length}</Badge>
+            ))
+          }
         >
           {providers.length === 0 ? (
             <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
@@ -306,12 +359,15 @@ export function DashboardPage() {
             </p>
           ) : (
             <div className="overflow-hidden rounded-xl border bg-card">
-              <div className="grid grid-cols-[3px_minmax(0,1fr)_4.5rem_5.5rem] gap-x-3 border-b px-4 py-2 text-xs text-muted-foreground sm:grid-cols-[3px_minmax(0,1fr)_6rem_5rem_5.5rem]">
+              <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_3.5rem_3.5rem] gap-x-3 border-b px-4 py-2 text-xs text-muted-foreground sm:grid-cols-[1.25rem_minmax(0,1fr)_6rem_5rem_5.5rem]">
                 <span />
-                <span>{t('dashboard.providers_title')}</span>
+                <span>{t('dashboard.col_provider')}</span>
                 <span className="max-sm:hidden">{t('dashboard.col_volume')}</span>
                 <span className="text-right">{t('dashboard.col_requests')}</span>
-                <span className="text-right whitespace-nowrap">{t('dashboard.success_rate')}</span>
+                <span className="text-right whitespace-nowrap">
+                  <span className="sm:hidden">{t('dashboard.col_rate')}</span>
+                  <span className="max-sm:hidden">{t('dashboard.success_rate')}</span>
+                </span>
               </div>
               <ul className="py-1">
                 {providers.map((provider) => {
@@ -320,9 +376,17 @@ export function DashboardPage() {
                   return (
                     <li
                       key={provider.id}
-                      className="grid grid-cols-[3px_minmax(0,1fr)_4.5rem_5.5rem] items-center gap-x-3 px-4 py-1.5 transition-colors duration-150 hover:bg-muted/60 sm:grid-cols-[3px_minmax(0,1fr)_6rem_5rem_5.5rem]"
+                      className="grid grid-cols-[1.25rem_minmax(0,1fr)_3.5rem_3.5rem] items-center gap-x-3 px-4 py-1.5 transition-colors duration-150 hover:bg-muted/60 sm:grid-cols-[1.25rem_minmax(0,1fr)_6rem_5rem_5.5rem]"
                     >
-                      <span className={cn('h-4 rounded-full', TONE_BAR[tone])} />
+                      <span className="relative">
+                        <ProviderLogo type={provider.id} className="size-5 rounded-[5px]" />
+                        <span
+                          className={cn(
+                            'absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-card',
+                            TONE_BAR[tone]
+                          )}
+                        />
+                      </span>
                       <span className="flex min-w-0 items-baseline gap-2">
                         <span className="truncate text-[13px]">{label}</span>
                         <span className="truncate text-xs text-faint max-sm:hidden">
@@ -334,15 +398,10 @@ export function DashboardPage() {
                         ariaLabel={t('dashboard.fleet_spark_label', { provider: label })}
                         className="text-muted-foreground max-sm:hidden"
                       />
-                      <span className="text-right font-mono text-[12.5px] tabular-nums">
+                      <span className="text-right text-[13px]">
                         {provider.total.toLocaleString()}
                       </span>
-                      <span
-                        className={cn(
-                          'text-right font-mono text-[12.5px] tabular-nums',
-                          TONE_TEXT[tone]
-                        )}
-                      >
+                      <span className={cn('text-right text-[13px]', TONE_TEXT[tone])}>
                         {provider.successRate === null ? DASH : formatPercent(provider.successRate)}
                       </span>
                     </li>
@@ -358,7 +417,7 @@ export function DashboardPage() {
           actions={
             credentials &&
             credentials.total > 0 && (
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+              <Button asChild variant="ghost" size="sm" className={sectionLink}>
                 <Link to="/auth-files">
                   {t('dashboard.health_link')}
                   <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" strokeWidth={2} />
@@ -377,37 +436,43 @@ export function DashboardPage() {
                 {credentials.active > 0 && (
                   <span className="bg-success" style={{ flexGrow: credentials.active }} />
                 )}
-                {credentials.unavailable > 0 && (
-                  <span className="bg-warning" style={{ flexGrow: credentials.unavailable }} />
+                {credentials.problem > 0 && (
+                  <span className="bg-warning" style={{ flexGrow: credentials.problem }} />
                 )}
                 {credentials.disabled > 0 && (
                   <span className="bg-faint" style={{ flexGrow: credentials.disabled }} />
                 )}
               </div>
-              <ul className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground">
+              <ul className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground max-sm:gap-y-2">
                 {[
                   {
+                    status: 'active',
                     label: t('dashboard.health_active'),
                     value: credentials.active,
                     dot: 'bg-success',
                   },
                   {
-                    label: t('dashboard.health_unavailable'),
-                    value: credentials.unavailable,
+                    status: 'problem',
+                    label: t('dashboard.health_problem'),
+                    value: credentials.problem,
                     dot: 'bg-warning',
                   },
                   {
+                    status: 'disabled',
                     label: t('dashboard.health_disabled'),
                     value: credentials.disabled,
                     dot: 'bg-faint',
                   },
                 ].map((entry) => (
-                  <li key={entry.label} className="flex items-center gap-1.5">
-                    <span className={cn('size-2 rounded-full', entry.dot)} />
-                    {entry.label}
-                    <span className="font-mono text-xs text-foreground tabular-nums">
-                      {entry.value.toLocaleString()}
-                    </span>
+                  <li key={entry.status}>
+                    <Link
+                      to={`/auth-files?status=${entry.status}`}
+                      className="flex items-center gap-1.5 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring max-sm:min-h-10"
+                    >
+                      <span className={cn('size-2 rounded-full', entry.dot)} />
+                      {entry.label}
+                      <span className="text-foreground">{entry.value.toLocaleString()}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -415,14 +480,27 @@ export function DashboardPage() {
                 <span className="text-xs text-muted-foreground">
                   {t('dashboard.health_by_type')}
                 </span>
-                <ul className="flex flex-wrap gap-1.5">
+                <ul className="flex flex-wrap gap-1.5 max-sm:gap-2">
                   {credentials.byType.map((entry) => (
                     <li key={entry.type}>
-                      <Badge variant="secondary" className="gap-1.5 font-normal">
-                        {providerLabel(entry.type, unknownProviderLabel)}
-                        <span className="font-mono text-muted-foreground">
-                          {entry.count.toLocaleString()}
-                        </span>
+                      <Badge
+                        asChild
+                        variant="secondary"
+                        className="gap-1.5 font-normal max-sm:h-10 max-sm:px-3.5 max-sm:text-[13px]"
+                      >
+                        {/* Files with no provider have no filter to open. */}
+                        <Link
+                          to={
+                            entry.type === 'unknown'
+                              ? '/auth-files'
+                              : `/auth-files?provider=${encodeURIComponent(entry.type)}`
+                          }
+                        >
+                          {providerLabel(entry.type, unknownProviderLabel)}
+                          <span className="text-muted-foreground">
+                            {entry.count.toLocaleString()}
+                          </span>
+                        </Link>
                       </Badge>
                     </li>
                   ))}
@@ -435,66 +513,132 @@ export function DashboardPage() {
         <Section
           title={t('dashboard.runtime_eyebrow')}
           actions={
-            <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-              <Link to="/config">
+            <Button asChild variant="ghost" size="sm" className={sectionLink}>
+              {/* Opens Config at the routing and retry settings. */}
+              <Link to="/config?field=routingStrategy">
                 {t('dashboard.runtime_link')}
                 <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" strokeWidth={2} />
               </Link>
             </Button>
           }
         >
-          <dl className="divide-y overflow-hidden rounded-xl border bg-card text-sm">
-            {runtimeRows.map((row) => (
-              <div key={row.label} className="flex items-center justify-between gap-6 px-4 py-2.5">
-                <dt className="shrink-0 text-muted-foreground">{row.label}</dt>
-                <dd className={cn('min-w-0 truncate text-right', row.mono && 'font-mono text-xs')}>
-                  {row.value}
-                </dd>
-              </div>
-            ))}
-            {runtimeToggles.map((toggle) => (
-              <div
-                key={toggle.label}
-                className="flex items-center justify-between gap-6 px-4 py-2.5"
-              >
-                <dt className="text-muted-foreground">{toggle.label}</dt>
-                <dd className="flex items-center gap-2 text-[13px]">
+          <div className="overflow-hidden rounded-xl border bg-card text-sm">
+            <ul className="divide-y">
+              {runtimeRows.map((row) => {
+                const value = (
+                  // Phones wrap long values instead of cutting them off.
                   <span
-                    className={cn('size-2 rounded-full', toggle.on ? 'bg-success' : 'bg-faint')}
-                  />
-                  <span className={toggle.on ? undefined : 'text-muted-foreground'}>
-                    {toggle.on ? t('common.yes') : t('common.no')}
+                    className={cn(
+                      'min-w-0 truncate text-right max-sm:whitespace-normal',
+                      // The placeholder dash stays in the body font.
+                      row.mono && row.value !== DASH
+                        ? 'font-mono text-xs max-sm:break-all'
+                        : 'max-sm:break-words'
+                    )}
+                  >
+                    {row.value}
                   </span>
-                </dd>
-              </div>
-            ))}
-          </dl>
+                );
+                const label = <span className="shrink-0 text-muted-foreground">{row.label}</span>;
+                const rowClass = 'flex items-center justify-between gap-6 px-4 py-2.5 max-sm:gap-4';
+                return (
+                  <li key={row.label}>
+                    {row.to ? (
+                      <Link
+                        to={row.to}
+                        className={cn(
+                          rowClass,
+                          'transition-colors duration-150 outline-none hover:bg-muted/60 max-sm:min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:bg-muted'
+                        )}
+                      >
+                        {label}
+                        <span className="flex min-w-0 items-center gap-1">
+                          {value}
+                          <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            strokeWidth={2}
+                            aria-hidden
+                            className="-mr-1 size-4 shrink-0 text-faint"
+                          />
+                        </span>
+                      </Link>
+                    ) : (
+                      <div className={rowClass}>
+                        {label}
+                        {value}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+              {!phone &&
+                runtimeToggles.map((toggle) => (
+                  <li
+                    key={toggle.label}
+                    className="flex items-center justify-between gap-6 px-4 py-2.5"
+                  >
+                    <span className="text-muted-foreground">{toggle.label}</span>
+                    <span className="flex items-center gap-2 text-[13px]">
+                      <span
+                        className={cn('size-2 rounded-full', toggle.on ? 'bg-success' : 'bg-faint')}
+                      />
+                      <span className={toggle.on ? undefined : 'text-muted-foreground'}>
+                        {toggle.on ? t('common.yes') : t('common.no')}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            {/* Phones fold the on/off settings into one row of chips. */}
+            {phone && runtimeToggles.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5 border-t px-4 py-3">
+                {runtimeToggles.map((toggle) => (
+                  <li
+                    key={toggle.label}
+                    className={cn(
+                      'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs',
+                      !toggle.on && 'text-muted-foreground'
+                    )}
+                  >
+                    <span
+                      className={cn('size-1.5 rounded-full', toggle.on ? 'bg-success' : 'bg-faint')}
+                    />
+                    {toggle.label}
+                    <span className="sr-only">{toggle.on ? t('common.yes') : t('common.no')}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </Section>
 
-        <Section title={t('dashboard.shortcuts_title')}>
-          <ItemGroup className="gap-2">
-            {shortcuts.map((shortcut) => (
-              <Item key={shortcut.to} variant="outline" asChild>
-                <Link to={shortcut.to}>
-                  <ItemMedia variant="icon">
-                    <HugeiconsIcon icon={shortcut.icon} strokeWidth={1.75} />
-                  </ItemMedia>
-                  <ItemContent className="min-w-0">
-                    <ItemTitle>{shortcut.title}</ItemTitle>
-                    <ItemDescription>{shortcut.description}</ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      className="size-4 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                  </ItemActions>
-                </Link>
-              </Item>
-            ))}
-          </ItemGroup>
-        </Section>
+        {/* Phones reach every one of these from the bottom bar or its More menu. */}
+        {!phone && (
+          <Section title={t('dashboard.shortcuts_title')}>
+            <ItemGroup className="gap-2">
+              {shortcuts.map((shortcut) => (
+                <Item key={shortcut.to} variant="outline" asChild>
+                  <Link to={shortcut.to}>
+                    <ItemMedia variant="icon">
+                      <HugeiconsIcon icon={shortcut.icon} strokeWidth={1.75} />
+                    </ItemMedia>
+                    <ItemContent className="min-w-0">
+                      <ItemTitle>{shortcut.title}</ItemTitle>
+                      <ItemDescription>{shortcut.description}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        className="size-4 text-muted-foreground"
+                        strokeWidth={2}
+                      />
+                    </ItemActions>
+                  </Link>
+                </Item>
+              ))}
+            </ItemGroup>
+          </Section>
+        )}
       </Page>
     </>
   );

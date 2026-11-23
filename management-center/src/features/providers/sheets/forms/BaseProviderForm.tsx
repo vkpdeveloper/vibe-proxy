@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import {
   DISABLE_ALL_RULE,
   ExcludedModelsPicker,
@@ -32,7 +33,7 @@ import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import { ApiKeyEntriesEditor } from './ApiKeyEntriesEditor';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
 import { FormSection } from './FormSection';
-import { FormError, FormSelect, SecretInput, SwitchField } from './FormControls';
+import { FormError, FormSelect, NO_SPINNER, SecretInput, SwitchField } from './FormControls';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import { readRuntimePolicy, validateRuntimePolicy } from '../../runtimePolicy';
 import { readModelOptions, validateModelOptions } from '../../modelOptions';
@@ -52,6 +53,8 @@ interface BaseProviderFormProps {
   formId: string;
   onSubmit: (input: ProviderEntryFormInput) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Reports whether every required field is filled, so the submit button can wait for them. */
+  onReadyChange?: (ready: boolean) => void;
 }
 
 const emptyHeader = () => ({ key: '', value: '' });
@@ -224,6 +227,7 @@ export function BaseProviderForm({
   formId,
   onSubmit,
   onDirtyChange,
+  onReadyChange,
 }: BaseProviderFormProps) {
   const { t } = useTranslation();
   const descriptor = PROVIDER_DESCRIPTORS[brand];
@@ -245,6 +249,15 @@ export function BaseProviderForm({
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
+
+  // validate() still checks these on submit and names the missing one.
+  const missingRequired =
+    (descriptor.supportsName && !form.name.trim()) ||
+    (descriptor.supportsApiKey && mode === 'create' && !form.apiKey.trim()) ||
+    (descriptor.baseUrlRequired && !form.baseUrl.trim());
+  useEffect(() => {
+    onReadyChange?.(!missingRequired);
+  }, [missingRequired, onReadyChange]);
 
   const fallbackApiKey = useMemo(() => {
     if (mode !== 'edit' || !resource) return '';
@@ -537,7 +550,7 @@ export function BaseProviderForm({
             <FieldLabel htmlFor={`${fid}-baseUrl`}>{t('providersPage.form.baseUrl')}</FieldLabel>
             <Input
               id={`${fid}-baseUrl`}
-              className="h-9 font-mono"
+              className="h-9 font-mono placeholder:font-sans"
               value={form.baseUrl}
               onChange={(e) => updateField('baseUrl', e.target.value)}
               placeholder="https://api.example.com"
@@ -557,7 +570,7 @@ export function BaseProviderForm({
             <FieldLabel htmlFor={`${fid}-proxy`}>{t('providersPage.form.proxyUrl')}</FieldLabel>
             <Input
               id={`${fid}-proxy`}
-              className="h-9 font-mono"
+              className="h-9 font-mono placeholder:font-sans"
               value={form.proxyUrl}
               onChange={(e) => updateField('proxyUrl', e.target.value)}
               placeholder="http://127.0.0.1:7890"
@@ -584,7 +597,7 @@ export function BaseProviderForm({
                 <Input
                   id={`${fid}-prio`}
                   type="number"
-                  className="h-9"
+                  className={cn('h-9', NO_SPINNER)}
                   value={form.priority ?? ''}
                   onChange={(e) =>
                     updateField(
@@ -607,7 +620,7 @@ export function BaseProviderForm({
               type="number"
               step="1"
               max={MAX_CREDENTIAL_WEIGHT}
-              className="h-9"
+              className={cn('h-9', NO_SPINNER)}
               value={form.weight ?? ''}
               placeholder="1"
               aria-describedby={`${fid}-weight-hint`}
@@ -630,7 +643,7 @@ export function BaseProviderForm({
             <div className="flex gap-2">
               <FormSelect
                 id={`${fid}-testModel`}
-                className="flex-1 data-[size=default]:h-9"
+                className="flex-1 data-[size=default]:h-9 max-sm:data-[size=default]:h-10"
                 value={form.testModel ?? ''}
                 options={testModelOptions}
                 onChange={(value) => updateField('testModel', value)}
@@ -682,7 +695,7 @@ export function BaseProviderForm({
             </FieldLabel>
             <FormSelect
               id={`${fid}-fingerprint-profile`}
-              className="data-[size=default]:h-9"
+              className="data-[size=default]:h-9 max-sm:data-[size=default]:h-10"
               value={form.fingerprintProfile ?? ''}
               options={[
                 {
@@ -783,7 +796,7 @@ export function BaseProviderForm({
               {headersList.map((entry, idx) => (
                 <div key={idx} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
                   <Input
-                    className="font-mono"
+                    className="font-mono placeholder:font-sans"
                     placeholder="X-Custom-Header"
                     aria-label={t('common.custom_headers_key_placeholder')}
                     value={entry.key}
@@ -798,7 +811,7 @@ export function BaseProviderForm({
                     disabled={mutating}
                   />
                   <Input
-                    className="font-mono"
+                    className="font-mono placeholder:font-sans"
                     placeholder="value"
                     aria-label={t('common.custom_headers_value_placeholder')}
                     value={entry.value}
@@ -836,7 +849,7 @@ export function BaseProviderForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="self-start"
+                className="self-start max-sm:h-10"
                 disabled={mutating}
                 onClick={() => updateField('headers', [...headersList, emptyHeader()])}
               >
@@ -858,7 +871,7 @@ export function BaseProviderForm({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="self-start"
+                  className="self-start max-sm:h-10"
                   onClick={openDiscovery}
                   disabled={mutating}
                 >
@@ -949,7 +962,7 @@ export function BaseProviderForm({
                 </FieldLabel>
                 <Textarea
                   id={`${fid}-cloak-words`}
-                  className="font-mono"
+                  className="font-mono placeholder:font-sans"
                   rows={3}
                   value={form.cloak.sensitiveWordsText}
                   onChange={(e) => updateCloak('sensitiveWordsText', e.target.value)}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { File01Icon, Upload04Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
@@ -58,7 +59,28 @@ export function VertexImportDialog({
     : [];
 
   return (
-    <FlowDialog open={open} heading={heading} onClose={onClose}>
+    <FlowDialog
+      open={open}
+      heading={heading}
+      onClose={onClose}
+      footer={
+        !result && (
+          <DialogFooter>
+            <Button variant="outline" size="lg" className="h-9 px-4" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="lg"
+              className="h-9 px-4"
+              onClick={onImport}
+              disabled={!vertex.file || vertex.loading}
+            >
+              {t('vertex_import.import_button')}
+            </Button>
+          </DialogFooter>
+        )
+      }
+    >
       <FlowView key={result ? 'result' : 'form'}>
         {result ? (
           <ResultView
@@ -89,11 +111,9 @@ export function VertexImportDialog({
           </ResultView>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">{t('vertex_import.description')}</p>
-
             <FieldGroup>
               <Field>
-                <FieldTitle id={fileLabelId}>{t('vertex_import.file_label')}</FieldTitle>
+                <FieldTitle id={fileLabelId}>{t('vertex_import.file_field_label')}</FieldTitle>
                 {/* Stretched button keeps the email reveal button out of the click target */}
                 <div
                   className={cn(
@@ -166,15 +186,6 @@ export function VertexImportDialog({
             </FieldGroup>
 
             {vertex.error && <FlowAlert>{vertex.error}</FlowAlert>}
-
-            <Button
-              size="lg"
-              className="h-9 w-fit px-4"
-              onClick={onImport}
-              disabled={!vertex.file || vertex.loading}
-            >
-              {t('vertex_import.import_button')}
-            </Button>
           </>
         )}
       </FlowView>

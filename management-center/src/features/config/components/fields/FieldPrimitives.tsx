@@ -46,24 +46,37 @@ type ControlSize = 'sm' | 'md' | 'lg';
 const rowClass =
   'scroll-mt-24 px-4 py-3.5 transition-colors duration-200 ease-out data-highlight:bg-primary/10 motion-reduce:transition-none';
 
-// Short controls sit beside the copy; long ones (and every control on a phone) go below it.
+// Short controls sit beside the copy on wider screens. On a phone switches and short numbers
+// stay beside the title; longer inputs and selects go full width below it.
 type RowLayout = ControlSize | 'toggle' | 'block';
 
+/* On a phone the copy column dissolves (`contents`) so its parts join the row. A switch or a
+   short number sits beside the title only, with the error and description full width below
+   both. Other controls go between the title and the description, as in the sheets' forms. */
+const besideOnPhone =
+  'max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-4 max-sm:gap-y-1';
+
 const layoutClass: Record<RowLayout, string> = {
-  toggle: 'flex items-center justify-between gap-4',
-  sm: 'flex items-center justify-between gap-4',
-  md: 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
-  lg: 'flex flex-col gap-3',
-  block: 'flex flex-col gap-3',
+  toggle: cn('flex items-center justify-between gap-4', besideOnPhone),
+  sm: cn('flex sm:items-center sm:justify-between sm:gap-4', besideOnPhone),
+  md: 'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
+  lg: 'flex flex-col gap-2 sm:gap-3',
+  block: 'flex flex-col gap-2 sm:gap-3',
 };
 
 const controlClass: Record<RowLayout, string> = {
-  toggle: 'flex shrink-0',
-  sm: 'w-28 shrink-0',
+  toggle: 'flex shrink-0 max-sm:col-start-2 max-sm:row-start-1',
+  sm: 'w-28 shrink-0 max-sm:col-start-2 max-sm:row-start-1',
   md: 'w-full sm:w-64 sm:shrink-0',
   lg: 'w-full',
   block: 'w-full min-w-0',
 };
+
+/** Spans both phone grid columns of a side-by-side row; a no-op in the flex layouts. */
+const fullRow = 'max-sm:col-span-2';
+
+/** Phone order: title, control, error, description. Grid rows pin the control beside the title. */
+const phoneOrder = { control: 'max-sm:order-1', error: 'max-sm:order-2', hint: 'max-sm:order-3' };
 
 function SettingRow({
   fieldId,
@@ -83,7 +96,7 @@ function SettingRow({
 }) {
   return (
     <div id={configFieldDomId(fieldId)} className={cn(rowClass, layoutClass[layout])}>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 max-sm:contents">
         {labelFor ? (
           <label id={ids.labelId} htmlFor={labelFor} className="text-sm font-medium">
             {label}
@@ -94,17 +107,27 @@ function SettingRow({
           </span>
         )}
         {description ? (
-          <div id={ids.hintId} className="text-[13px] leading-normal text-muted-foreground">
+          <div
+            id={ids.hintId}
+            className={cn(
+              'text-[13px] leading-normal text-muted-foreground',
+              fullRow,
+              phoneOrder.hint
+            )}
+          >
             {description}
           </div>
         ) : null}
         {error ? (
-          <div id={ids.errorId} className="text-[13px] text-destructive">
+          <div
+            id={ids.errorId}
+            className={cn('text-[13px] text-destructive', fullRow, phoneOrder.error)}
+          >
             {error}
           </div>
         ) : null}
       </div>
-      <div className={controlClass[layout]}>{control}</div>
+      <div className={cn(controlClass[layout], phoneOrder.control)}>{control}</div>
     </div>
   );
 }
@@ -177,8 +200,10 @@ export function TextSetting({
           <Input
             id={ids.controlId}
             className={cn(
-              'h-9',
-              (type === 'number' || size === 'lg') && 'font-mono text-[13px] md:text-[13px]',
+              'h-9 max-sm:h-10',
+              // Mono for paths, URLs and other long literals; numbers stay sans with even digits.
+              // Placeholders stay sans so an example never reads like a set value.
+              size === 'lg' && 'font-mono placeholder:font-sans sm:text-[13px] md:text-[13px]',
               adornment && 'pr-20'
             )}
             type={type}
@@ -297,12 +322,20 @@ export function SettingList({
   description?: ReactNode;
   children: ReactNode;
 }) {
-  const list = <div className="divide-y overflow-hidden rounded-xl border bg-card">{children}</div>;
+  const list = (
+    <div data-slot="setting-list" className="divide-y overflow-hidden rounded-xl border bg-card">
+      {children}
+    </div>
+  );
   if (!title) return list;
   return (
-    <section className="flex flex-col gap-2.5">
-      <header className="flex flex-col gap-1 px-0.5">
-        <h3 className="text-sm font-medium">{title}</h3>
+    // On phones the title is a muted group heading, a step above the row labels it would
+    // otherwise match.
+    <section className="flex flex-col gap-2.5 max-sm:not-first:mt-2">
+      <header className="flex flex-col gap-1 sm:px-0.5">
+        <h3 className="text-sm font-medium max-sm:text-[13px] max-sm:font-semibold max-sm:text-muted-foreground">
+          {title}
+        </h3>
         {description ? (
           <p className="text-[13px] leading-normal text-muted-foreground">{description}</p>
         ) : null}
@@ -323,12 +356,13 @@ export function FieldStack({ children }: { children: ReactNode }) {
 }
 
 // Stable, stateless anchor around a searchable block that is not a setting row
-// (payload rule groups). Search jumps target its DOM id and highlight it.
+// (payload rule groups). Search jumps target its DOM id and highlight it. The ring sits inside
+// because the groups share one clipped card.
 export function FieldAnchor({ fieldId, children }: { fieldId: string; children: ReactNode }) {
   return (
     <div
       id={configFieldDomId(fieldId)}
-      className="scroll-mt-24 rounded-xl transition-shadow duration-200 ease-out data-highlight:ring-2 data-highlight:ring-primary/60 motion-reduce:transition-none"
+      className="scroll-mt-24 transition-shadow duration-200 ease-out data-highlight:ring-2 data-highlight:ring-primary/60 data-highlight:ring-inset motion-reduce:transition-none"
     >
       {children}
     </div>

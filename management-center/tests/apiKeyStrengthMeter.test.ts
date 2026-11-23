@@ -28,7 +28,7 @@ describe('ApiKeyStrengthMeter', () => {
 
     expect(markup).toContain('aria-valuenow="0"');
     expect(markup).not.toContain('data-filled="true"');
-    expect(markup).toContain('—');
+    expect(markup).toContain('aria-hidden="true">-</span>');
   });
 
   test('segments cascade only over the newly lit ones', () => {

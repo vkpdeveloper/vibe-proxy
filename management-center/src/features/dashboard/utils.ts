@@ -11,11 +11,12 @@ const PROVIDER_LABELS: Record<string, string> = {
   meta: 'Muse (Meta)',
   xai: 'xAI',
   vertex: 'Vertex AI',
-  openai: 'OpenAI Compatible',
-  'openai-compatibility': 'OpenAI Compatible',
+  openai: 'OpenAI compatible',
+  'openai-compatibility': 'OpenAI compatible',
   qwen: 'Qwen',
   iflow: 'iFlow',
   antigravity: 'Antigravity',
+  'opencode-go': 'OpenCode Go',
 };
 
 /**

@@ -34,12 +34,24 @@ export function OAuthAliasMappingRow({
   const removeLabel = t('oauth_model_alias.remove_mapping', { number: index + 1 });
 
   return (
-    <div className="flex flex-col gap-3 p-3" role="group" aria-label={rowLabel}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    // Phones give each row a header with its number and the trash, so the inputs keep the full
+    // width and delete reads as removing the whole row.
+    <div
+      className="flex flex-col gap-3 p-3 max-sm:grid max-sm:grid-cols-[1fr_auto] max-sm:gap-x-2 max-sm:p-4 max-sm:pt-2"
+      role="group"
+      aria-label={rowLabel}
+    >
+      <span
+        aria-hidden="true"
+        className="self-center text-sm font-medium text-muted-foreground sm:hidden"
+      >
+        {rowLabel}
+      </span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center max-sm:col-span-2">
         <Input
           id={`${id}-source`}
           aria-label={t('oauth_model_alias.alias_name_placeholder')}
-          className="h-9 font-mono text-sm sm:flex-1"
+          className="h-9 font-mono text-sm placeholder:font-sans max-sm:h-10 max-sm:text-base sm:flex-1"
           list={`${id}-models`}
           placeholder={t('oauth_model_alias.alias_name_placeholder')}
           value={entry.name}
@@ -64,7 +76,7 @@ export function OAuthAliasMappingRow({
         <Input
           id={`${id}-alias`}
           aria-label={t('oauth_model_alias.alias_placeholder')}
-          className="h-9 font-mono text-sm sm:flex-1"
+          className="h-9 font-mono text-sm placeholder:font-sans max-sm:h-10 max-sm:text-base sm:flex-1"
           placeholder={t('oauth_model_alias.alias_placeholder')}
           value={entry.alias}
           onChange={(event) => onChange('alias', event.target.value)}
@@ -73,8 +85,8 @@ export function OAuthAliasMappingRow({
           spellCheck={false}
         />
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 max-sm:contents">
+        <div className="flex items-center gap-2 max-sm:col-span-2">
           <Switch
             id={`${id}-fork`}
             size="sm"
@@ -90,7 +102,7 @@ export function OAuthAliasMappingRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive max-sm:col-start-2 max-sm:row-start-1 max-sm:-mr-2 max-sm:size-10"
             onClick={onRemove}
             disabled={disabled || !canRemove}
             aria-label={removeLabel}

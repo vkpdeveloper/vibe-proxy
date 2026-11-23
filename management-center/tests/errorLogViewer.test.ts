@@ -27,6 +27,14 @@ describe('error log viewer state machine', () => {
     });
   });
 
+  test('a request with no saved log ends calmly, not as a failure', () => {
+    const loading = errorLogViewerReducer(closed, { type: 'open', item });
+    expect(errorLogViewerReducer(loading, { type: 'missing' })).toEqual({
+      status: 'missing',
+      item,
+    });
+  });
+
   test('failure retains metadata, and reopening clears the error before loading', () => {
     const loading = errorLogViewerReducer(closed, { type: 'open', item });
     const failed = errorLogViewerReducer(loading, { type: 'error', message: 'Unavailable' });
@@ -100,9 +108,11 @@ test('viewer UI derives controls and content from a single discriminated state',
   expect(source).not.toContain('setSelectedErrorLog');
   expect(source).toContain("open={errorLogViewer.status !== 'closed'}");
   expect(source).toContain("disabled={errorLogViewer.status !== 'ready' || !errorLogViewer.text}");
+  // Copy and Download only appear while there is a file to act on.
   expect(source).toContain(
-    "disabled={errorLogViewer.status === 'closed' || errorLogViewer.status === 'loading'}"
+    "{(errorLogViewer.status === 'loading' || errorLogViewer.status === 'ready') && ("
   );
+  expect(source).toContain("disabled={errorLogViewer.status !== 'ready'}");
   expect(source).toContain("errorLogViewer.status === 'ready'");
   expect(source).toContain("errorLogViewer.status === 'error'");
 });

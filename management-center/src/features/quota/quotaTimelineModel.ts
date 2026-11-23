@@ -548,3 +548,18 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
 
   return empty;
 }
+
+/**
+ * The least capacity left on any limit of one credential, for "least left first".
+ * Reads through the lane builder so the sort and the timeline agree on what each
+ * provider's percent means. Null when nothing is loaded.
+ */
+export function lowestRemainingPercent(
+  provider: QuotaProviderType,
+  quota: { status?: string } | undefined
+): number | null {
+  const lane = buildTimelineLane({ name: '', displayName: '', provider, quota });
+  const values = lane.limits.map((limit) => limit.remaining);
+  if (lane.remaining !== null) values.push(lane.remaining);
+  return values.length > 0 ? Math.min(...values) : null;
+}

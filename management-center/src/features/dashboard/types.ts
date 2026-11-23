@@ -17,6 +17,12 @@ export interface TrafficWindow {
   peakIndex: number;
   /** 窗口跨度（分钟） */
   windowMinutes: number;
+  /**
+   * Start of the last bucket in epoch ms, read from the browser clock when the data arrived. The
+   * server cuts buckets from Unix time and the last one is the current one, so every bucket's start
+   * is known without trusting the server's time zone.
+   */
+  lastBucketStart: number;
 }
 
 /** 单个供应商的流量切片 */
@@ -35,14 +41,15 @@ export interface CredentialHealth {
   total: number;
   active: number;
   disabled: number;
-  unavailable: number;
+  /** Enabled but failing or unusable, the same rule as Auth files' Problem filter. */
+  problem: number;
   /** 按供应商类型分组的凭证数，按数量降序 */
   byType: Array<{ type: string; count: number }>;
 }
 
 /** 顶部计数卡片的原始数值 */
 export interface DashboardCounts {
-  managementKeys: number | null;
+  apiKeys: number | null;
   providerKeys: number | null;
   credentials: number | null;
   models: number | null;

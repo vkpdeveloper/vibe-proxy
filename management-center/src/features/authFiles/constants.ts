@@ -113,21 +113,23 @@ export const normalizeProviderKey = normalizeOAuthProviderKey;
 export const supportsAuthFileManualRefresh = (provider: unknown): boolean =>
   AUTH_FILE_MANUAL_REFRESH_PROVIDERS.has(normalizeProviderKey(String(provider ?? '')));
 
-export const buildOAuthProviderOptions = (values: Iterable<unknown>): string[] => {
-  const extraProviders = new Set<string>();
+/**
+ * Provider shortcuts for the OAuth editors: providers with a signed-in account first (A-Z), then
+ * the presets, then anything else that only appears in the config.
+ */
+export const buildOAuthProviderOptions = (
+  values: Iterable<unknown>,
+  configured: Iterable<unknown> = []
+): string[] => {
+  const keysOf = (items: Iterable<unknown>) =>
+    Array.from(items)
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => normalizeProviderKey(value))
+      .filter((key) => key && !OAUTH_PROVIDER_EXCLUDES.has(key));
 
-  Array.from(values).forEach((value) => {
-    const key = normalizeProviderKey(String(value ?? ''));
-    if (!key || OAUTH_PROVIDER_EXCLUDES.has(key)) return;
-    extraProviders.add(key);
-  });
-
-  const baseSet = new Set(OAUTH_PROVIDER_PRESETS.map((value) => normalizeProviderKey(value)));
-  const extraList = Array.from(extraProviders)
-    .filter((value) => !baseSet.has(value))
-    .sort((a, b) => a.localeCompare(b));
-
-  return [...OAUTH_PROVIDER_PRESETS, ...extraList];
+  const configuredList = [...new Set(keysOf(configured))].sort((a, b) => a.localeCompare(b));
+  const extraList = [...new Set(keysOf(values))].sort((a, b) => a.localeCompare(b));
+  return [...new Set([...configuredList, ...OAUTH_PROVIDER_PRESETS, ...extraList])];
 };
 
 export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
@@ -209,6 +211,13 @@ export const isProblemAuthFile = (file: AuthFileItem): boolean => {
   if (file.disabled === true || status === 'disabled') return false;
   return file.unavailable === true || status === 'error' || hasAuthFileStatusWarning(file);
 };
+
+const SIGN_IN_PROBLEM_PATTERN =
+  /\b401\b|unauthori[sz]ed|invalid[_ ]grant|invalid[_ ]token|expired|revoked|authenticat|re-?auth|sign[- ]?in|log[- ]?in/i;
+
+/** A failure that a new sign-in fixes (an expired or revoked token), unlike a rate limit. */
+export const isSignInProblem = (file: AuthFileItem): boolean =>
+  hasAuthFileStatusWarning(file) && SIGN_IN_PROBLEM_PATTERN.test(getAuthFileStatusMessage(file));
 
 export const getTypeLabel = (t: TFunction, type: string): string => {
   const providerKey = normalizeProviderKey(type);
@@ -338,4 +347,11 @@ export const isModelExcluded = (
     }
     return pattern.toLowerCase() === modelId.toLowerCase();
   });
+};
+
+/** The OAuth pages and the details sheet call excluded models "disabled", like their page title. */
+export const DISABLED_MODELS_SUMMARY_KEYS = {
+  empty: 'oauth_excluded.picker_empty',
+  summary: 'oauth_excluded.picker_summary',
+  rules: 'oauth_excluded.picker_summary_rules',
 };

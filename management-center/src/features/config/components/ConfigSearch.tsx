@@ -67,7 +67,7 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
 
   return (
     <div className="relative min-w-0 flex-1" ref={searchBoxRef}>
-      <InputGroup className="h-9">
+      <InputGroup className="h-9 max-sm:h-10">
         <InputGroupAddon>
           <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
         </InputGroupAddon>

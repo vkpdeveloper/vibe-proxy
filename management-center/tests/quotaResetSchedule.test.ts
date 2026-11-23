@@ -319,6 +319,39 @@ describe('nextRecoveryMs', () => {
     expect(nextRecoveryMs('claude', { status: 'error' }, NOW)).toBeNull();
   });
 
+  test('skips limits still at 100% left, so an idle credential does not sort first', () => {
+    const quota = {
+      status: 'success',
+      windows: [
+        { id: 'five_hour', usedPercent: 0, resetAtMs: NOW + HOUR_MS },
+        { id: 'seven_day', usedPercent: 66, resetAtMs: NOW + 2 * DAY_MS },
+      ],
+      dollarWindows: [{ key: 'balance', utilization: 0, resetsAt: iso(NOW + 2 * HOUR_MS) }],
+    };
+    expect(nextRecoveryMs('claude', quota, NOW)).toBe(NOW + 2 * DAY_MS);
+
+    const fresh = {
+      status: 'success',
+      groups: [{ buckets: [{ id: 'full', remainingFraction: 1, resetAtMs: NOW + HOUR_MS }] }],
+    };
+    expect(nextRecoveryMs('antigravity', fresh, NOW)).toBeNull();
+
+    const xai = {
+      status: 'success',
+      billing: { periodType: 'weekly', usedPercent: 0, resetAtMs: NOW + HOUR_MS },
+      grokBot: { usedPercent: 6, resetAtMs: NOW + DAY_MS },
+    };
+    expect(nextRecoveryMs('xai', xai, NOW)).toBe(NOW + DAY_MS);
+  });
+
+  test('still counts a limit whose usage is unknown', () => {
+    const quota = {
+      status: 'success',
+      windows: [{ id: 'five_hour', usedPercent: null, resetAtMs: NOW + HOUR_MS }],
+    };
+    expect(nextRecoveryMs('claude', quota, NOW)).toBe(NOW + HOUR_MS);
+  });
+
   test('is null when every known instant has passed', () => {
     const quota = { status: 'success', windows: [{ id: 'stale', resetAtMs: NOW - 1 }] };
     expect(nextRecoveryMs('claude', quota, NOW)).toBeNull();

@@ -5,19 +5,13 @@ import { cn } from '@/lib/utils';
 import { PROVIDER_LOGOS, type ProviderBrandLogoKey } from '../brandLogos';
 
 type ProviderLogoProps = { className?: string } & (
-  | { brand: ProviderBrandLogoKey }
-  /** `flush` is for artwork that already carries its own rounded tile. */
-  | { src: string; flush?: boolean }
+  { brand: ProviderBrandLogoKey } | { src: string }
 );
 
-/**
- * A provider's mark on a dark rounded tile. Glyph logos are inset; logos that ship their own
- * tile fill it. Falls back to a plug icon when a plugin logo fails to load.
- */
+/** A provider's glyph inset on a dark rounded tile. Falls back to a plug icon when a plugin logo fails to load. */
 export function ProviderLogo({ className, ...props }: ProviderLogoProps) {
   const logo = 'brand' in props ? PROVIDER_LOGOS[props.brand] : null;
   const src = logo ? (logo.darkSrc ?? logo.src) : 'src' in props ? props.src : '';
-  const flush = logo ? Boolean(logo.themeSurface) : 'flush' in props && Boolean(props.flush);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const broken = !src || failedSrc === src;
 
@@ -40,7 +34,7 @@ export function ProviderLogo({ className, ...props }: ProviderLogoProps) {
           alt=""
           draggable={false}
           onError={() => setFailedSrc(src)}
-          className={cn('size-full object-contain', !flush && 'p-[18%]')}
+          className="size-full object-contain p-[18%]"
         />
       )}
     </span>

@@ -3,15 +3,14 @@ import type { DevinQuotaState } from '@/types';
 import { useNow } from '@/hooks/useNow';
 import { buildResetDisplay } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
+import { QuotaPlanDate } from '../../components/QuotaPlanDate';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
-import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
 
 export function DevinQuotaBody({ quota, classes }: QuotaBodyProps<DevinQuotaState>) {
   const { t, i18n } = useTranslation();
   const now = useNow();
   const locale = i18n.resolvedLanguage;
-  const urgentRow = pickUrgentRowId(collectQuotaRowInstants('devin', quota), now);
   const planEnd = buildResetDisplay(null, quota.planEndMs, now, locale);
 
   return (
@@ -25,16 +24,12 @@ export function DevinQuotaBody({ quota, classes }: QuotaBodyProps<DevinQuotaStat
             </span>
           )}
           {planEnd && (
-            <span className={classes.codexPlanItem}>
-              <span className={classes.codexPlanLabel}>{t('devin_quota.plan_end')}</span>
-              <QuotaResetLabel display={planEnd} classes={classes} />
-            </span>
+            <QuotaPlanDate label={t('devin_quota.plan_end')} display={planEnd} classes={classes} />
           )}
         </div>
       )}
       {quota.windows.map((window, index) => {
         const reset = buildResetDisplay(null, window.resetAtMs, now, locale);
-        const soon = window.id === urgentRow;
         const label = t(`devin_quota.${window.id}`);
         return (
           <div key={window.id} className={classes.quotaRow}>
@@ -44,10 +39,14 @@ export function DevinQuotaBody({ quota, classes }: QuotaBodyProps<DevinQuotaStat
                 <span className={classes.quotaPercent}>
                   {window.remainingPercent === null
                     ? t('devin_quota.unavailable')
-                    : `${window.remainingPercent}%`}
+                    : t('auth_files.quota_drain_remaining', { percent: window.remainingPercent })}
                 </span>
                 {reset ? (
-                  <QuotaResetLabel display={reset} classes={classes} soon={soon} />
+                  <QuotaResetLabel
+                    display={reset}
+                    classes={classes}
+                    remainingPercent={window.remainingPercent}
+                  />
                 ) : (
                   <span className={classes.quotaReset}>{t('devin_quota.reset_unknown')}</span>
                 )}

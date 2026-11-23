@@ -63,7 +63,7 @@ export const ApiKeyStrengthMeter = memo(function ApiKeyStrengthMeter({ value }: 
         ))}
       </div>
       <span className="w-14 text-right text-xs text-muted-foreground" aria-hidden="true">
-        {empty ? '—' : tierLabel}
+        {empty ? '-' : tierLabel}
       </span>
     </div>
   );

@@ -4,6 +4,7 @@ import { useNow } from '@/hooks/useNow';
 import type { DevinCliQuotaState } from '@/types';
 import { buildResetDisplay } from '@/utils/quota';
 import { QuotaMeter } from '../../components/QuotaMeter';
+import { QuotaPlanDate } from '../../components/QuotaPlanDate';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
@@ -39,10 +40,11 @@ export function DevinCliQuotaBody({ quota, classes }: QuotaBodyProps<DevinCliQuo
             </span>
           )}
           {planEndDisplay && (
-            <span className={classes.codexPlanItem}>
-              <span className={classes.codexPlanLabel}>{t('devin_cli_quota.plan_end_label')}</span>
-              <QuotaResetLabel display={planEndDisplay} classes={classes} />
-            </span>
+            <QuotaPlanDate
+              label={t('devin_cli_quota.plan_end_label')}
+              display={planEndDisplay}
+              classes={classes}
+            />
           )}
         </div>
       )}
@@ -73,7 +75,11 @@ export function DevinCliQuotaBody({ quota, classes }: QuotaBodyProps<DevinCliQuo
                       })}
                 </span>
                 {resetDisplay && (
-                  <QuotaResetLabel display={resetDisplay} classes={classes} soon={urgent} />
+                  <QuotaResetLabel
+                    display={resetDisplay}
+                    classes={classes}
+                    remainingPercent={remaining}
+                  />
                 )}
               </div>
             </div>

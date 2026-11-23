@@ -51,11 +51,15 @@ export function resetCreditRowId(
 interface WindowLike {
   id?: string;
   resetAtMs?: number | null;
+  usedPercent?: number | null;
+  /** Antigravity and plugin buckets report what is left instead of what was used. */
+  remainingFraction?: number;
 }
 
 interface DollarWindowLike {
   key: string;
   resetsAt?: string | null;
+  utilization?: number | null;
 }
 
 interface ResetCreditLike {
@@ -73,10 +77,22 @@ export const XAI_GROK_BOT_ROW_ID = 'xai:grok-bot';
 const isUsableMs = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
+/**
+ * A limit that is known to be untouched (100% left) gives nothing back when it
+ * resets, so its reset is not a recovery. Unknown usage still counts: dropping
+ * it would hide a limit that may well be exhausted.
+ */
+const isUntouched = (usedPercent: number | null | undefined) =>
+  typeof usedPercent === 'number' && Number.isFinite(usedPercent) && usedPercent <= 0;
+
+const rowIsUntouched = (row: WindowLike) =>
+  isUntouched(row.usedPercent) ||
+  (typeof row.remainingFraction === 'number' && row.remainingFraction >= 1);
+
 const collectRows = (rows: readonly WindowLike[], fallbackPrefix: string): QuotaRowInstant[] =>
   rows
     .map((row, index): QuotaRowInstant | null =>
-      isUsableMs(row.resetAtMs)
+      isUsableMs(row.resetAtMs) && !rowIsUntouched(row)
         ? { rowId: row.id || `${fallbackPrefix}-${index}`, atMs: row.resetAtMs, kind: 'window' }
         : null
     )
@@ -85,7 +101,9 @@ const collectRows = (rows: readonly WindowLike[], fallbackPrefix: string): Quota
 /**
  * Every recovery instant on one credential, tagged with the row it belongs to.
  *
- * Only genuine capacity-return events are collected. The Codex subscription
+ * Only genuine capacity-return events are collected, so limits still at 100%
+ * left are skipped: otherwise a fresh 5-hour window would rank an idle
+ * credential first under "soonest recovery". The Codex subscription
  * renewal date and xAI's monthly billing rollover are excluded: a spend cap
  * turning over is not a rate limit lifting, and ranking cards by it would
  * answer a different question than the one being asked. Both still render
@@ -113,7 +131,9 @@ export function collectQuotaRowInstants(
       const balances = ((quota as { dollarWindows?: DollarWindowLike[] }).dollarWindows ?? [])
         .map((balance): QuotaRowInstant | null => {
           const atMs = parseIsoToMs(balance.resetsAt);
-          return atMs === null ? null : { rowId: balance.key, atMs, kind: 'window' };
+          return atMs === null || isUntouched(balance.utilization)
+            ? null
+            : { rowId: balance.key, atMs, kind: 'window' };
         })
         .filter((instant): instant is QuotaRowInstant => instant !== null);
       return [...windows, ...balances];
@@ -137,18 +157,27 @@ export function collectQuotaRowInstants(
 
   if (provider === 'xai') {
     const state = quota as {
-      billing?: { periodType?: string; resetAtMs?: number | null } | null;
-      grokBot?: { resetAtMs?: number | null } | null;
+      billing?: {
+        periodType?: string;
+        resetAtMs?: number | null;
+        usedPercent?: number | null;
+      } | null;
+      grokBot?: { resetAtMs?: number | null; usedPercent?: number | null } | null;
     };
     const instants: QuotaRowInstant[] = [];
     if (
       state.billing &&
       state.billing.periodType === 'weekly' &&
-      isUsableMs(state.billing.resetAtMs)
+      isUsableMs(state.billing.resetAtMs) &&
+      !isUntouched(state.billing.usedPercent)
     ) {
       instants.push({ rowId: XAI_WEEKLY_ROW_ID, atMs: state.billing.resetAtMs, kind: 'window' });
     }
-    if (state.grokBot && isUsableMs(state.grokBot.resetAtMs)) {
+    if (
+      state.grokBot &&
+      isUsableMs(state.grokBot.resetAtMs) &&
+      !isUntouched(state.grokBot.usedPercent)
+    ) {
       instants.push({ rowId: XAI_GROK_BOT_ROW_ID, atMs: state.grokBot.resetAtMs, kind: 'window' });
     }
     return instants;

@@ -1,14 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { SettingGroup } from '../fields/SettingGroup';
+import { SettingGroup, SettingGroups } from '../fields/SettingGroup';
 import type { ConfigSectionProps } from '../../types';
 import { Section } from '@/components/layout/Page';
-import {
-  BlockSetting,
-  FieldStack,
-  SettingList,
-  TextSetting,
-  ToggleSetting,
-} from '../fields/FieldPrimitives';
+import { BlockSetting, SettingList, TextSetting, ToggleSetting } from '../fields/FieldPrimitives';
 import { ApiKeysField, HostField, PortField } from '../fields/sharedFields';
 import { getValidationMessage } from '../blocks/shared';
 import { StringListEditor } from '../blocks/StringListEditor';
@@ -33,7 +27,6 @@ export function SectionConnectivity({
           fieldId="authDir"
           size="lg"
           label={t('config_management.visual.sections.auth.auth_dir')}
-          description={t('config_management.visual.sections.auth.auth_dir_hint')}
           placeholder="~/.cli-proxy-api"
           value={values.authDir}
           onChange={(authDir) => onChange({ authDir })}
@@ -47,9 +40,9 @@ export function SectionConnectivity({
         <TextSetting
           fieldId="githubToken"
           label={t('config_management.visual.sections.server.github_token')}
-          description={t('config_management.visual.sections.server.github_token_hint')}
           type="password"
           autoComplete="new-password"
+          placeholder="ghp_xxxxxxxxxxxxxxxx"
           value={values.githubToken}
           onChange={(githubToken) => onChange({ githubToken })}
           disabled={disabled}
@@ -70,54 +63,46 @@ export function SectionConnectivity({
         </BlockSetting>
       </SettingList>
 
-      <SettingGroup
-        label={t('config_management.visual.sections.tls.title')}
-        hint={t('config_management.visual.sections.tls.description')}
-      >
-        <SettingList>
-          <ToggleSetting
-            fieldId="tlsEnable"
-            label={t('config_management.visual.sections.tls.enable')}
-            description={t('config_management.visual.sections.tls.enable_desc')}
-            checked={values.tlsEnable}
-            disabled={disabled}
-            onChange={(tlsEnable) => onChange({ tlsEnable })}
-          />
-          {values.tlsEnable ? (
-            <>
-              <TextSetting
-                fieldId="tlsCert"
-                size="lg"
-                label={t('config_management.visual.sections.tls.cert')}
-                placeholder="/path/to/cert.pem"
-                value={values.tlsCert}
-                onChange={(tlsCert) => onChange({ tlsCert })}
-                disabled={disabled}
-              />
-              <TextSetting
-                fieldId="tlsKey"
-                size="lg"
-                label={t('config_management.visual.sections.tls.key')}
-                placeholder="/path/to/key.pem"
-                value={values.tlsKey}
-                onChange={(tlsKey) => onChange({ tlsKey })}
-                disabled={disabled}
-              />
-            </>
-          ) : null}
-        </SettingList>
-      </SettingGroup>
+      <SettingGroups>
+        <SettingGroup label={t('config_management.visual.sections.tls.title')}>
+          <SettingList>
+            <ToggleSetting
+              fieldId="tlsEnable"
+              label={t('config_management.visual.sections.tls.enable')}
+              checked={values.tlsEnable}
+              disabled={disabled}
+              onChange={(tlsEnable) => onChange({ tlsEnable })}
+            />
+            {values.tlsEnable ? (
+              <>
+                <TextSetting
+                  fieldId="tlsCert"
+                  size="lg"
+                  label={t('config_management.visual.sections.tls.cert')}
+                  placeholder="/path/to/cert.pem"
+                  value={values.tlsCert}
+                  onChange={(tlsCert) => onChange({ tlsCert })}
+                  disabled={disabled}
+                />
+                <TextSetting
+                  fieldId="tlsKey"
+                  size="lg"
+                  label={t('config_management.visual.sections.tls.key')}
+                  placeholder="/path/to/key.pem"
+                  value={values.tlsKey}
+                  onChange={(tlsKey) => onChange({ tlsKey })}
+                  disabled={disabled}
+                />
+              </>
+            ) : null}
+          </SettingList>
+        </SettingGroup>
 
-      <SettingGroup
-        label={t('config_management.visual.sections.remote.title')}
-        hint={t('config_management.visual.sections.remote.description')}
-      >
-        <FieldStack>
+        <SettingGroup label={t('config_management.visual.sections.remote.title')}>
           <SettingList>
             <ToggleSetting
               fieldId="rmAllowRemote"
               label={t('config_management.visual.sections.remote.allow_remote')}
-              description={t('config_management.visual.sections.remote.allow_remote_desc')}
               checked={values.rmAllowRemote}
               disabled={disabled}
               onChange={(rmAllowRemote) => onChange({ rmAllowRemote })}
@@ -125,7 +110,6 @@ export function SectionConnectivity({
             <ToggleSetting
               fieldId="rmDisableControlPanel"
               label={t('config_management.visual.sections.remote.disable_panel')}
-              description={t('config_management.visual.sections.remote.disable_panel_desc')}
               checked={values.rmDisableControlPanel}
               disabled={disabled}
               onChange={(rmDisableControlPanel) => onChange({ rmDisableControlPanel })}
@@ -140,8 +124,6 @@ export function SectionConnectivity({
               disabled={disabled}
               onChange={(rmDisableAutoUpdatePanel) => onChange({ rmDisableAutoUpdatePanel })}
             />
-          </SettingList>
-          <SettingList>
             <TextSetting
               fieldId="rmSecretKey"
               label={t('config_management.visual.sections.remote.secret_key')}
@@ -161,15 +143,15 @@ export function SectionConnectivity({
               disabled={disabled}
             />
           </SettingList>
-        </FieldStack>
-      </SettingGroup>
+        </SettingGroup>
 
-      <SectionDiscovery
-        values={values}
-        validationErrors={validationErrors}
-        disabled={disabled}
-        onChange={onChange}
-      />
+        <SectionDiscovery
+          values={values}
+          validationErrors={validationErrors}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      </SettingGroups>
     </Section>
   );
 }

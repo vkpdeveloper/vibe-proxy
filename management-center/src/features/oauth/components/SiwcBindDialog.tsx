@@ -1,9 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { DialogFooter } from '@/components/ui/dialog';
 import { FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import iconCodex from '@/assets/icons/codex.svg';
+import { Private } from '@/components/ui/private';
+import iconCodex from '../codex-glyph.svg';
 import { authFilesApi } from '@/services/api/authFiles';
 import { captureSiwcBindingApi, oauthApi, type SiwcBindResponse } from '@/services/api/oauth';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -37,7 +39,7 @@ import { SiwcStatusBadge } from './SiwcStatusBadge';
 type Phase = 'idle' | 'starting' | 'wait' | 'ok' | 'error' | 'unsupported' | 'expired';
 type Feedback = 'submitted' | 'invalid_callback' | 'callback_failed';
 
-const CALLBACK_PLACEHOLDER = 'http://127.0.0.1:1455/auth/callback?code=…&state=…';
+const CALLBACK_PLACEHOLDER = 'http://127.0.0.1:1455/…';
 
 export interface SiwcBindDialogProps {
   open: boolean;
@@ -227,7 +229,6 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
         title: t('siwc.title'),
         caption: `Codex · ${t('auth_login.method_browser')}`,
         icon: iconCodex,
-        flush: true,
       }}
       footer={
         view === 'flow' ? (
@@ -239,6 +240,26 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
               {t('siwc.cancel')}
             </Button>
           </FlowFooter>
+        ) : view === 'pick' || (view === 'failed' && phase !== 'unsupported') ? (
+          <DialogFooter>
+            <Button variant="outline" size="lg" className="h-10 px-4 sm:h-9" onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            {view === 'pick' ? (
+              <Button
+                size="lg"
+                className="h-10 px-4 sm:h-9"
+                disabled={!name}
+                onClick={() => void startRef.current?.start()}
+              >
+                {t('siwc.start')}
+              </Button>
+            ) : (
+              <Button size="lg" className="h-10 px-4 sm:h-9" onClick={restart}>
+                {t('siwc.retry')}
+              </Button>
+            )}
+          </DialogFooter>
         ) : undefined
       }
     >
@@ -253,14 +274,6 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
               onChange={setName}
               expiresOf={expiresOf}
             />
-            <Button
-              size="lg"
-              className="h-9 w-fit px-4"
-              disabled={!name}
-              onClick={() => void startRef.current?.start()}
-            >
-              {t('siwc.start')}
-            </Button>
           </>
         )}
 
@@ -295,11 +308,6 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
           <>
             {selected && <TargetSummary file={selected} />}
             <FlowAlert>{t(`siwc.${phase}`)}</FlowAlert>
-            {phase !== 'unsupported' && (
-              <Button size="lg" className="h-9 w-fit px-4" onClick={restart}>
-                {t('siwc.retry')}
-              </Button>
-            )}
           </>
         )}
 
@@ -308,10 +316,15 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
             title={t('siwc.ok')}
             actions={
               <>
-                <Button variant="outline" size="lg" className="h-9 px-4" onClick={onViewAuthFiles}>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-10 px-4 sm:h-9"
+                  onClick={onViewAuthFiles}
+                >
                   {t('auth_login.view_auth_files')}
                 </Button>
-                <Button size="lg" className="h-9 px-4" onClick={close}>
+                <Button size="lg" className="h-10 px-4 sm:h-9" onClick={close}>
                   {t('siwc.done')}
                 </Button>
               </>
@@ -319,7 +332,12 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
           >
             {selected && (
               <p className="text-sm text-muted-foreground">
-                {t('siwc.ok_hint', { name: deriveAuthFileIdentity(selected).primary })}
+                <Trans
+                  i18nKey="siwc.ok_hint"
+                  components={{
+                    name: <IdentityText text={deriveAuthFileIdentity(selected).primary} />,
+                  }}
+                />
               </p>
             )}
           </ResultView>
@@ -328,6 +346,17 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
     </FlowDialog>
   );
 }
+
+// Clipping only sideways (not truncate) keeps Private's 40px tap area intact.
+const clipLine = 'min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap';
+
+/** Emails stay blurred like on the auth file cards; Codex file names usually contain one too. */
+function IdentityText({ text }: { text: string }) {
+  return text.includes('@') ? <Private>{text}</Private> : text;
+}
+
+/** The hover title would reveal a blurred email, so it is left out for those. */
+const identityTitle = (fullName: string) => (fullName.includes('@') ? undefined : fullName);
 
 /* ---------- Credential picker: native radios (keyboard and screen readers for free), shown as tiles ---------- */
 
@@ -369,9 +398,6 @@ function TargetPicker({
         {targets.map((file) => {
           const identity = deriveAuthFileIdentity(file);
           const expires = expiresOf(file);
-          const meta = [expires && t('siwc.expires', { date: expires }), identity.secondary]
-            .filter(Boolean)
-            .join(' · ');
           return (
             <label
               key={file.name}
@@ -388,14 +414,21 @@ function TargetPicker({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span
                   className={cn(
-                    'truncate text-sm font-medium',
+                    clipLine,
+                    'text-sm font-medium',
                     identity.kind === 'fileName' && 'font-mono text-xs leading-5'
                   )}
-                  title={identity.fullName}
+                  title={identityTitle(identity.fullName)}
                 >
-                  {identity.primary || stripJsonExtension(file.name)}
+                  <IdentityText text={identity.primary || stripJsonExtension(file.name)} />
                 </span>
-                {meta && <span className="truncate text-sm text-muted-foreground">{meta}</span>}
+                {(expires || identity.secondary) && (
+                  <span className={cn(clipLine, 'text-sm text-muted-foreground')}>
+                    {expires && t('siwc.expires', { date: expires })}
+                    {expires && identity.secondary && ' · '}
+                    {identity.secondary && <IdentityText text={identity.secondary} />}
+                  </span>
+                )}
               </span>
               <SiwcStatusBadge status={getSiwcBindingStatus(file)} withLabel={false} />
             </label>
@@ -424,12 +457,13 @@ function TargetSummary({ file }: { file: AuthFileItem }) {
       <span className="shrink-0 text-sm text-muted-foreground">{t('siwc.target')}</span>
       <span
         className={cn(
-          'min-w-0 flex-1 truncate text-sm font-medium',
+          clipLine,
+          'flex-1 text-sm font-medium',
           identity.kind === 'fileName' && 'font-mono text-xs'
         )}
-        title={identity.fullName}
+        title={identityTitle(identity.fullName)}
       >
-        {identity.primary || stripJsonExtension(file.name)}
+        <IdentityText text={identity.primary || stripJsonExtension(file.name)} />
       </span>
       <SiwcStatusBadge status={getSiwcBindingStatus(file)} withLabel={false} />
     </div>
@@ -465,7 +499,7 @@ function CallbackStep({
       <CallbackForm onSubmit={onSubmit}>
         <Input
           id={inputId}
-          className="h-9 flex-1 font-mono text-xs md:text-xs"
+          className="h-10 font-mono text-base sm:h-9 sm:flex-1 sm:text-xs md:text-xs"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={CALLBACK_PLACEHOLDER}
@@ -479,7 +513,7 @@ function CallbackStep({
           type="submit"
           variant="outline"
           size="lg"
-          className="h-9 px-4"
+          className="h-10 px-4 sm:h-9"
           disabled={disabled || submitting || !value.trim()}
         >
           {t('siwc.submit')}

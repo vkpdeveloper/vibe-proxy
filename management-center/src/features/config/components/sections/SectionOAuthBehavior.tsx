@@ -127,9 +127,6 @@ export function SectionOAuthBehavior({
           <ToggleSetting
             fieldId="antigravityConnectionPoolEnabled"
             label={t('config_management.visual.additions.antigravityConnectionPoolEnabled.label')}
-            description={t(
-              'config_management.visual.additions.antigravityConnectionPoolEnabled.hint'
-            )}
             checked={values.antigravityConnectionPoolEnabled}
             disabled={disabled}
             onChange={(antigravityConnectionPoolEnabled) =>
@@ -252,7 +249,6 @@ export function SectionOAuthBehavior({
             fieldId="codexLiveMediaRelayUDPPortMax"
             size="sm"
             label={t('config_management.visual.additions.codexLiveMediaRelayUDPPortMax.label')}
-            description={t('config_management.visual.additions.codexLiveMediaRelayUDPPortMax.hint')}
             type="number"
             value={values.codexLiveMediaRelayUDPPortMax}
             onChange={(codexLiveMediaRelayUDPPortMax) =>

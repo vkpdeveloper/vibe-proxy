@@ -33,9 +33,10 @@ export function OAuthConfigEmpty({
           ? t('common.loading')
           : emptyTitle;
 
+  // Phones drop the dashed box: a plain line under the heading is enough.
   return (
-    <Empty className="border border-dashed p-6 md:p-6">
-      <EmptyHeader>
+    <Empty className="border border-dashed p-6 max-sm:items-start max-sm:border-0 max-sm:p-0 max-sm:text-left md:p-6">
+      <EmptyHeader className="max-sm:items-start">
         <EmptyTitle className="font-normal text-muted-foreground">{title}</EmptyTitle>
         {error === 'unsupported' && <EmptyDescription>{upgradeDescription}</EmptyDescription>}
       </EmptyHeader>

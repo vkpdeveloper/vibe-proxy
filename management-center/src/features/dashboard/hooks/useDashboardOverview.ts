@@ -10,6 +10,7 @@ import {
 } from '@/utils/recentRequests';
 import type { Config } from '@/types';
 import type { AuthFileItem } from '@/types/authFile';
+import { isProblemAuthFile } from '@/features/authFiles/constants';
 import {
   TRAFFIC_BUCKET_MINUTES,
   type CredentialHealth,
@@ -27,6 +28,7 @@ const EMPTY_TRAFFIC: TrafficWindow = {
   peakTotal: 0,
   peakIndex: -1,
   windowMinutes: 0,
+  lastBucketStart: 0,
 };
 
 /** `api-key-usage` 的键形如 `<baseUrl>|<apiKey>`，取第一个分隔符之后的部分 */
@@ -42,8 +44,14 @@ const providerIdOfAuthFile = (file: AuthFileItem): string => {
   return candidate && candidate !== 'empty' ? candidate : 'unknown';
 };
 
+// The server keeps 20 ten-minute buckets; Home shows the last 18 so the window is a round 3 hours.
+const WINDOW_BUCKETS = 18;
+const BUCKET_MS = TRAFFIC_BUCKET_MINUTES * 60_000;
+const recentWindow = (bucketGroups: RecentRequestBucket[][]) =>
+  mergeRecentRequestBucketGroups(bucketGroups).slice(-WINDOW_BUCKETS);
+
 const buildTrafficWindow = (bucketGroups: RecentRequestBucket[][]): TrafficWindow => {
-  const buckets = mergeRecentRequestBucketGroups(bucketGroups);
+  const buckets = recentWindow(bucketGroups);
   if (buckets.length === 0) {
     return EMPTY_TRAFFIC;
   }
@@ -74,20 +82,17 @@ const buildTrafficWindow = (bucketGroups: RecentRequestBucket[][]): TrafficWindo
     peakTotal,
     peakIndex,
     windowMinutes: buckets.length * TRAFFIC_BUCKET_MINUTES,
+    lastBucketStart: Math.floor(Date.now() / BUCKET_MS) * BUCKET_MS,
   };
 };
 
 interface ProviderAccumulator {
   credentials: number;
-  success: number;
-  failure: number;
   bucketGroups: RecentRequestBucket[][];
 }
 
 const createAccumulator = (): ProviderAccumulator => ({
   credentials: 0,
-  success: 0,
-  failure: 0,
   bucketGroups: [],
 });
 
@@ -189,8 +194,6 @@ export function useDashboardOverview() {
           apiKeysFromUsage.add(apiKey);
         }
         accumulator.credentials += 1;
-        accumulator.success += entry.success;
-        accumulator.failure += entry.failed;
         if (entry.recentRequests.length > 0) {
           accumulator.bucketGroups.push(entry.recentRequests);
           allBucketGroups.push(entry.recentRequests);
@@ -211,8 +214,6 @@ export function useDashboardOverview() {
       const accumulator = accumulatorFor(providerIdOfAuthFile(file));
       const entry = normalizeRecentRequestUsageEntry(file);
       accumulator.credentials += 1;
-      accumulator.success += entry.success;
-      accumulator.failure += entry.failed;
       if (entry.recentRequests.length > 0) {
         accumulator.bucketGroups.push(entry.recentRequests);
         allBucketGroups.push(entry.recentRequests);
@@ -221,15 +222,24 @@ export function useDashboardOverview() {
 
     const providerRows: ProviderTraffic[] = Array.from(accumulators.entries())
       .map(([id, accumulator]) => {
-        const total = accumulator.success + accumulator.failure;
+        // Counted from the same recent buckets as the hero, so both cover the same window
+        // (the entries' success/failed fields are all-time counters).
+        const buckets = recentWindow(accumulator.bucketGroups);
+        let success = 0;
+        let failure = 0;
+        for (const bucket of buckets) {
+          success += bucket.success;
+          failure += bucket.failed;
+        }
+        const total = success + failure;
         return {
           id,
           credentials: accumulator.credentials,
-          success: accumulator.success,
-          failure: accumulator.failure,
+          success,
+          failure,
           total,
-          successRate: total > 0 ? (accumulator.success / total) * 100 : null,
-          buckets: mergeRecentRequestBucketGroups(accumulator.bucketGroups),
+          successRate: total > 0 ? (success / total) * 100 : null,
+          buckets,
         };
       })
       .sort(
@@ -246,14 +256,14 @@ export function useDashboardOverview() {
     if (!authFiles) return null;
 
     let disabled = 0;
-    let unavailable = 0;
+    let problem = 0;
     const countsByType = new Map<string, number>();
 
     authFiles.forEach((file) => {
       if (file.disabled) {
         disabled += 1;
-      } else if (file.unavailable) {
-        unavailable += 1;
+      } else if (isProblemAuthFile(file)) {
+        problem += 1;
       }
       const type = providerIdOfAuthFile(file);
       countsByType.set(type, (countsByType.get(type) ?? 0) + 1);
@@ -261,9 +271,9 @@ export function useDashboardOverview() {
 
     return {
       total: authFiles.length,
-      active: authFiles.length - disabled - unavailable,
+      active: authFiles.length - disabled - problem,
       disabled,
-      unavailable,
+      problem,
       byType: Array.from(countsByType.entries())
         .map(([type, count]) => ({ type, count }))
         .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type)),
@@ -272,7 +282,7 @@ export function useDashboardOverview() {
 
   const counts = useMemo<DashboardCounts>(
     () => ({
-      managementKeys: config ? (config.apiKeys?.length ?? 0) : null,
+      apiKeys: config ? (config.apiKeys?.length ?? 0) : null,
       providerKeys: providerKeyCounts
         ? Object.values(providerKeyCounts).reduce((sum, count) => sum + count, 0)
         : null,

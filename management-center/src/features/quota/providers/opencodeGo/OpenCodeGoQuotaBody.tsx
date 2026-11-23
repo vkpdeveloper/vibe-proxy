@@ -49,7 +49,11 @@ export function OpenCodeGoQuotaBody({ quota, classes }: QuotaBodyProps<OpenCodeG
                       })}
                 </span>
                 {resetDisplay && (
-                  <QuotaResetLabel display={resetDisplay} classes={classes} soon={urgent} />
+                  <QuotaResetLabel
+                    display={resetDisplay}
+                    classes={classes}
+                    remainingPercent={remaining}
+                  />
                 )}
               </div>
             </div>

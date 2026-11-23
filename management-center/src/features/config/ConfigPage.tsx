@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { RefreshIcon } from '@hugeicons/core-free-icons';
-import { Page } from '@/components/layout/Page';
+import { Page, PageBarContent } from '@/components/layout/Page';
+import { usePageBar } from '@/components/layout/pageBar';
 import { Button } from '@/components/ui/button';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
@@ -41,7 +42,6 @@ import { FloatingSaveBar } from './components/FloatingSaveBar';
 import { ModeSwitch } from './components/ModeSwitch';
 import { SourcePanel, SourceSearchBar } from './components/SourcePanel';
 import { SectionAdvanced } from './components/sections/SectionAdvanced';
-import { SectionCommon } from './components/sections/SectionCommon';
 import { SectionConnectivity } from './components/sections/SectionConnectivity';
 import { SectionLogging } from './components/sections/SectionLogging';
 import { SectionNetwork } from './components/sections/SectionNetwork';
@@ -77,6 +77,7 @@ export function ConfigPage() {
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const pageBar = usePageBar();
 
   const {
     visualValues,
@@ -124,9 +125,9 @@ export function ConfigPage() {
 
   const unsavedChangesDialog = useMemo(
     () => ({
-      title: t('common.unsaved_changes_title'),
-      message: t('common.unsaved_changes_message'),
-      confirmText: t('common.confirm'),
+      title: t('config_management.leave_title'),
+      message: t('config_management.leave_message'),
+      confirmText: t('config_management.leave_confirm'),
       cancelText: t('common.cancel'),
     }),
     [t]
@@ -280,8 +281,6 @@ export function ConfigPage() {
 
   const renderActiveSection = () => {
     switch (activeSection) {
-      case 'common':
-        return <SectionCommon {...sectionProps} />;
       case 'connectivity':
         return <SectionConnectivity {...sectionProps} />;
       case 'network':
@@ -308,7 +307,7 @@ export function ConfigPage() {
   const statusMeta = headerMeta.filter((segment) => segment.key !== 'fields');
 
   const actions = (
-    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+    <div className="flex shrink-0 items-center gap-1 max-sm:pl-3 sm:gap-3">
       <p className="flex items-center gap-2 text-[13px] max-lg:sr-only" aria-live="polite">
         <span className={cn('size-2 rounded-full', statusDot[status.tone])} />
         {statusMeta.map((segment, index) => (
@@ -325,13 +324,14 @@ export function ConfigPage() {
         disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
         onChange={handleModeChange}
       />
-      <Hint label={t('config_management.reload')}>
+      <Hint label={t('common.refresh')}>
         <Button
-          variant="outline"
+          variant={pageBar ? 'ghost' : 'outline'}
           size="icon-lg"
+          className="max-sm:size-10"
           onClick={doc.handleReload}
           disabled={doc.loading || doc.saving}
-          aria-label={t('config_management.reload')}
+          aria-label={t('common.refresh')}
         >
           <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
         </Button>
@@ -385,13 +385,20 @@ export function ConfigPage() {
 
   if (mode === 'source') {
     // The YAML editor uses the full width and height, so it skips Page's narrow content column.
+    // On phones the title and actions go into the app's top bar, as Page does.
     return (
       <div className="flex h-full flex-col">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-6 sm:px-10 sm:py-8">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('config_management.title')}</h1>
-          {actions}
-        </header>
-        <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:px-10">
+        {pageBar ? (
+          <PageBarContent bar={pageBar} title={t('config_management.title')} actions={actions} />
+        ) : (
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-6 sm:px-10 sm:py-8">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t('config_management.title')}
+            </h1>
+            {actions}
+          </header>
+        )}
+        <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 max-sm:px-4 sm:px-10">
           {alert}
           <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
         </div>
@@ -414,10 +421,13 @@ export function ConfigPage() {
       tab={activeSection}
       onTab={handleSectionChange}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 max-sm:gap-4">
         {alert}
         <ConfigSearch disabled={disableControls || doc.loading} onJump={jumpToField} />
-        {renderActiveSection()}
+        {/* The tab row right above already names the section, so phones skip its heading. */}
+        <div className="contents max-sm:[&>section>div:first-child]:hidden">
+          {renderActiveSection()}
+        </div>
         {/* Room for the save bar so it never covers the last setting. */}
         {doc.isDirty ? <div aria-hidden="true" className="h-14" /> : null}
       </div>
