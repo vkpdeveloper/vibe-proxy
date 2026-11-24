@@ -41,7 +41,7 @@ func TestGenerateAuthURLUsesNativeClaudeCodeScopes(t *testing.T) {
 	if errParse != nil {
 		t.Fatalf("parse authorization URL: %v", errParse)
 	}
-	const wantScope = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+	const wantScope = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 	if got := parsed.Query().Get("scope"); got != wantScope {
 		t.Errorf("authorization scope = %q, want %q", got, wantScope)
 	}
@@ -58,14 +58,14 @@ func TestGenerateAuthURLRespectsOAuthIncludeCreateAPIKeyConfig(t *testing.T) {
 		wantScope string
 	}{
 		{
-			name:      "nil config defaults to native scope",
+			name:      "nil config omits org:create_api_key",
 			cfg:       nil,
-			wantScope: claudeOAuthAuthorizeScope,
+			wantScope: ClaudeOAuthScope,
 		},
 		{
-			name:      "unset pointer defaults to native scope",
+			name:      "unset pointer omits org:create_api_key",
 			cfg:       &config.Config{},
-			wantScope: claudeOAuthAuthorizeScope,
+			wantScope: ClaudeOAuthScope,
 		},
 		{
 			name: "explicit true includes org:create_api_key",

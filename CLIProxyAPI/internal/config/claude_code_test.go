@@ -217,7 +217,7 @@ func TestParseAndSaveClaudeOAuthIncludeCreateAPIKey(t *testing.T) {
 		wantEnabled bool
 		wantNil     bool
 	}{
-		{name: "defaults to true when omitted", yaml: "port: 8317\n", wantEnabled: true, wantNil: true},
+		{name: "defaults to false when omitted", yaml: "port: 8317\n", wantEnabled: false, wantNil: true},
 		{name: "v8 oauth providers explicit true", yaml: "config-version: 8\noauth:\n  providers:\n    claude:\n      oauth-include-create-api-key: true\n", wantEnabled: true},
 		{name: "v8 oauth providers explicit false", yaml: "config-version: 8\noauth:\n  providers:\n    claude:\n      oauth-include-create-api-key: false\n", wantEnabled: false},
 	}
@@ -303,8 +303,8 @@ func TestParseAndSaveClaudeOAuthIncludeCreateAPIKey(t *testing.T) {
 	if errClearReload != nil {
 		t.Fatalf("LoadConfig() after clearing nil error = %v", errClearReload)
 	}
-	if cleared.Claude.OAuthIncludeCreateAPIKey != nil || !cleared.Claude.OAuthIncludeCreateAPIKeyEnabled() {
-		t.Fatalf("cleared OAuthIncludeCreateAPIKey = %v, want nil (default true)", cleared.Claude.OAuthIncludeCreateAPIKey)
+	if cleared.Claude.OAuthIncludeCreateAPIKey != nil || cleared.Claude.OAuthIncludeCreateAPIKeyEnabled() {
+		t.Fatalf("cleared OAuthIncludeCreateAPIKey = %v, want nil (default false)", cleared.Claude.OAuthIncludeCreateAPIKey)
 	}
 
 	// Migrating legacy claude.oauth-include-create-api-key=false alongside an empty

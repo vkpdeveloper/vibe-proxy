@@ -1269,8 +1269,8 @@ oauth:
 
     # Claude OAuth login behavior.
     # claude:
-    #   # Include the org:create_api_key scope during new Claude OAuth logins (default: true).
-    #   # Set to false to request only the five user:* scopes (note: claude.ai may require org:create_api_key).
+    #   # Also ask for the org:create_api_key scope on new Claude OAuth logins (default: false).
+    #   # Off, logins request only the five user:* scopes.
     #   oauth-include-create-api-key: true
 
     # Codex provider behavior.

@@ -39,8 +39,9 @@ const (
 	ClaudeInferenceScope  = "user:inference"
 	LongLivedTokenSeconds = 365 * 24 * 60 * 60
 
-	// Native Claude Code includes the Console scope when authorizing a new login.
-	// Keep the established token refresh scope unchanged.
+	// Native Claude Code also asks for the Console scope on a new login. It is
+	// opt-in here (claude.oauth-include-create-api-key) because logins only need
+	// inference. The token refresh scope is unchanged either way.
 	claudeOAuthAuthorizeScope = "org:create_api_key " + ClaudeOAuthScope
 
 	claudeRefreshMinBackoff       = 5 * time.Second
@@ -187,10 +188,10 @@ type ClaudeAuth struct {
 }
 
 func resolveClaudeAuthorizeScope(cfg *config.Config) string {
-	if cfg != nil && !cfg.Claude.OAuthIncludeCreateAPIKeyEnabled() {
-		return ClaudeOAuthScope
+	if cfg != nil && cfg.Claude.OAuthIncludeCreateAPIKeyEnabled() {
+		return claudeOAuthAuthorizeScope
 	}
-	return claudeOAuthAuthorizeScope
+	return ClaudeOAuthScope
 }
 
 // NewClaudeAuth creates a new Anthropic authentication service.
@@ -364,7 +365,7 @@ func (o *ClaudeAuth) generateAuthURL(state string, pkceCodes *PKCECodes, scope s
 	}
 
 	if scope == "" {
-		scope = claudeOAuthAuthorizeScope
+		scope = ClaudeOAuthScope
 		if o != nil && o.authorizeScope != "" {
 			scope = o.authorizeScope
 		}

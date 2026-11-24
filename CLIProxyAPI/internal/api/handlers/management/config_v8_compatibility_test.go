@@ -438,8 +438,8 @@ func TestConfigV8ClaudeOAuthIncludeCreateAPIKey(t *testing.T) {
 		t.Fatalf("DELETE status = %d, want 200: %s", delRec.Code, delRec.Body.String())
 	}
 	reloaded, errReload := config.LoadConfig(file)
-	if errReload != nil || !reloaded.Claude.OAuthIncludeCreateAPIKeyEnabled() {
-		t.Fatalf("reloaded after delete = (%v, %v), want default enabled", reloaded, errReload)
+	if errReload != nil || reloaded.Claude.OAuthIncludeCreateAPIKey != nil || reloaded.Claude.OAuthIncludeCreateAPIKeyEnabled() {
+		t.Fatalf("reloaded after delete = (%v, %v), want default disabled", reloaded, errReload)
 	}
 
 	// Root PATCH with {"oauth":{"providers":{"claude":null}}} must also reset oauth-include-create-api-key.
@@ -454,7 +454,7 @@ func TestConfigV8ClaudeOAuthIncludeCreateAPIKey(t *testing.T) {
 		t.Fatalf("root PATCH null status = %d, want 200: %s", patchNull.Code, patchNull.Body.String())
 	}
 	afterNull, errAfterNull := config.LoadConfig(file)
-	if errAfterNull != nil || !afterNull.Claude.OAuthIncludeCreateAPIKeyEnabled() {
-		t.Fatalf("after root PATCH null = (%v, %v), want default enabled", afterNull, errAfterNull)
+	if errAfterNull != nil || afterNull.Claude.OAuthIncludeCreateAPIKey != nil || afterNull.Claude.OAuthIncludeCreateAPIKeyEnabled() {
+		t.Fatalf("after root PATCH null = (%v, %v), want default disabled", afterNull, errAfterNull)
 	}
 }
