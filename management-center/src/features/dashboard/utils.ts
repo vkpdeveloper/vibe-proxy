@@ -6,6 +6,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   'gemini-interactions': 'Interactions API',
   aistudio: 'AI Studio',
   codex: 'Codex',
+  copilot: 'GitHub Copilot',
   claude: 'Claude',
   devin: 'Devin',
   meta: 'Muse (Meta)',

@@ -99,6 +99,7 @@ describe('buildTabCounts', () => {
       xai: 1,
       devin: 0,
       meta: 1,
+      copilot: 0,
       plugin: 0,
     });
   });

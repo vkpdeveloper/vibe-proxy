@@ -520,6 +520,20 @@ export interface MetaQuotaData {
   windows: MetaQuotaWindow[];
 }
 
+/** Premium request quota only; the credential-bearing response is discarded. */
+export interface CopilotQuotaData {
+  percentRemaining: number;
+  remaining: number | null;
+  entitlement: number | null;
+}
+
+export interface CopilotQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  data?: CopilotQuotaData;
+  error?: string;
+  errorStatus?: number;
+}
+
 export interface MetaQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   data?: MetaQuotaData;

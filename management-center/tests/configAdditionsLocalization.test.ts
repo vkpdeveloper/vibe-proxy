@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { CONFIG_FIELD_SEARCH_INDEX } from '@/features/config/searchIndex';
 
 const addedFieldIds = [
+  'serverShutdownTimeout',
   'routingSessionAffinitySubagents',
   'saveCooldownStatus',
   'transientErrorCooldownSeconds',

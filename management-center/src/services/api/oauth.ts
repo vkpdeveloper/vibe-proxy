@@ -8,7 +8,8 @@ import {
   normalizeManagementOAuthProviderKey,
 } from '@/utils/providerKeys';
 
-export type BuiltInOAuthProvider = 'codex' | 'anthropic' | 'antigravity' | 'xai' | 'devin' | 'meta';
+export type BuiltInOAuthProvider =
+  'codex' | 'anthropic' | 'antigravity' | 'xai' | 'devin' | 'meta' | 'copilot';
 
 export interface OAuthStartResponse {
   url: string;
@@ -18,10 +19,13 @@ export interface OAuthStartResponse {
   expires_in?: number;
 }
 
-/** Claude only: a display name for a new login, or the credential whose limits login to replace. */
 export interface OAuthStartOptions {
-  name?: string;
+  /** Claude only: a display name for the new credential. */
+  accountName?: string;
+  /** Claude only: the credential whose limits login to replace. */
   reconnect?: string;
+  /** Proxy the login (and the saved credential) goes through; already validated. */
+  proxyUrl?: string;
 }
 
 export interface OAuthStatusResponse {
@@ -68,13 +72,16 @@ export const oauthApi = {
     if (WEBUI_SUPPORTED.has(providerKey)) {
       params.is_webui = true;
     }
-    const name = options.name?.trim();
-    if (name) params.name = name;
+    // `name` would select an existing credential to re-login, so the display name has its own key.
+    const accountName = options.accountName?.trim();
+    if (accountName) params.account_name = accountName;
     if (options.reconnect) params.reconnect = options.reconnect;
-    return apiClient.get<OAuthStartResponse>('/oauth/auth-url', {
-      params,
-      ...(signal ? { signal } : {}),
-    });
+    const config = { params, ...(signal ? { signal } : {}) };
+    // The backend refuses proxy_url in the query string; it is only read from a POST body.
+    const proxyUrl = options.proxyUrl?.trim();
+    return proxyUrl
+      ? apiClient.post<OAuthStartResponse>('/oauth/auth-url', { proxy_url: proxyUrl }, config)
+      : apiClient.get<OAuthStartResponse>('/oauth/auth-url', config);
   },
 
   getAuthStatus: (state: string, signal?: AbortSignal) =>

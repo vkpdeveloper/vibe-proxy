@@ -393,6 +393,7 @@
     "filter_devin": "Devin",
     "filter_antigravity": "Antigravity",
     "filter_xai": "xAI",
+    "filter_copilot": "GitHub Copilot",
     "filter_opencode-go": "OpenCode Go",
     "filter_devin-cli": "Devin CLI",
     "filter_iflow": "iFlow",
@@ -648,6 +649,17 @@
     "load_failed": "额度查询失败：{{message}}",
     "empty_title": "暂无 Devin 凭据",
     "empty_desc": "上传 Devin 凭据文件或通过后端 CLI 登录后，即可查询额度。"
+  },
+  "copilot_quota": {
+    "title": "GitHub Copilot 额度",
+    "empty_title": "暂无 GitHub Copilot 凭证",
+    "empty_desc": "使用 GitHub Copilot OAuth 登录或上传 GitHub Copilot 认证文件以查询额度。",
+    "idle": "点击查询 GitHub Copilot 额度",
+    "loading": "正在查询 GitHub Copilot 额度…",
+    "load_failed": "额度查询失败：{{message}}",
+    "remaining": "剩余 {{percent}}%",
+    "premium": "每月高级请求",
+    "unavailable": "额度不可用。请检查 Copilot 凭证后重试。"
   },
   "meta_quota": {
     "title": "Muse (Meta) 额度",
@@ -1018,6 +1030,15 @@
     "meta_oauth_status_error": "认证失败:",
     "meta_oauth_start_error": "启动 Muse OAuth 失败:",
     "meta_oauth_polling_error": "检查认证状态失败:",
+    "copilot_oauth_button": "使用 GitHub Copilot 登录",
+    "copilot_oauth_hint": "登录你的 GitHub 账号即可添加 Copilot。如有提示，请输入设备码。",
+    "copilot_open_link": "打开链接",
+    "copilot_copy_link": "复制链接",
+    "copilot_oauth_status_waiting": "等待认证中...",
+    "copilot_oauth_status_success": "认证成功！",
+    "copilot_oauth_status_error": "认证失败:",
+    "copilot_oauth_start_error": "启动 GitHub Copilot OAuth 失败:",
+    "copilot_oauth_polling_error": "检查认证状态失败:",
     "device_code_label": "设备码:",
     "device_code_copy": "复制设备码",
     "xai_oauth_button": "开始 xAI 登录",
@@ -1085,6 +1106,8 @@
     "copied": "已复制",
     "account_name_label": "名称 (可选)",
     "account_name_placeholder": "工作、个人",
+    "login_proxy_label": "登录代理",
+    "login_proxy_invalid": "请输入代理 URL，如 socks5://host:1080 或 http://host:8080。",
     "anthropic_second_step": "再次授权以获取长期令牌",
     "anthropic_reconnect_hint": "以 {{name}} 登录以重新显示其额度。请求继续使用长期令牌。"
   },
@@ -1438,6 +1461,10 @@
         "codexLiveMediaRelayICEServers": {
           "label": "ICE 服务器",
           "hint": "可选的 STUN 或 TURN 服务器。"
+        },
+        "serverShutdownTimeout": {
+          "label": "关闭等待时间（秒）",
+          "hint": "服务停止时等待进行中请求完成的时长。0 表示立即关闭。"
         }
       },
       "search": {
@@ -1547,6 +1574,8 @@
           "devin_sensitive_words_label": "OAuth 敏感词",
           "devin_sensitive_words_placeholder": "敏感短语",
           "devin_sensitive_words_hint": "每项填写一个词或短语。请谨慎配置：命中内容会导致整行系统提示词被删除；保存时移除空项",
+          "sensitive_replacements_label": "替换",
+          "sensitive_replacements_desc": "把系统提示词中匹配的文本或正则替换为自定义文本。",
           "antigravity_signature_cache": "启用 Antigravity 签名缓存",
           "antigravity_signature_cache_desc": "优先使用并校验缓存的 thinking block 签名",
           "antigravity_signature_strict": "严格校验旁路签名",
@@ -1635,7 +1664,9 @@
           "override_raw_rules": "覆盖 Raw 规则",
           "override_raw_rules_desc": "同上，使用原始 JSON 值",
           "filter_rules": "过滤规则",
-          "filter_rules_desc": "按 JSON 路径移除请求中的参数"
+          "filter_rules_desc": "按 JSON 路径移除请求中的参数",
+          "replace_rules": "替换规则",
+          "replace_rules_desc": "在指定消息或 JSON 路径中查找并替换文本。"
         }
       },
       "api_keys": {
@@ -1674,6 +1705,18 @@
         "remove_params": "移除参数",
         "json_path": "JSON 路径 (如 temperature)",
         "json_path_filter": "JSON 路径 (gjson/sjson)，如 generationConfig.thinkingConfig.thinkingBudget",
+        "target": "作用于",
+        "target_role": "消息",
+        "target_paths": "JSON 路径",
+        "role": "消息角色",
+        "role_system": "系统",
+        "role_developer": "开发者",
+        "role_user": "用户",
+        "all_messages": "全部消息",
+        "positions": "位置",
+        "positions_placeholder": "位置，如 1, 2",
+        "json_path_replace": "JSON 路径，如 messages.0.content",
+        "replacements": "替换",
         "param_type": "参数类型",
         "param_value": "参数值",
         "add_param": "添加参数",
@@ -1714,6 +1757,15 @@
         "boolean_true": "true",
         "boolean_false": "false"
       },
+      "replacements": {
+        "kind": "匹配方式",
+        "kind_text": "文本",
+        "kind_regex": "正则",
+        "find": "要查找的文本",
+        "pattern": "正则表达式",
+        "replace_with": "替换为",
+        "add": "添加替换"
+      },
       "validation": {
         "invalid_trusted_proxies": "每个可信代理必须是有效的 IP 地址或 CIDR。",
         "invalid_discovery_service_type": "请使用 _名称._tcp 格式：名称为 1–15 位英文字母、数字或连字符，首尾不能是连字符。",
@@ -1732,7 +1784,10 @@
         "integer_range_1_3600": "请输入 1 到 3600 之间的整数",
         "payload_invalid_number": "请输入有效数字",
         "payload_invalid_boolean": "请选择 true 或 false",
-        "payload_invalid_json": "请输入有效的 JSON"
+        "payload_invalid_json": "请输入有效的 JSON",
+        "payload_replace_positions": "位置请填从 1 开始的整数，用逗号分隔，或选择全部消息。",
+        "payload_replace_paths": "至少添加一个 JSON 路径。",
+        "payload_replace_replacements": "至少添加一条带查找文本的替换。"
       },
       "common": {
         "edit": "编辑",

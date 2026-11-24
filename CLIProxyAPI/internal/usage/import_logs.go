@@ -3,7 +3,6 @@ package usage
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tidwall/gjson"
+	"github.com/MoeForge/moego/json"
+	"github.com/MoeForge/moego/ojson"
 )
 
 var mainLogRequestPattern = regexp.MustCompile(`^\[[^]]+\].*\|\s+(?:GET|POST|PUT|PATCH|DELETE)\s+"(/(?:v1|v0|openai|anthropic)/[^"? ]+)`)
@@ -175,7 +175,7 @@ func extractLogTokens(raw []byte) TokenDetail {
 
 func tokensFromJSON(raw []byte) TokenDetail {
 	for _, prefix := range []string{"response.usage", "message.usage", "usage", "response.usageMetadata", "usageMetadata"} {
-		node := gjson.GetBytes(raw, prefix)
+		node := ojson.GetBytes(raw, prefix)
 		if !node.Exists() || !node.IsObject() {
 			continue
 		}
@@ -185,13 +185,14 @@ func tokensFromJSON(raw []byte) TokenDetail {
 		cached := firstInt(node, "cached_tokens", "cachedContentTokenCount", "total_cached_tokens", "input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens")
 		read := firstInt(node, "cache_read_input_tokens", "cache_read_tokens")
 		write := firstInt(node, "cache_creation_input_tokens", "cache_creation_tokens", "input_tokens_details.cache_write_tokens")
+		writeOneHour := min(firstInt(node, "cache_creation.ephemeral_1h_input_tokens"), write)
 		total := firstInt(node, "total_tokens", "totalTokenCount")
-		return TokenDetail{InputTokens: input, OutputTokens: output, ReasoningTokens: reasoning, CachedTokens: cached, CacheReadTokens: read, CacheCreationTokens: write, TotalTokens: total}
+		return TokenDetail{InputTokens: input, OutputTokens: output, ReasoningTokens: reasoning, CachedTokens: cached, CacheReadTokens: read, CacheCreationTokens: write, CacheCreation1hTokens: writeOneHour, TotalTokens: total}
 	}
 	return TokenDetail{}
 }
 
-func firstInt(node gjson.Result, paths ...string) int64 {
+func firstInt(node ojson.Result, paths ...string) int64 {
 	for _, path := range paths {
 		value := node.Get(path)
 		if value.Exists() {
@@ -223,6 +224,9 @@ func mergeTokenDetail(dst *TokenDetail, candidate TokenDetail) {
 	if candidate.CacheCreationTokens > dst.CacheCreationTokens {
 		dst.CacheCreationTokens = candidate.CacheCreationTokens
 	}
+	if candidate.CacheCreation1hTokens > dst.CacheCreation1hTokens {
+		dst.CacheCreation1hTokens = candidate.CacheCreation1hTokens
+	}
 	if candidate.TotalTokens > dst.TotalTokens {
 		dst.TotalTokens = candidate.TotalTokens
 	}
@@ -232,7 +236,7 @@ func firstJSONValue(raw []byte, paths ...string) string {
 	trimmed := bytes.TrimSpace(raw)
 	if json.Valid(trimmed) {
 		for _, path := range paths {
-			if value := strings.TrimSpace(gjson.GetBytes(trimmed, path).String()); value != "" {
+			if value := strings.TrimSpace(ojson.GetBytes(trimmed, path).String()); value != "" {
 				return value
 			}
 		}
@@ -243,7 +247,7 @@ func firstJSONValue(raw []byte, paths ...string) string {
 			continue
 		}
 		for _, path := range paths {
-			if value := strings.TrimSpace(gjson.GetBytes(line, path).String()); value != "" {
+			if value := strings.TrimSpace(ojson.GetBytes(line, path).String()); value != "" {
 				return value
 			}
 		}

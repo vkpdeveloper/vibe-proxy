@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -19,10 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/MoeForge/moego/json"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginstore"
 	log "github.com/sirupsen/logrus"
 )
@@ -97,7 +98,7 @@ var (
 	ErrPluginSyncUnsupported = errors.New("home plugin sync is unsupported")
 	ErrDispatchFenced        = errors.New("home auth dispatch is fenced")
 	// ErrCompareAndSwapUnsupported reports that this Home predates the CAS command.
-	ErrCompareAndSwapUnsupported = errors.New("home compare-and-swap is unsupported")
+	ErrCompareAndSwapUnsupported = kvstore.ErrCompareAndSwapUnsupported
 )
 
 // isHomeCommandUnsupported reports whether Home rejected a command it does not
@@ -155,12 +156,7 @@ type PluginTask struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-type KVSetOptions struct {
-	EX time.Duration
-	PX time.Duration
-	NX bool
-	XX bool
-}
+type KVSetOptions = kvstore.KVSetOptions
 
 type subscriptionCloser interface {
 	Close() error
@@ -194,6 +190,7 @@ type Client struct {
 	// releaseReady belongs to this acknowledged membership and is never copied to a replacement.
 	releaseReady bool
 
+	schedulerProtocol atomic.Int64
 	heartbeatOK       atomic.Bool
 	dispatchFenced    atomic.Bool
 	releaseFenced     atomic.Bool
@@ -212,6 +209,7 @@ type Client struct {
 	clusterNodes         []clusterNode
 	reconnectFailures    int
 	balance              clusterBalanceState
+	latency              *clusterLatencyHistory
 }
 
 func New(homeCfg config.HomeConfig) *Client {
@@ -240,9 +238,11 @@ func (c *Client) NewLifetime() *Client {
 		instanceID:           c.instanceID,
 		legacyMembership:     c.legacyMembership,
 		balance:              c.balance,
+		latency:              c.latency,
 	}
 	next.balance.registered = false
 	next.balance.unsupported = false
+	next.balance.latencySupported = false
 	next.recoveryState.Store(c.recoveryState.Load())
 	if next.balance.moving {
 		next.homeCfg.Host = next.balance.target.IP
@@ -540,10 +540,31 @@ func (c *Client) ensureClients() error {
 }
 
 func (c *Client) redisOptionsLocked(addr string) (*redis.Options, error) {
-	tlsConfig, errTLS := c.homeTLSConfigLocked(addr)
+	options, tlsSettings := c.redisOptionsSnapshotLocked(addr)
+	tlsConfig, errTLS := newHomeTLSConfig(tlsSettings, "")
 	if errTLS != nil {
 		return nil, errTLS
 	}
+	options.TLSConfig = tlsConfig
+	options.Dialer = c.trackedRedisDialer(redis.NewDialer(options))
+	return options, nil
+}
+
+// redisOptionsSnapshotLocked copies only values; certificate IO can run after releasing c.mu.
+func (c *Client) redisOptionsSnapshotLocked(addr string) (*redis.Options, config.HomeTLSConfig) {
+	tlsSettings := c.homeCfg.TLS
+	serverName := strings.TrimSpace(tlsSettings.ServerName)
+	if serverName == "" {
+		if tlsSettings.UseTargetServerName {
+			serverName = hostFromAddress(addr)
+		} else {
+			serverName = strings.TrimSpace(c.seedHost)
+		}
+	}
+	if serverName == "" {
+		serverName = strings.TrimSpace(c.homeCfg.Host)
+	}
+	tlsSettings.ServerName = serverName
 	dialTimeout := homeRedisOperationTimeout
 	readTimeout := homeRedisOperationTimeout
 	writeTimeout := homeRedisOperationTimeout
@@ -564,7 +585,6 @@ func (c *Client) redisOptionsLocked(addr string) (*redis.Options, error) {
 	}
 	options := &redis.Options{
 		Addr:                  addr,
-		TLSConfig:             tlsConfig,
 		DialTimeout:           dialTimeout,
 		ReadTimeout:           readTimeout,
 		WriteTimeout:          writeTimeout,
@@ -572,8 +592,7 @@ func (c *Client) redisOptionsLocked(addr string) (*redis.Options, error) {
 		DialerRetries:         1,
 		ContextTimeoutEnabled: true,
 	}
-	options.Dialer = c.trackedRedisDialer(redis.NewDialer(options))
-	return options, nil
+	return options, tlsSettings
 }
 
 type homeDispatchConn struct {
@@ -648,21 +667,6 @@ func cloneRedisOptions(options *redis.Options) *redis.Options {
 		cloned.MaintNotificationsConfig = &maintNotifications
 	}
 	return &cloned
-}
-
-func (c *Client) homeTLSConfigLocked(addr string) (*tls.Config, error) {
-	serverName := strings.TrimSpace(c.homeCfg.TLS.ServerName)
-	if serverName == "" {
-		if c.homeCfg.TLS.UseTargetServerName {
-			serverName = hostFromAddress(addr)
-		} else {
-			serverName = strings.TrimSpace(c.seedHost)
-		}
-	}
-	if serverName == "" {
-		serverName = strings.TrimSpace(c.homeCfg.Host)
-	}
-	return newHomeTLSConfig(c.homeCfg.TLS, serverName)
 }
 
 func hostFromAddress(addr string) string {
@@ -1004,6 +1008,9 @@ func (c *Client) GetConfig(ctx context.Context) ([]byte, error) {
 	if len(raw) == 0 {
 		return nil, ErrEmptyResponse
 	}
+	if errDecode := c.updateSchedulerProtocol(raw); errDecode != nil {
+		return nil, errDecode
+	}
 	return raw, nil
 }
 
@@ -1035,41 +1042,11 @@ func (c *Client) GetModels(ctx context.Context, headers http.Header, query url.V
 }
 
 func buildKVSetArgs(key string, value []byte, opts KVSetOptions) ([]any, error) {
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return nil, fmt.Errorf("home kv: key is empty")
-	}
-	if opts.EX > 0 && opts.PX > 0 {
-		return nil, fmt.Errorf("home kv: EX and PX are mutually exclusive")
-	}
-	if opts.EX < 0 || opts.PX < 0 {
-		return nil, fmt.Errorf("home kv: ttl must not be negative")
-	}
-	if opts.NX && opts.XX {
-		return nil, fmt.Errorf("home kv: NX and XX are mutually exclusive")
-	}
-
-	args := []any{key, append([]byte(nil), value...)}
-	if opts.EX > 0 {
-		args = append(args, "EX", durationCeil(opts.EX, time.Second))
-	}
-	if opts.PX > 0 {
-		args = append(args, "PX", durationCeil(opts.PX, time.Millisecond))
-	}
-	if opts.NX {
-		args = append(args, "NX")
-	}
-	if opts.XX {
-		args = append(args, "XX")
-	}
-	return args, nil
+	return kvstore.BuildSetArgs(key, value, opts)
 }
 
 func durationCeil(value time.Duration, unit time.Duration) int64 {
-	if value <= 0 || unit <= 0 {
-		return 0
-	}
-	return int64((value + unit - 1) / unit)
+	return kvstore.DurationCeil(value, unit)
 }
 
 func (c *Client) KVGet(ctx context.Context, key string) ([]byte, bool, error) {
@@ -1413,6 +1390,9 @@ func (c *Client) rPopAuth(ctx context.Context, requestedModel string, sessionID 
 	} else {
 		req = newAuthDispatchRequestWithRetryRound(requestedModel, sessionID, parentSessionID, headers, count, credentialPolicy, *retryRound, excludedAuthIDs, pinnedAuthID)
 	}
+	if input, ok := ctx.Value(schedulerContextKey{}).(SchedulerContext); ok {
+		req.SchedulerContext = &input
+	}
 	keyBytes, errMarshal := json.Marshal(&req)
 	if errMarshal != nil {
 		return nil, errMarshal
@@ -1430,7 +1410,7 @@ func (c *Client) rPopAuth(ctx context.Context, requestedModel string, sessionID 
 	conn := cmd.Conn()
 	defer func() {
 		if errClose := conn.Close(); errClose != nil {
-			log.WithError(errClose).Debug("Home auth dispatch connection close failed")
+			log.Debugf("Home auth dispatch connection close failed: %v", errClose)
 		}
 	}()
 	if errProbe := conn.Ping(ctx).Err(); errProbe != nil {
@@ -1757,20 +1737,34 @@ func pluginSyncDialer(options *redis.Options) func(context.Context, string, stri
 
 type pluginSyncCancelableConn struct {
 	net.Conn
-	done chan struct{}
-	once sync.Once
+	ctx                 context.Context
+	stopCancel          func() bool
+	once                sync.Once
+	closeUnderlyingOnce sync.Once
 }
 
 func newPluginSyncCancelableConn(ctx context.Context, conn net.Conn) net.Conn {
-	wrapped := &pluginSyncCancelableConn{Conn: conn, done: make(chan struct{})}
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = closeUnderlyingTransport(conn)
-		case <-wrapped.done:
-		}
-	}()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	wrapped := &pluginSyncCancelableConn{
+		Conn: conn,
+		ctx:  ctx,
+	}
+	wrapped.stopCancel = context.AfterFunc(ctx, wrapped.closeUnderlying)
+	if ctx.Err() != nil {
+		wrapped.closeUnderlying()
+	}
 	return wrapped
+}
+
+func (c *pluginSyncCancelableConn) closeUnderlying() {
+	if c == nil || c.Conn == nil {
+		return
+	}
+	c.closeUnderlyingOnce.Do(func() {
+		_ = closeUnderlyingTransport(c.Conn)
+	})
 }
 
 func closeUnderlyingTransport(conn net.Conn) error {
@@ -1810,7 +1804,14 @@ func (c *pluginSyncCancelableConn) Close() error {
 	if c == nil || c.Conn == nil {
 		return net.ErrClosed
 	}
-	c.once.Do(func() { close(c.done) })
+	defer c.once.Do(func() {
+		if c.stopCancel != nil {
+			c.stopCancel()
+		}
+	})
+	if c.ctx != nil && c.ctx.Err() != nil {
+		c.closeUnderlying()
+	}
 	return c.Conn.Close()
 }
 
@@ -1941,7 +1942,7 @@ func (c *Client) promoteSubscription() {
 	c.mu.Unlock()
 	if commandClient != nil {
 		if errClose := commandClient.Close(); errClose != nil {
-			log.WithError(errClose).Warn("Home bootstrap command client close failed")
+			log.Warnf("Home bootstrap command client close failed: %v", errClose)
 		}
 	}
 }
@@ -1954,10 +1955,12 @@ func (c *Client) handleSubscriptionPayload(ctx context.Context, channel string, 
 
 	switch strings.ToLower(strings.TrimSpace(channel)) {
 	case redisChannelConfig:
-		if onConfig == nil {
-			return nil
+		if onConfig != nil {
+			if errApply := onConfig([]byte(payload)); errApply != nil {
+				return errApply
+			}
 		}
-		return onConfig([]byte(payload))
+		return c.updateSchedulerProtocol([]byte(payload))
 	case redisChannelCluster:
 		if errUpdate := c.updateClusterNodesFromPayload([]byte(payload)); errUpdate != nil {
 			return errUpdate
@@ -2024,6 +2027,7 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 		}
 		return c.endConfigSubscriberLifetimeWithSubscription(errACK, pubsub, "failed ACK")
 	}
+	heartbeatStarted := time.Now()
 	// A protocol-one ACK means Home already committed this membership. Preserve it if the command probe fails.
 	if len(args) > 1 {
 		c.markMembershipTakeoverEligible()
@@ -2041,13 +2045,46 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 	receiveCtx, cancelReceive := context.WithCancelCause(ctx)
 	events := make(chan any, 16)
 	receiveDone := make(chan struct{})
+	c.mu.Lock()
+	if c.latency == nil {
+		c.latency = &clusterLatencyHistory{entries: make(map[string]clusterLatencyEntry)}
+	}
+	sampler := &clusterRTTSampler{history: c.latency, node: clusterNode{IP: c.homeCfg.Host, Port: c.homeCfg.Port}}
+	c.mu.Unlock()
+	failReceive := func(errReceive error) {
+		if !errors.Is(context.Cause(receiveCtx), ErrRebalanceRequested) {
+			if ctx.Err() == nil {
+				if c.heartbeatOK.Load() {
+					c.markMembershipTakeoverEligible()
+				}
+				c.releaseFenced.Store(true)
+			}
+			// Graceful cancellation stops new work but keeps final releases available until Close.
+			c.dispatchFenced.Store(true)
+		}
+		c.heartbeatOK.Store(false)
+		cancelReceive(errReceive)
+	}
 	stopReceive := context.AfterFunc(receiveCtx, func() { _ = pubsub.Close() })
+	latencyDone := make(chan struct{})
+	go func() {
+		defer close(latencyDone)
+		if errLatency := c.runClusterLatency(receiveCtx, pubsub, sampler); errLatency != nil {
+			failReceive(errLatency)
+		}
+	}()
 	go func() {
 		defer close(receiveDone)
+		lastHeartbeat := heartbeatStarted
 		for {
 			_, timeout := c.subscriptionParameters()
-			event, errReceive := pubsub.ReceiveTimeout(receiveCtx, timeout)
+			event, errReceive := receiveSubscriptionEvent(receiveCtx, pubsub, sampler, lastHeartbeat.Add(timeout))
 			if errReceive == nil {
+				// Only a persisted heartbeat PONG renews liveness. Config, cluster traffic,
+				// and RTT echoes cannot extend the deadline while the consumer is busy.
+				if pong, ok := event.(*redis.Pong); ok && pong != nil && pong.Payload == "" {
+					lastHeartbeat = time.Now()
+				}
 				select {
 				case events <- event:
 					continue
@@ -2058,18 +2095,7 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 					errReceive = fmt.Errorf("Home subscription consumer backlog exceeded")
 				}
 			}
-			if !errors.Is(context.Cause(receiveCtx), ErrRebalanceRequested) {
-				if ctx.Err() == nil {
-					if c.heartbeatOK.Load() {
-						c.markMembershipTakeoverEligible()
-					}
-					c.releaseFenced.Store(true)
-				}
-				// Graceful cancellation stops new work but keeps final releases available until Close.
-				c.dispatchFenced.Store(true)
-			}
-			c.heartbeatOK.Store(false)
-			cancelReceive(errReceive)
+			failReceive(errReceive)
 			return
 		}
 	}()
@@ -2078,6 +2104,8 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 		stopReceive()
 		_ = pubsub.Close()
 		<-receiveDone
+		<-latencyDone
+		sampler.expire(time.Now(), true)
 	}()
 	endReceiveFailure := func(err error) error {
 		if cause := context.Cause(receiveCtx); cause != nil {
@@ -2132,12 +2160,38 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 				log.Warn("failed to apply config update from home control center, ignoring")
 			}
 		case *redis.Pong:
-			c.resetReconnectFailures()
-		case *redis.Subscription:
-			continue
+			if msg != nil && msg.Payload == "" {
+				c.resetReconnectFailures()
+			}
 		default:
 			log.Debugf("home subscription returned unsupported message type %T", event)
 		}
+	}
+}
+
+// receiveSubscriptionEvent preserves the absolute heartbeat deadline across ordinary messages.
+func receiveSubscriptionEvent(ctx context.Context, pubsub *redis.PubSub, sampler *clusterRTTSampler, deadline time.Time) (any, error) {
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, os.ErrDeadlineExceeded
+		}
+		event, errReceive := pubsub.ReceiveTimeout(ctx, remaining)
+		if errReceive != nil {
+			return nil, errReceive
+		}
+		if !time.Now().Before(deadline) {
+			return nil, os.ErrDeadlineExceeded
+		}
+		if _, ok := event.(*redis.Subscription); ok {
+			return nil, fmt.Errorf("unexpected Home subscription ACK after initialization")
+		}
+		if pong, ok := event.(*redis.Pong); ok && pong != nil && strings.HasPrefix(pong.Payload, "home-rtt/") {
+			// Timestamp before consumer callbacks, and also exclude stale or duplicate telemetry from liveness.
+			sampler.pong(pong.Payload, time.Now())
+			continue
+		}
+		return event, nil
 	}
 }
 
@@ -2174,7 +2228,7 @@ func (c *Client) endConfigSubscriberLifetimeWithSubscription(err error, subscrip
 	}
 	if subscription != nil {
 		if errClose := subscription.Close(); errClose != nil {
-			log.WithError(errClose).Debugf("Home subscription close after %s", reason)
+			log.Debugf("Home subscription close after %s: %v", reason, errClose)
 		}
 	}
 	if !c.managedLifetime() {
@@ -2186,7 +2240,7 @@ func (c *Client) endConfigSubscriberLifetimeWithSubscription(err error, subscrip
 // StartConfigSubscriber is retained for callers that do not need the lifetime error.
 func (c *Client) StartConfigSubscriber(ctx context.Context, onConfig func([]byte) error) {
 	if errRun := c.RunConfigSubscriberLifetime(ctx, onConfig, nil); errRun != nil && !errors.Is(errRun, context.Canceled) {
-		log.WithError(errRun).Warn("Home config subscription lifetime ended")
+		log.Warnf("Home config subscription lifetime ended: %v", errRun)
 	}
 }
 

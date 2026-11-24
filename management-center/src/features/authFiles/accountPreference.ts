@@ -10,6 +10,7 @@ const ROUTING_PROVIDERS = new Set([
   'qwen',
   'iflow',
   'meta',
+  'copilot',
   'xai',
   'devin',
 ]);

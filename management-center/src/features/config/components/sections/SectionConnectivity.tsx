@@ -24,6 +24,18 @@ export function SectionConnectivity({
         <HostField {...fieldProps} />
         <PortField {...fieldProps} error={getValidationMessage(t, validationErrors?.port)} />
         <TextSetting
+          fieldId="serverShutdownTimeout"
+          size="sm"
+          label={t('config_management.visual.additions.serverShutdownTimeout.label')}
+          description={t('config_management.visual.additions.serverShutdownTimeout.hint')}
+          type="number"
+          placeholder="0"
+          value={values.serverShutdownTimeout}
+          onChange={(serverShutdownTimeout) => onChange({ serverShutdownTimeout })}
+          disabled={disabled}
+          error={getValidationMessage(t, validationErrors?.serverShutdownTimeout)}
+        />
+        <TextSetting
           fieldId="authDir"
           size="lg"
           label={t('config_management.visual.sections.auth.auth_dir')}

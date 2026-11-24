@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n';
 import { DEFAULT_VISUAL_VALUES } from '@/types/visualConfig';
 import { SectionAdvanced } from '@/features/config/components/sections/SectionAdvanced';
+import { SectionConnectivity } from '@/features/config/components/sections/SectionConnectivity';
 import { SectionNetwork } from '@/features/config/components/sections/SectionNetwork';
 import { SectionOAuthBehavior } from '@/features/config/components/sections/SectionOAuthBehavior';
 import { CodexLiveICEServersEditor } from '@/features/config/components/blocks/CodexLiveICEServersEditor';
@@ -30,20 +31,27 @@ const server = {
 describe('OAuth behavior configuration UI', () => {
   test('keeps six canonical tabs and places every addition in its designated section', () => {
     expect(CONFIG_SECTION_IDS).toHaveLength(6);
-    const network = render(createElement(SectionNetwork, props));
-    const advanced = render(createElement(SectionAdvanced, props));
+    const sections: Record<string, string> = {
+      connectivity: render(createElement(SectionConnectivity, props)),
+      network: render(createElement(SectionNetwork, props)),
+      advanced: render(createElement(SectionAdvanced, props)),
+    };
     const additions = CONFIG_FIELD_SEARCH_INDEX.filter((entry) =>
       entry.labelKey.includes('.additions.')
     );
-    expect(additions).toHaveLength(26);
+    expect(additions).toHaveLength(27);
     for (const entry of additions) {
-      const own = entry.sectionId === 'network' ? network : advanced;
-      const other = entry.sectionId === 'network' ? advanced : network;
-      expect(own).toContain(`id="cfg-field-${entry.fieldId}"`);
-      expect(other).not.toContain(`id="cfg-field-${entry.fieldId}"`);
+      const anchor = `id="cfg-field-${entry.fieldId}"`;
+      for (const [sectionId, markup] of Object.entries(sections)) {
+        if (sectionId === entry.sectionId) expect(markup).toContain(anchor);
+        else expect(markup).not.toContain(anchor);
+      }
+      const own = sections[entry.sectionId];
       expect(own).toContain(escapeText(translations.t(entry.labelKey)));
       if (entry.hintKey) expect(own).toContain(escapeText(translations.t(entry.hintKey)));
-      expect(entry.yamlKeys?.join('.')).toMatch(/^(routing|multimedia|oauth|upstream|client)\./);
+      expect(entry.yamlKeys?.join('.')).toMatch(
+        /^(routing|multimedia|oauth|upstream|client|server)\./
+      );
     }
     const oauth = render(createElement(SectionOAuthBehavior, props));
     expect(oauth).toContain('<details');

@@ -7,6 +7,7 @@ import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
 import { createOAuthAttempts, type OAuthAttempt } from '../oauthAttempts';
 import { validateDevinCallback } from '../devinOAuth';
 import { resolveCallbackUrl } from '../callbackUrl';
+import { checkLoginProxyUrl, isInvalidProxyUrlError } from '../loginProxy';
 import {
   buildPluginOAuthProviderCards,
   type OAuthProviderCard,
@@ -42,7 +43,7 @@ export interface ClaudeReconnectTarget {
 }
 
 export interface StartAuthOptions {
-  name?: string;
+  accountName?: string;
   reconnect?: ClaudeReconnectTarget;
 }
 
@@ -100,6 +101,8 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
   /** 本次会话新增的凭证数（含 Vertex 导入），换连接时归零。 */
   const [addedCount, setAddedCount] = useState(0);
   const recordCredentialAdded = useCallback(() => setAddedCount((count) => count + 1), []);
+  /** Optional proxy for every login started on this page; kept only for this session. */
+  const [loginProxy, setLoginProxy] = useState('');
   const attempts = useRef(
     createOAuthAttempts({
       setTimeout: (callback, delay) => window.setTimeout(callback, delay),
@@ -123,6 +126,7 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
         clearTimers();
         setStates({});
         setAddedCount(0);
+        setLoginProxy('');
       }
     });
     return () => {
@@ -288,6 +292,7 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     // A network error can stop polling while the server is still waiting. Require
     // explicit cancellation before replacing that Devin session.
     if (provider === 'devin' && states[provider]?.state) return;
+    const proxy = checkLoginProxyUrl(loginProxy);
     const attempt = attempts.current.begin(provider);
     updateProviderState(provider, {
       url: undefined,
@@ -306,10 +311,18 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
       reconnect: options.reconnect,
       secondStep: false,
     });
+    // Never fall back to a direct login when the requested proxy cannot be used.
+    if (proxy.kind === 'invalid') {
+      const message = t('auth_login.login_proxy_invalid');
+      updateProviderState(provider, { status: 'error', error: message, polling: false });
+      notify(provider, message, 'error');
+      return;
+    }
     try {
       const res = await oauthApi.startAuth(provider, attempt.signal, {
-        name: options.name,
+        accountName: options.accountName,
         reconnect: options.reconnect?.id,
+        proxyUrl: proxy.kind === 'valid' ? proxy.url : undefined,
       });
       if (!attempt.isCurrent()) return;
       if (!res.state) {
@@ -334,7 +347,9 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
       startPolling(provider, res.state, attempt);
     } catch (err: unknown) {
       if (!attempt.isCurrent()) return;
-      const message = getErrorMessage(err);
+      const message = isInvalidProxyUrlError(err)
+        ? t('auth_login.login_proxy_invalid')
+        : getErrorMessage(err);
       updateProviderState(provider, { status: 'error', error: message, polling: false });
       notify(
         provider,
@@ -440,6 +455,8 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     addedCount,
     recordCredentialAdded,
     providerText,
+    loginProxy,
+    setLoginProxy,
     startAuth,
     setAccountName,
     cancelAuth,

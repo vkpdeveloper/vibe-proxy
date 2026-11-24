@@ -2,13 +2,13 @@ package usage
 
 import (
 	"context"
-	"encoding/json"
 	"math"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/MoeForge/moego/json"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 )
@@ -94,6 +94,31 @@ func TestStorePricesClaudeSeparateCacheAndProtectsAPIKey(t *testing.T) {
 	// $3 base input + $0.30 cache read + $3.75 cache write + $15 output.
 	if events[0].Cost.TotalUSD != 22.05 {
 		t.Fatalf("estimated cost = %.8f, want 22.05", events[0].Cost.TotalUSD)
+	}
+}
+
+func TestStorePricesClaudeOneHourCacheWrites(t *testing.T) {
+	store, errStore := NewStore(filepath.Join(t.TempDir(), "usage"), "", true)
+	if errStore != nil {
+		t.Fatalf("NewStore() error = %v", errStore)
+	}
+	oneHour := int64(400_000)
+	store.HandleUsage(context.Background(), coreusage.Record{
+		Provider: "claude", Model: "claude-opus-5-5",
+		Detail: coreusage.Detail{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheCreationTokens: 1_000_000, CacheCreation1hTokens: &oneHour},
+	})
+	events := store.Events()
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	// $4 input + 600k five-minute writes at $5 + 400k one-hour writes at $8 + $20 output.
+	if got := events[0].Cost.TotalUSD; math.Abs(got-30.2) > 1e-9 {
+		t.Fatalf("estimated cost = %.6f, want 30.2", got)
+	}
+	// Without a one-hour split every write is billed at the five-minute rate.
+	plain := store.price(Event{Provider: "claude", Model: "claude-opus-5-5", Tokens: TokenDetail{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheCreationTokens: 1_000_000}})
+	if math.Abs(plain.TotalUSD-29) > 1e-9 {
+		t.Fatalf("plain cost = %.6f, want 29", plain.TotalUSD)
 	}
 }
 

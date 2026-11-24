@@ -14,6 +14,7 @@ export type AuthFileType =
   | 'devin-cli'
   | 'devin'
   | 'meta'
+  | 'copilot'
   | 'opencode-go'
   | 'antigravity'
   | 'xai'

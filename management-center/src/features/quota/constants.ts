@@ -10,6 +10,7 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
   'devin-cli',
   'xai',
   'devin',
+  'copilot',
   'meta',
   'plugin',
 ];

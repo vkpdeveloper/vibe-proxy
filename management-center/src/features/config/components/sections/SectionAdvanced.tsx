@@ -10,7 +10,9 @@ import {
   TextSetting,
   ToggleSetting,
 } from '../fields/FieldPrimitives';
+import type { TextReplacementEntry } from '@/types/visualConfig';
 import { StringListEditor } from '../blocks/StringListEditor';
+import { TextReplacementsEditor } from '../blocks/TextReplacementsEditor';
 import { getValidationMessage } from '../blocks/shared';
 import { SectionOAuthBehavior } from './SectionOAuthBehavior';
 
@@ -29,6 +31,16 @@ export function SectionAdvanced({
   );
   const handleDevinSensitiveWordsChange = useCallback(
     (devinSensitiveWords: string[]) => onChange({ devinSensitiveWords }),
+    [onChange]
+  );
+  const handleAntigravitySensitiveReplacementsChange = useCallback(
+    (antigravitySensitiveReplacements: TextReplacementEntry[]) =>
+      onChange({ antigravitySensitiveReplacements }),
+    [onChange]
+  );
+  const handleDevinSensitiveReplacementsChange = useCallback(
+    (devinSensitiveReplacements: TextReplacementEntry[]) =>
+      onChange({ devinSensitiveReplacements }),
     [onChange]
   );
 
@@ -89,6 +101,16 @@ export function SectionAdvanced({
                   onChange={handleAntigravitySensitiveWordsChange}
                 />
               </BlockSetting>
+              <BlockSetting
+                fieldId="antigravitySensitiveReplacements"
+                label={t('config_management.visual.sections.system.sensitive_replacements_label')}
+              >
+                <TextReplacementsEditor
+                  value={values.antigravitySensitiveReplacements}
+                  disabled={disabled}
+                  onChange={handleAntigravitySensitiveReplacementsChange}
+                />
+              </BlockSetting>
             </SettingList>
 
             <SettingList title={t('config_management.visual.sections.advanced.signature_title')}>
@@ -136,6 +158,16 @@ export function SectionAdvanced({
                   'config_management.visual.sections.system.devin_sensitive_words_label'
                 )}
                 onChange={handleDevinSensitiveWordsChange}
+              />
+            </BlockSetting>
+            <BlockSetting
+              fieldId="devinSensitiveReplacements"
+              label={t('config_management.visual.sections.system.sensitive_replacements_label')}
+            >
+              <TextReplacementsEditor
+                value={values.devinSensitiveReplacements}
+                disabled={disabled}
+                onChange={handleDevinSensitiveReplacementsChange}
               />
             </BlockSetting>
           </SettingList>

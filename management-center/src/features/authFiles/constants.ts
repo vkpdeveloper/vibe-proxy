@@ -2,6 +2,8 @@ import type { TFunction } from 'i18next';
 import iconAntigravity from '@/assets/icons/antigravity.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconCodex from '@/assets/icons/codex.svg';
+import iconCopilot from '@/assets/icons/copilot.svg';
+import iconCopilotDark from '@/assets/icons/copilot-dark.svg';
 import iconCursorDark from '@/assets/icons/cursor-dark.svg';
 import iconCursorLight from '@/assets/icons/cursor-light.svg';
 import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
@@ -36,6 +38,7 @@ export type QuotaProviderType =
   | 'antigravity'
   | 'claude'
   | 'codex'
+  | 'copilot'
   | 'cursor'
   | 'devin-cli'
   | 'devin'
@@ -51,6 +54,7 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'antigravity',
   'claude',
   'codex',
+  'copilot',
   'cursor',
   'devin-cli',
   'devin',
@@ -61,6 +65,7 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
 
 export const OAUTH_PROVIDER_PRESETS = [
   'meta',
+  'copilot',
   'vertex',
   'aistudio',
   'antigravity',
@@ -78,6 +83,7 @@ export const FALSY_TEXT_VALUES = new Set(['false', '0', 'no', 'n', 'off']);
 export const AUTH_FILE_WEBSOCKET_PROVIDERS = new Set(['codex', 'xai']);
 export const AUTH_FILE_USING_API_PROVIDERS = new Set(['xai']);
 export const AUTH_FILE_MANUAL_REFRESH_PROVIDERS = new Set([
+  'copilot',
   'meta',
   'antigravity',
   'claude',
@@ -96,6 +102,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   aistudio: iconGemini,
   claude: iconClaude,
   codex: iconCodex,
+  copilot: { light: iconCopilot, dark: iconCopilotDark },
   cursor: { light: iconCursorDark, dark: iconCursorLight },
   'devin-cli': { light: iconDevinCliDark, dark: iconDevinCliLight },
   devin: { light: iconDevin, dark: iconDevinDark },

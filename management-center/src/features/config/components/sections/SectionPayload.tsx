@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingGroup, SettingGroups } from '../fields/SettingGroup';
-import type { PayloadFilterRule, PayloadRule } from '@/types/visualConfig';
+import type { PayloadFilterRule, PayloadReplaceRule, PayloadRule } from '@/types/visualConfig';
 import type { ConfigSectionProps } from '../../types';
 import { Section } from '@/components/layout/Page';
 import { FieldAnchor } from '../fields/FieldPrimitives';
 import { PayloadFilterRulesEditor } from '../blocks/PayloadFilterRulesEditor';
+import { PayloadReplaceRulesEditor } from '../blocks/PayloadReplaceRulesEditor';
 import { PayloadRulesEditor } from '../blocks/PayloadRulesEditor';
 
 export type SectionPayloadProps = ConfigSectionProps & {
@@ -13,7 +14,7 @@ export type SectionPayloadProps = ConfigSectionProps & {
   hasPayloadValidationErrors: boolean;
 };
 
-/** 06 Payload 配置：默认值 / 原始 JSON / 覆盖 / 过滤 五个规则组。 */
+/** 06 Payload 配置：默认值 / 原始 JSON / 覆盖 / 过滤 / 替换 六个规则组。 */
 export function SectionPayload({
   values,
   disabled,
@@ -41,6 +42,10 @@ export function SectionPayload({
   );
   const handlePayloadFilterRulesChange = useCallback(
     (payloadFilterRules: PayloadFilterRule[]) => onChange({ payloadFilterRules }),
+    [onChange]
+  );
+  const handlePayloadReplaceRulesChange = useCallback(
+    (payloadReplaceRules: PayloadReplaceRule[]) => onChange({ payloadReplaceRules }),
     [onChange]
   );
 
@@ -122,6 +127,21 @@ export function SectionPayload({
               value={values.payloadFilterRules}
               disabled={disabled}
               onChange={handlePayloadFilterRulesChange}
+            />
+          </SettingGroup>
+        </FieldAnchor>
+
+        <FieldAnchor fieldId="payloadReplaceRules">
+          <SettingGroup
+            key={`payloadReplaceRules-${payloadValidationKey}`}
+            label={t('config_management.visual.sections.payload.replace_rules')}
+            hint={t('config_management.visual.sections.payload.replace_rules_desc')}
+            defaultOpen={hasPayloadValidationErrors}
+          >
+            <PayloadReplaceRulesEditor
+              value={values.payloadReplaceRules}
+              disabled={disabled}
+              onChange={handlePayloadReplaceRulesChange}
             />
           </SettingGroup>
         </FieldAnchor>

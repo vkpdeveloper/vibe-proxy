@@ -12,6 +12,11 @@ import { readConfigBoolean } from './visualConfigBoolean';
 // under upstream.*/client.codex; only OAuth-only provider paths keep oauth.providers.*.
 export const ADDITION_FIELDS = [
   {
+    key: 'serverShutdownTimeout',
+    path: 'server.shutdown-timeout'.split('.'),
+    kind: 'integer',
+  },
+  {
     key: 'routingSessionAffinitySubagents',
     path: 'routing.session-affinity-subagents'.split('.'),
     kind: 'boolean',
@@ -295,6 +300,7 @@ export function validateVisualAdditions(
   dirtyFields?: ReadonlySet<string>
 ): VisualConfigValidationErrors {
   const errors: VisualConfigValidationErrors = {
+    serverShutdownTimeout: undefined,
     transientErrorCooldownSeconds: undefined,
     videoResultAuthCacheTTL: undefined,
     claudeHeaderTimezone: undefined,

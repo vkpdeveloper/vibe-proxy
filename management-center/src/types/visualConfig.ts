@@ -16,6 +16,7 @@ export type CodexLiveICEServerDraft = {
 export type VisualConfigFieldPath =
   | 'trustedProxies'
   | 'discoveryServiceType'
+  | 'serverShutdownTimeout'
   | 'transientErrorCooldownSeconds'
   | 'videoResultAuthCacheTTL'
   | 'claudeHeaderTimezone'
@@ -96,6 +97,30 @@ export type PayloadFilterRule = {
   params: string[];
 };
 
+/** A literal `{from: to}` replacement, or a Go RE2 `{pattern, replacement}` one when regex. */
+export type TextReplacementEntry = {
+  id: string;
+  regex: boolean;
+  from: string;
+  to: string;
+};
+
+export const PAYLOAD_REPLACE_ROLES = ['system', 'developer', 'user'] as const;
+export type PayloadReplaceRole = (typeof PAYLOAD_REPLACE_ROLES)[number];
+
+/** Targets either JSON paths or messages of one role; the backend refuses both at once. */
+export type PayloadReplaceRule = {
+  id: string;
+  models: PayloadModelEntry[];
+  targetKind: 'role' | 'paths';
+  role: PayloadReplaceRole;
+  all: boolean;
+  /** One-based positions of the role's messages, comma separated. */
+  positions: string;
+  paths: string[];
+  replacements: TextReplacementEntry[];
+};
+
 export interface StreamingConfig {
   keepaliveSeconds: string;
   bootstrapRetries: string;
@@ -128,6 +153,7 @@ export type VisualConfigValues = {
   discoveryAuthRequired: boolean;
   discoveryAdvertiseManagement: boolean;
 
+  serverShutdownTimeout: string;
   routingSessionAffinitySubagents: boolean;
   saveCooldownStatus: boolean;
   transientErrorCooldownSeconds: string;
@@ -197,6 +223,9 @@ export type VisualConfigValues = {
   wsAuth: boolean;
   antigravitySensitiveWords: string[];
   devinSensitiveWords: string[];
+  /** sensitive-words-replace (literal) and sensitive-patterns-replace (regex) together. */
+  antigravitySensitiveReplacements: TextReplacementEntry[];
+  devinSensitiveReplacements: TextReplacementEntry[];
   antigravitySignatureCacheEnabled: boolean;
   antigravitySignatureBypassStrict: boolean;
   claudeHeaderUserAgent: string;
@@ -213,6 +242,7 @@ export type VisualConfigValues = {
   payloadOverrideRules: PayloadRule[];
   payloadOverrideRawRules: PayloadRule[];
   payloadFilterRules: PayloadFilterRule[];
+  payloadReplaceRules: PayloadReplaceRule[];
   streaming: StreamingConfig;
 };
 
@@ -235,6 +265,7 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
 
   routingSessionAffinitySubagents: true,
   saveCooldownStatus: false,
+  serverShutdownTimeout: '',
   transientErrorCooldownSeconds: '',
   videoResultAuthCacheTTL: '',
   claudeHeaderTimezone: '',
@@ -299,6 +330,8 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   routingSessionAffinityTTL: '',
   wsAuth: true,
   antigravitySensitiveWords: [],
+  antigravitySensitiveReplacements: [],
+  devinSensitiveReplacements: [],
   devinSensitiveWords: [],
   antigravitySignatureCacheEnabled: true,
   antigravitySignatureBypassStrict: false,
@@ -316,6 +349,7 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   payloadOverrideRules: [],
   payloadOverrideRawRules: [],
   payloadFilterRules: [],
+  payloadReplaceRules: [],
   streaming: {
     keepaliveSeconds: '',
     bootstrapRetries: '',

@@ -156,6 +156,7 @@ export function QuotaPage() {
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
+  const copilotQuota = useQuotaStore((state) => state.copilotQuota);
   const cursorQuota = useQuotaStore((state) => state.cursorQuota);
   const devinCliQuota = useQuotaStore((state) => state.devinCliQuota);
   const devinQuota = useQuotaStore((state) => state.devinQuota);
@@ -170,6 +171,7 @@ export function QuotaPage() {
         antigravity: antigravityQuota,
         claude: claudeQuota,
         codex: codexQuota,
+        copilot: copilotQuota,
         cursor: cursorQuota,
         'devin-cli': devinCliQuota,
         devin: devinQuota,
@@ -182,6 +184,7 @@ export function QuotaPage() {
       antigravityQuota,
       claudeQuota,
       codexQuota,
+      copilotQuota,
       cursorQuota,
       devinCliQuota,
       devinQuota,

@@ -52,7 +52,7 @@ export const CONFIG_TAB_ICONS: Record<ConfigTabId, IconSvgElement> = {
  */
 export const SECTION_VALIDATION_FIELDS: Record<VisualSectionId, readonly VisualConfigFieldPath[]> =
   {
-    connectivity: ['port', 'trustedProxies', 'discoveryServiceType'],
+    connectivity: ['port', 'serverShutdownTimeout', 'trustedProxies', 'discoveryServiceType'],
     network: [
       'requestRetry',
       'maxRetryCredentials',
@@ -133,6 +133,7 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   discoveryAdvertiseManagement: ['discoveryAdvertiseManagement'],
   host: ['host'],
   port: ['port'],
+  serverShutdownTimeout: ['serverShutdownTimeout'],
   authDir: ['authDir'],
   apiKeys: ['apiKeysText'],
   tlsEnable: ['tlsEnable'],
@@ -177,6 +178,8 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   pluginsEnabled: ['pluginsEnabled'],
   antigravitySensitiveWords: ['antigravitySensitiveWords'],
   devinSensitiveWords: ['devinSensitiveWords'],
+  antigravitySensitiveReplacements: ['antigravitySensitiveReplacements'],
+  devinSensitiveReplacements: ['devinSensitiveReplacements'],
   antigravitySignatureCacheEnabled: ['antigravitySignatureCacheEnabled'],
   antigravitySignatureBypassStrict: ['antigravitySignatureBypassStrict'],
   claudeHeaderUserAgent: ['claudeHeaderUserAgent'],
@@ -194,6 +197,7 @@ export const FIELD_VALUE_KEYS: Record<string, readonly string[]> = {
   payloadOverrideRules: ['payloadOverrideRules'],
   payloadOverrideRawRules: ['payloadOverrideRawRules'],
   payloadFilterRules: ['payloadFilterRules'],
+  payloadReplaceRules: ['payloadReplaceRules'],
 };
 
 /** localStorage 键：mode 沿用旧键（'visual' | 'source' 值域不变）；section 为新键。 */

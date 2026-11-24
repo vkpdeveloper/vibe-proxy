@@ -12,6 +12,7 @@ import iconDevinCliDark from '@/assets/icons/devin-cli-dark.svg';
 import iconDevinCliLight from '@/assets/icons/devin-cli-light.svg';
 import { ProviderTile } from './components/ProviderTile';
 import { OAuthFlowDialog } from './components/OAuthFlowDialog';
+import { LoginProxyField } from './components/LoginProxyField';
 import type { DialogHeading } from './components/FlowDialogParts';
 import { VertexImportDialog } from './components/VertexImportDialog';
 import { SiwcBindDialog } from './components/SiwcBindDialog';
@@ -150,7 +151,10 @@ export function OAuthPage() {
       flows.dismissSuccess(providerId);
       return;
     }
-    void flows.startAuth(providerId, { name: state.accountName, reconnect: state.reconnect });
+    void flows.startAuth(providerId, {
+      accountName: state.accountName,
+      reconnect: state.reconnect,
+    });
   };
 
   const reconnectTarget = (location.state as OAuthPageLocationState | null)?.claudeReconnect;
@@ -235,6 +239,7 @@ export function OAuthPage() {
         title={t('auth_login.browser_sign_in_heading')}
         actions={phone ? progress : undefined}
       >
+        <LoginProxyField value={flows.loginProxy} onChange={flows.setLoginProxy} />
         <div className={TILE_GRID}>
           {providerCards.map((card) => {
             const status = flows.states[card.id]?.status;

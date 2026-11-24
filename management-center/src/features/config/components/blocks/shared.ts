@@ -7,11 +7,13 @@ import type {
   PayloadParamValidationErrorCode,
   VisualConfigValidationErrorCode,
 } from '@/types/visualConfig';
+import type { PayloadReplaceRuleErrorCode } from '@/hooks/useVisualConfig';
 import { VISUAL_CONFIG_PROTOCOL_OPTIONS } from '@/hooks/useVisualConfig';
 
 export function getValidationMessage(
   t: ReturnType<typeof useTranslation>['t'],
-  errorCode?: VisualConfigValidationErrorCode | PayloadParamValidationErrorCode
+  errorCode?:
+    VisualConfigValidationErrorCode | PayloadParamValidationErrorCode | PayloadReplaceRuleErrorCode
 ) {
   if (!errorCode) return undefined;
   return t(`config_management.visual.validation.${errorCode}`);

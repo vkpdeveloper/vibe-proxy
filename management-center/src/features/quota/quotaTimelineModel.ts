@@ -546,6 +546,16 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
     };
   }
 
+  if (provider === 'copilot') {
+    // GitHub reports no reset instant, so there is no lane to draw; the limit still sorts.
+    const percent = (quota as { data?: { percentRemaining?: number } }).data?.percentRemaining;
+    if (typeof percent !== 'number' || !Number.isFinite(percent)) return empty;
+    return {
+      ...empty,
+      limits: [{ label: 'copilot_quota.premium', remaining: clampPercent(percent) }],
+    };
+  }
+
   return empty;
 }
 

@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,9 +11,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/MoeForge/moego/json"
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
 )
@@ -59,8 +58,17 @@ func claudeSecondStepURL(state string) string {
 	return url
 }
 
+// claudeLongLivedOAuthService is the part of *claude.ClaudeAuth that mints
+// the one-year token. Services without it (test doubles) skip step 2.
+type claudeLongLivedOAuthService interface {
+	GenerateLongLivedAuthURL(state string, pkceCodes *claude.PKCECodes) (string, error)
+	ExchangeCodeForLongLivedToken(ctx context.Context, code, state string, pkceCodes *claude.PKCECodes) (*claude.LongLivedToken, error)
+}
+
 type claudeLogin struct {
-	auth        *claude.ClaudeAuth
+	auth        claudeOAuthService
+	longAuth    claudeLongLivedOAuthService
+	proxyURL    string
 	state       string
 	pkce        *claude.PKCECodes
 	accountName string
@@ -75,7 +83,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 	ctx := PopulateAuthContext(context.Background(), c)
 	isWebUI := isWebUIRequest(c)
 
-	accountName := strings.TrimSpace(c.Query("name"))
+	accountName := strings.TrimSpace(c.Query("account_name"))
 	if utf8.RuneCountInString(accountName) > maxClaudeAccountNameLength {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("name must be at most %d characters", maxClaudeAccountNameLength)})
 		return
@@ -93,43 +101,47 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 		}
 	}
 
+	sessionProxyURL := oauthSessionProxyURLFromContext(c)
 	login := claudeLogin{
-		auth:        claude.NewClaudeAuth(h.cfg),
+		auth:        newClaudeOAuthService(h.oauthConfigWithProxy(sessionProxyURL), sessionProxyURL),
+		proxyURL:    sessionProxyURL,
 		accountName: accountName,
 		reconnectID: reconnectID,
 	}
+	login.longAuth, _ = login.auth.(claudeLongLivedOAuthService)
 	var err error
 	if login.pkce, err = claude.GeneratePKCECodes(); err != nil {
 		log.Errorf("Failed to generate PKCE codes: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PKCE codes"})
 		return
 	}
-	if login.state, err = misc.GenerateRandomState(); err != nil {
+	if login.state, err = claude.GenerateState(); err != nil {
 		log.Errorf("Failed to generate state parameter: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state parameter"})
 		return
 	}
-	authURL, _, err := login.auth.GenerateAuthURL(login.state, login.pkce)
+	authURL, state, err := login.auth.GenerateAuthURL(login.state, login.pkce)
 	if err != nil {
 		log.Errorf("Failed to generate authorization URL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization url"})
 		return
 	}
+	login.state = state
 
 	// The CLI and TUI paste a single callback, so only the web UI chains the
 	// second consent. Their logins stay on the refreshable token.
-	if isWebUI && reconnectID == "" {
+	if isWebUI && reconnectID == "" && login.longAuth != nil {
 		if login.longPKCE, err = claude.GeneratePKCECodes(); err != nil {
 			log.Errorf("Failed to generate PKCE codes: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PKCE codes"})
 			return
 		}
-		if login.longState, err = misc.GenerateRandomState(); err != nil {
+		if login.longState, err = claude.GenerateState(); err != nil {
 			log.Errorf("Failed to generate state parameter: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state parameter"})
 			return
 		}
-		if login.longURL, err = login.auth.GenerateLongLivedAuthURL(login.longState, login.longPKCE); err != nil {
+		if login.longURL, err = login.longAuth.GenerateLongLivedAuthURL(login.longState, login.longPKCE); err != nil {
 			log.Errorf("Failed to generate long-lived authorization URL: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization url"})
 			return
@@ -152,9 +164,13 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 		}
 	}
 
-	RegisterOAuthSession(login.state, "anthropic")
+	RegisterOAuthSessionWithProxy(login.state, "anthropic", sessionProxyURL)
+	respPayload := gin.H{"status": "ok", "url": authURL, "state": login.state}
+	if reconnectID == "" {
+		bindOAuthSessionTarget(c, login.state, respPayload)
+	}
 	if login.longState != "" {
-		RegisterOAuthSession(login.longState, "anthropic")
+		RegisterOAuthSessionWithProxy(login.longState, "anthropic", sessionProxyURL)
 		claudeChainedAuthURLs.Store(login.state, login.longURL)
 	}
 
@@ -170,7 +186,7 @@ func (h *Handler) RequestAnthropicToken(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "url": authURL, "state": login.state})
+	c.JSON(http.StatusOK, respPayload)
 }
 
 func (h *Handler) runClaudeLogin(ctx context.Context, login claudeLogin) {
@@ -180,7 +196,8 @@ func (h *Handler) runClaudeLogin(ctx context.Context, login claudeLogin) {
 	}
 	bundle, errExchange := login.auth.ExchangeCodeForTokens(ctx, code, login.state, login.pkce)
 	if errExchange != nil {
-		log.Errorf("Failed to exchange authorization code for tokens: %v", claude.NewAuthenticationError(claude.ErrCodeExchangeFailed, errExchange))
+		authErr := claude.NewAuthenticationError(claude.ErrCodeExchangeFailed, errExchange)
+		log.Errorf("Failed to exchange authorization code for tokens: %s", redactSessionProxyInString(authErr.Error(), login.proxyURL))
 		SetOAuthSessionError(login.state, "Failed to exchange authorization code for tokens")
 		return
 	}
@@ -198,9 +215,9 @@ func (h *Handler) runClaudeLogin(ctx context.Context, login claudeLogin) {
 		if !okLong {
 			return
 		}
-		token, errLong := login.auth.ExchangeCodeForLongLivedToken(ctx, longCode, login.longState, login.longPKCE)
+		token, errLong := login.longAuth.ExchangeCodeForLongLivedToken(ctx, longCode, login.longState, login.longPKCE)
 		if errLong != nil {
-			log.Errorf("Failed to exchange long-lived authorization code: %v", errLong)
+			log.Errorf("Failed to exchange long-lived authorization code: %s", redactSessionProxyInString(errLong.Error(), login.proxyURL))
 			SetOAuthSessionError(login.state, "Failed to get the long-lived token")
 			return
 		}
@@ -245,20 +262,14 @@ func (h *Handler) runClaudeLogin(ctx context.Context, login claudeLogin) {
 		Storage:  storage,
 		Metadata: metadata,
 	}
-	if errGuard := guardOAuthSessionPendingForSave(login.state, "anthropic"); errGuard != nil {
-		return
-	}
-	savedPath, errSave := h.saveTokenRecord(ctx, record)
-	if errSave != nil {
-		log.Errorf("Failed to save authentication tokens: %v", errSave)
-		SetOAuthSessionError(login.state, "Failed to save authentication tokens")
+	savedPath, okSaved := h.commitAndCompleteBuiltinOAuthSession(ctx, login.state, "anthropic", login.proxyURL, record, "Failed to save authentication tokens", false)
+	if !okSaved {
 		return
 	}
 	log.Infof("Claude authentication saved to %s (long-lived: %t)", savedPath, login.longState != "")
 	if login.longState != "" {
 		CompleteOAuthSession(login.longState)
 	}
-	CompleteOAuthSession(login.state)
 }
 
 // reconnectClaudeLimits replaces the limits login of an existing long-lived
@@ -282,7 +293,7 @@ func (h *Handler) reconnectClaudeLimits(ctx context.Context, login claudeLogin, 
 		SetOAuthSessionError(login.state, message)
 		return
 	}
-	if errGuard := guardOAuthSessionPendingForSave(login.state, "anthropic"); errGuard != nil {
+	if errClaim := claimOAuthSessionCommit(login.state, "anthropic"); errClaim != nil {
 		return
 	}
 	_, committed, errModify := h.authManager.Modify(ctx, login.reconnectID, 0, func(current *coreauth.Auth) error {
@@ -294,7 +305,7 @@ func (h *Handler) reconnectClaudeLimits(ctx context.Context, login claudeLogin, 
 	})
 	if errModify != nil || !committed {
 		log.Errorf("Failed to save Claude limits login for %s: %v", login.reconnectID, errModify)
-		SetOAuthSessionError(login.state, "Failed to save authentication tokens")
+		FailOAuthSessionCommit(login.state, "Failed to save authentication tokens")
 		return
 	}
 	CompleteOAuthSession(login.state)

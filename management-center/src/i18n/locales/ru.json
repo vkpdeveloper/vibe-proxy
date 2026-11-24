@@ -400,6 +400,7 @@
     "filter_devin": "Devin",
     "filter_antigravity": "Antigravity",
     "filter_xai": "xAI",
+    "filter_copilot": "GitHub Copilot",
     "filter_opencode-go": "OpenCode Go",
     "filter_devin-cli": "Devin CLI",
     "filter_iflow": "iFlow",
@@ -655,6 +656,17 @@
     "load_failed": "Не удалось запросить квоту: {{message}}",
     "empty_title": "Нет учётных данных Devin",
     "empty_desc": "Загрузите файл учётных данных Devin или войдите через CLI сервера для запроса квоты."
+  },
+  "copilot_quota": {
+    "title": "Квота GitHub Copilot",
+    "empty_title": "Нет учётных данных GitHub Copilot",
+    "empty_desc": "Войдите через GitHub Copilot OAuth или загрузите файл учётных данных GitHub Copilot для запроса квоты.",
+    "idle": "Нажмите для запроса квоты GitHub Copilot",
+    "loading": "Запрос квоты GitHub Copilot…",
+    "load_failed": "Не удалось запросить квоту: {{message}}",
+    "remaining": "Осталось {{percent}}%",
+    "premium": "Премиум-запросы за месяц",
+    "unavailable": "Квота недоступна. Проверьте учётные данные Copilot и повторите попытку."
   },
   "meta_quota": {
     "title": "Квота Muse (Meta)",
@@ -1025,6 +1037,15 @@
     "meta_oauth_status_error": "Ошибка аутентификации:",
     "meta_oauth_start_error": "Не удалось запустить Muse OAuth:",
     "meta_oauth_polling_error": "Не удалось проверить статус аутентификации:",
+    "copilot_oauth_button": "Войти через GitHub Copilot",
+    "copilot_oauth_hint": "Войдите в аккаунт GitHub, чтобы добавить Copilot. Если потребуется, введите код устройства.",
+    "copilot_open_link": "Открыть ссылку",
+    "copilot_copy_link": "Скопировать ссылку",
+    "copilot_oauth_status_waiting": "Ожидание аутентификации...",
+    "copilot_oauth_status_success": "Аутентификация успешна!",
+    "copilot_oauth_status_error": "Ошибка аутентификации:",
+    "copilot_oauth_start_error": "Не удалось запустить GitHub Copilot OAuth:",
+    "copilot_oauth_polling_error": "Не удалось проверить статус аутентификации:",
     "device_code_label": "Код устройства:",
     "device_code_copy": "Скопировать код устройства",
     "xai_oauth_button": "Начать вход xAI",
@@ -1092,6 +1113,8 @@
     "copied": "Скопировано",
     "account_name_label": "Название (необязательно)",
     "account_name_placeholder": "Работа, Личный",
+    "login_proxy_label": "Прокси для входа",
+    "login_proxy_invalid": "Введите URL прокси, например socks5://host:1080 или http://host:8080.",
     "anthropic_second_step": "Подтвердите ещё раз для долгосрочного токена",
     "anthropic_reconnect_hint": "Войдите как {{name}}, чтобы снова видеть лимиты. Запросы по-прежнему используют долгосрочный токен."
   },
@@ -1445,6 +1468,10 @@
         "codexLiveMediaRelayICEServers": {
           "label": "ICE-серверы",
           "hint": "Необязательные серверы STUN или TURN."
+        },
+        "serverShutdownTimeout": {
+          "label": "Тайм-аут остановки (секунды)",
+          "hint": "Сколько ждать завершения текущих запросов при остановке сервера. 0 закрывает их сразу."
         }
       },
       "search": {
@@ -1554,6 +1581,8 @@
           "devin_sensitive_words_label": "Стоп-слова OAuth",
           "devin_sensitive_words_placeholder": "чувствительная фраза",
           "devin_sensitive_words_hint": "Одно слово или фраза в строке. Настраивайте осторожно: при совпадении вся строка системного промпта удаляется; пустые значения удаляются при сохранении",
+          "sensitive_replacements_label": "Замены",
+          "sensitive_replacements_desc": "Заменять совпадающий текст или регулярные выражения в системном промпте своим текстом.",
           "antigravity_signature_cache": "Включить кэш подписей Antigravity",
           "antigravity_signature_cache_desc": "Предпочитать и проверять кэшированные подписи thinking-блоков",
           "antigravity_signature_strict": "Строгая проверка bypass-подписи",
@@ -1642,7 +1671,9 @@
           "override_raw_rules": "Raw-правила переопределения",
           "override_raw_rules_desc": "То же, но с raw JSON-значениями",
           "filter_rules": "Правила фильтрации",
-          "filter_rules_desc": "Удалять параметры из запросов по пути JSON"
+          "filter_rules_desc": "Удалять параметры из запросов по пути JSON",
+          "replace_rules": "Правила замены",
+          "replace_rules_desc": "Поиск и замена текста в выбранных сообщениях или JSON-путях."
         }
       },
       "api_keys": {
@@ -1681,6 +1712,18 @@
         "remove_params": "Удалить параметры",
         "json_path": "JSON Path (например, temperature)",
         "json_path_filter": "JSON Path (gjson/sjson), например generationConfig.thinkingConfig.thinkingBudget",
+        "target": "Применять к",
+        "target_role": "Сообщения",
+        "target_paths": "JSON-пути",
+        "role": "Роль сообщения",
+        "role_system": "Системное",
+        "role_developer": "Разработчик",
+        "role_user": "Пользователь",
+        "all_messages": "Все сообщения",
+        "positions": "Позиции",
+        "positions_placeholder": "Позиции, например 1, 2",
+        "json_path_replace": "JSON-путь, например messages.0.content",
+        "replacements": "Замены",
         "param_type": "Тип параметра",
         "param_value": "Значение параметра",
         "add_param": "Добавить параметр",
@@ -1721,6 +1764,15 @@
         "boolean_true": "true",
         "boolean_false": "false"
       },
+      "replacements": {
+        "kind": "Тип совпадения",
+        "kind_text": "Текст",
+        "kind_regex": "Регулярное выражение",
+        "find": "Искомый текст",
+        "pattern": "Регулярное выражение",
+        "replace_with": "Заменить на",
+        "add": "Добавить замену"
+      },
       "validation": {
         "invalid_trusted_proxies": "Каждый доверенный прокси должен быть корректным IP-адресом или CIDR.",
         "invalid_discovery_service_type": "Используйте _имя._tcp: имя — 1–15 латинских букв, цифр или дефисов, без дефиса в начале и конце.",
@@ -1739,7 +1791,10 @@
         "integer_range_1_3600": "Введите целое число от 1 до 3600",
         "payload_invalid_number": "Введите корректное число",
         "payload_invalid_boolean": "Выберите true или false",
-        "payload_invalid_json": "Введите корректный JSON"
+        "payload_invalid_json": "Введите корректный JSON",
+        "payload_replace_positions": "Укажите позиции целыми числами от 1 через запятую или выберите все сообщения.",
+        "payload_replace_paths": "Добавьте хотя бы один JSON-путь.",
+        "payload_replace_replacements": "Добавьте хотя бы одну замену с искомым текстом."
       },
       "common": {
         "edit": "Изменить",

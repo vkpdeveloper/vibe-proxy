@@ -5,7 +5,6 @@ package claude
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/MoeForge/moego/json"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
@@ -38,6 +38,10 @@ const (
 	// asking for a one-year access token and no refresh cycle.
 	ClaudeInferenceScope  = "user:inference"
 	LongLivedTokenSeconds = 365 * 24 * 60 * 60
+
+	// Native Claude Code includes the Console scope when authorizing a new login.
+	// Keep the established token refresh scope unchanged.
+	claudeOAuthAuthorizeScope = "org:create_api_key " + ClaudeOAuthScope
 
 	claudeRefreshMinBackoff       = 5 * time.Second
 	claudeRefreshMaxBackoff       = 5 * time.Minute
@@ -178,7 +182,15 @@ type OAuthProfile struct {
 // It provides methods for generating authorization URLs, exchanging codes for tokens,
 // and refreshing expired tokens using PKCE for enhanced security.
 type ClaudeAuth struct {
-	httpClient *http.Client
+	httpClient     *http.Client
+	authorizeScope string
+}
+
+func resolveClaudeAuthorizeScope(cfg *config.Config) string {
+	if cfg != nil && !cfg.Claude.OAuthIncludeCreateAPIKeyEnabled() {
+		return ClaudeOAuthScope
+	}
+	return claudeOAuthAuthorizeScope
 }
 
 // NewClaudeAuth creates a new Anthropic authentication service.
@@ -214,7 +226,8 @@ func NewClaudeAuthWithProxyURL(cfg *config.Config, proxyURL string) *ClaudeAuth 
 	// Use custom HTTP client with Firefox TLS fingerprint to bypass
 	// Cloudflare's bot detection on Anthropic domains.
 	return &ClaudeAuth{
-		httpClient: NewAnthropicHttpClient(sdkCfg),
+		httpClient:     NewAnthropicHttpClient(sdkCfg),
+		authorizeScope: resolveClaudeAuthorizeScope(cfg),
 	}
 }
 
@@ -333,7 +346,7 @@ func (o *ClaudeAuth) inspectOAuthAccount(ctx context.Context, accessToken string
 //   - string: The state parameter for verification
 //   - error: An error if PKCE codes are missing or URL generation fails
 func (o *ClaudeAuth) GenerateAuthURL(state string, pkceCodes *PKCECodes) (string, string, error) {
-	return o.generateAuthURL(state, pkceCodes, ClaudeOAuthScope)
+	return o.generateAuthURL(state, pkceCodes, "")
 }
 
 // GenerateLongLivedAuthURL creates the inference-only authorization URL used to
@@ -343,9 +356,18 @@ func (o *ClaudeAuth) GenerateLongLivedAuthURL(state string, pkceCodes *PKCECodes
 	return authURL, err
 }
 
+// generateAuthURL builds the authorize URL. An empty scope means the
+// configured full login scope.
 func (o *ClaudeAuth) generateAuthURL(state string, pkceCodes *PKCECodes, scope string) (string, string, error) {
 	if pkceCodes == nil {
 		return "", "", fmt.Errorf("PKCE codes are required")
+	}
+
+	if scope == "" {
+		scope = claudeOAuthAuthorizeScope
+		if o != nil && o.authorizeScope != "" {
+			scope = o.authorizeScope
+		}
 	}
 
 	params := url.Values{
@@ -558,6 +580,9 @@ func (o *ClaudeAuth) RefreshTokens(ctx context.Context, refreshToken string) (*C
 	result, err, _ := claudeRefreshGroup.Do(refreshToken, func() (interface{}, error) {
 		refreshCtx, cancelRefresh := context.WithTimeout(context.WithoutCancel(ctx), claudeRefreshTimeout)
 		defer cancelRefresh()
+		if errReadiness := claudeRefreshReadiness(refreshCtx); errReadiness != nil {
+			return nil, errReadiness
+		}
 		refreshCtx = context.WithValue(refreshCtx, claudeRefreshHandshakeTimeoutContextKey{}, claudeRefreshHandshakeTimeout)
 		return o.refreshTokensSingleFlight(refreshCtx, refreshToken)
 	})
@@ -691,6 +716,9 @@ func (o *ClaudeAuth) CreateTokenStorage(bundle *ClaudeAuthBundle) *ClaudeTokenSt
 //   - *ClaudeTokenData: The refreshed token data
 //   - error: An error if all retry attempts fail
 func (o *ClaudeAuth) RefreshTokensWithRetry(ctx context.Context, refreshToken string, maxRetries int) (*ClaudeTokenData, error) {
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
 	var lastErr error
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
@@ -706,6 +734,9 @@ func (o *ClaudeAuth) RefreshTokensWithRetry(ctx context.Context, refreshToken st
 		tokenData, err := o.RefreshTokens(ctx, refreshToken)
 		if err == nil {
 			return tokenData, nil
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, ErrClaudeRefreshDeferred) {
+			return nil, err
 		}
 
 		lastErr = err

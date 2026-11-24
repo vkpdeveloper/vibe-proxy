@@ -302,6 +302,13 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     yamlKeys: ['server', 'port'],
   },
   {
+    fieldId: 'serverShutdownTimeout',
+    sectionId: 'connectivity',
+    labelKey: L('additions.serverShutdownTimeout.label'),
+    hintKey: L('additions.serverShutdownTimeout.hint'),
+    yamlKeys: ['server', 'shutdown-timeout'],
+  },
+  {
     fieldId: 'authDir',
     sectionId: 'connectivity',
     labelKey: L('sections.auth.auth_dir'),
@@ -570,12 +577,42 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     keywords: ['antigravity', 'obfuscate', 'zero-width'],
   },
   {
+    fieldId: 'antigravitySensitiveReplacements',
+    sectionId: 'advanced',
+    labelKey: L('sections.system.sensitive_replacements_label'),
+    qualifierKey: L('sections.advanced.antigravity_title'),
+    hintKey: L('sections.system.sensitive_replacements_desc'),
+    yamlKeys: [
+      'oauth',
+      'providers',
+      'antigravity',
+      'sensitive-words-replace',
+      'sensitive-patterns-replace',
+    ],
+    keywords: ['antigravity', 'replace', 'regex', 'pattern'],
+  },
+  {
     fieldId: 'devinSensitiveWords',
     sectionId: 'advanced',
     labelKey: L('sections.system.devin_sensitive_words'),
     hintKey: L('sections.system.devin_sensitive_words_desc'),
     yamlKeys: ['oauth', 'providers', 'devin', 'sensitive-words'],
     keywords: ['devin', 'system prompt', 'remove line', 'obfuscate', 'zero-width'],
+  },
+  {
+    fieldId: 'devinSensitiveReplacements',
+    sectionId: 'advanced',
+    labelKey: L('sections.system.sensitive_replacements_label'),
+    qualifierKey: L('sections.advanced.devin_title'),
+    hintKey: L('sections.system.sensitive_replacements_desc'),
+    yamlKeys: [
+      'oauth',
+      'providers',
+      'devin',
+      'sensitive-words-replace',
+      'sensitive-patterns-replace',
+    ],
+    keywords: ['devin', 'system prompt', 'replace', 'regex', 'pattern'],
   },
   {
     fieldId: 'antigravitySignatureCacheEnabled',
@@ -705,6 +742,14 @@ export const CONFIG_FIELD_SEARCH_INDEX: ConfigFieldSearchEntry[] = [
     labelKey: L('sections.payload.filter_rules'),
     hintKey: L('sections.payload.filter_rules_desc'),
     keywords: ['payload', 'rule', 'filter'],
+  },
+  {
+    fieldId: 'payloadReplaceRules',
+    yamlKeys: ['requests', 'payload', 'replace'],
+    sectionId: 'payload',
+    labelKey: L('sections.payload.replace_rules'),
+    hintKey: L('sections.payload.replace_rules_desc'),
+    keywords: ['payload', 'rule', 'replace', 'regex', 'pattern', 'role', 'system prompt'],
   },
 ];
 

@@ -10,6 +10,8 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconDevin from '@/assets/icons/devin.svg';
 import iconDevinDark from '@/assets/icons/devin-dark.svg';
+import iconCopilot from '@/assets/icons/copilot.svg';
+import iconCopilotDark from '@/assets/icons/copilot-dark.svg';
 
 export type ThemedIcon = string | { light: string; dark: string };
 
@@ -77,6 +79,13 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     label: 'Devin',
     icon: { light: iconDevin, dark: iconDevinDark },
     flow: 'browser',
+  },
+  {
+    kind: 'builtin',
+    id: 'copilot',
+    label: 'GitHub Copilot',
+    icon: { light: iconCopilot, dark: iconCopilotDark },
+    flow: 'device',
   },
 ];
 

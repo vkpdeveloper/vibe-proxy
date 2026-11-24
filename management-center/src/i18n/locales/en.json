@@ -395,6 +395,7 @@
     "filter_devin": "Devin",
     "filter_antigravity": "Antigravity",
     "filter_xai": "xAI",
+    "filter_copilot": "GitHub Copilot",
     "filter_opencode-go": "OpenCode Go",
     "filter_devin-cli": "Devin CLI",
     "filter_iflow": "iFlow",
@@ -663,6 +664,17 @@
     "load_failed": "Failed to query quota: {{message}}",
     "empty_title": "No Devin credentials",
     "empty_desc": "Upload a Devin credential file or sign in using the backend CLI to query quota."
+  },
+  "copilot_quota": {
+    "title": "GitHub Copilot quota",
+    "empty_title": "No GitHub Copilot credentials",
+    "empty_desc": "Sign in with GitHub Copilot OAuth or upload a GitHub Copilot credential file to query quota.",
+    "idle": "Click to query GitHub Copilot quota",
+    "loading": "Querying GitHub Copilot quota…",
+    "load_failed": "Failed to query quota: {{message}}",
+    "remaining": "{{percent}}% left",
+    "premium": "Monthly premium requests",
+    "unavailable": "Quota unavailable. Check the Copilot credential and try again."
   },
   "meta_quota": {
     "title": "Muse (Meta) Quota",
@@ -1022,6 +1034,15 @@
     "meta_oauth_status_error": "Authentication failed:",
     "meta_oauth_start_error": "Failed to start Muse OAuth:",
     "meta_oauth_polling_error": "Failed to check authentication status:",
+    "copilot_oauth_button": "Sign in",
+    "copilot_oauth_hint": "Sign in with your GitHub account to add Copilot. Enter the device code when asked.",
+    "copilot_open_link": "Open link",
+    "copilot_copy_link": "Copy link",
+    "copilot_oauth_status_waiting": "Waiting for authentication...",
+    "copilot_oauth_status_success": "Authentication successful!",
+    "copilot_oauth_status_error": "Authentication failed:",
+    "copilot_oauth_start_error": "Failed to start GitHub Copilot OAuth:",
+    "copilot_oauth_polling_error": "Failed to check authentication status:",
     "device_code_label": "Device code:",
     "device_code_copy": "Copy device code",
     "xai_oauth_button": "Sign in",
@@ -1089,6 +1110,8 @@
     "copied": "Copied",
     "account_name_label": "Name (optional)",
     "account_name_placeholder": "Work, Personal",
+    "login_proxy_label": "Login proxy",
+    "login_proxy_invalid": "Enter a proxy URL like socks5://host:1080 or http://host:8080.",
     "anthropic_second_step": "Approve once more for the long-lived token",
     "anthropic_reconnect_hint": "Sign in as {{name}} to show its limits again. Requests keep using the long-lived token."
   },
@@ -1442,6 +1465,10 @@
         "codexLiveMediaRelayICEServers": {
           "label": "ICE servers",
           "hint": "Optional STUN or TURN servers."
+        },
+        "serverShutdownTimeout": {
+          "label": "Shutdown timeout (seconds)",
+          "hint": "How long open requests may finish when the server stops. 0 closes them right away."
         }
       },
       "search": {
@@ -1551,6 +1578,8 @@
           "devin_sensitive_words_label": "OAuth sensitive words",
           "devin_sensitive_words_placeholder": "sensitive phrase",
           "devin_sensitive_words_hint": "One word or phrase per row. Configure carefully: matching content causes the entire system-prompt line to be deleted; empty entries are removed when saved",
+          "sensitive_replacements_label": "Replacements",
+          "sensitive_replacements_desc": "Replace matching text or regex patterns in the system prompt with your own text.",
           "antigravity_signature_cache": "Antigravity signature cache",
           "antigravity_signature_cache_desc": "Prefer and validate cached thinking-block signatures",
           "antigravity_signature_strict": "Strict bypass signature validation",
@@ -1639,7 +1668,9 @@
           "override_raw_rules": "Override raw rules",
           "override_raw_rules_desc": "Same, with raw JSON values.",
           "filter_rules": "Filter rules",
-          "filter_rules_desc": "Remove parameters from requests by JSON path."
+          "filter_rules_desc": "Remove parameters from requests by JSON path.",
+          "replace_rules": "Replace rules",
+          "replace_rules_desc": "Find and replace text in chosen messages or JSON paths."
         }
       },
       "api_keys": {
@@ -1678,6 +1709,18 @@
         "remove_params": "Remove parameters",
         "json_path": "JSON path (e.g., temperature)",
         "json_path_filter": "JSON Path (gjson/sjson), e.g., generationConfig.thinkingConfig.thinkingBudget",
+        "target": "Apply to",
+        "target_role": "Messages",
+        "target_paths": "JSON paths",
+        "role": "Message role",
+        "role_system": "System",
+        "role_developer": "Developer",
+        "role_user": "User",
+        "all_messages": "All messages",
+        "positions": "Positions",
+        "positions_placeholder": "Positions, such as 1, 2",
+        "json_path_replace": "JSON path, such as messages.0.content",
+        "replacements": "Replacements",
         "param_type": "Parameter type",
         "param_value": "Parameter value",
         "add_param": "Add parameter",
@@ -1718,6 +1761,15 @@
         "boolean_true": "true",
         "boolean_false": "false"
       },
+      "replacements": {
+        "kind": "Match type",
+        "kind_text": "Text",
+        "kind_regex": "Regex",
+        "find": "Text to find",
+        "pattern": "Regex pattern",
+        "replace_with": "Replace with",
+        "add": "Add replacement"
+      },
       "validation": {
         "invalid_trusted_proxies": "Each trusted proxy must be a valid IP address or CIDR.",
         "invalid_discovery_service_type": "Use _name._tcp: name must be 1–15 letters, digits or hyphens, with no leading or trailing hyphen.",
@@ -1736,7 +1788,10 @@
         "integer_range_1_3600": "Enter a whole number between 1 and 3600",
         "payload_invalid_number": "Enter a valid number",
         "payload_invalid_boolean": "Choose true or false",
-        "payload_invalid_json": "Enter valid JSON"
+        "payload_invalid_json": "Enter valid JSON",
+        "payload_replace_positions": "Enter positions as whole numbers from 1, separated by commas, or choose all messages.",
+        "payload_replace_paths": "Add at least one JSON path.",
+        "payload_replace_replacements": "Add at least one replacement with text to find."
       },
       "common": {
         "edit": "Edit",

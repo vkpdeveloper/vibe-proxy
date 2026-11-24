@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/MoeForge/moego/json"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clientpolicy"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
@@ -36,20 +36,24 @@ type PricingCatalog struct {
 }
 
 type PricingRule struct {
-	ID                        string  `json:"id"`
-	Provider                  string  `json:"provider,omitempty"`
-	Model                     string  `json:"model"`
-	InputPerMillion           float64 `json:"input_per_million"`
-	CachedInputPerMillion     float64 `json:"cached_input_per_million"`
-	CacheWritePerMillion      float64 `json:"cache_write_per_million"`
-	OutputPerMillion          float64 `json:"output_per_million"`
-	LongContextThreshold      int64   `json:"long_context_threshold,omitempty"`
-	LongInputPerMillion       float64 `json:"long_input_per_million,omitempty"`
-	LongCachedInputPerMillion float64 `json:"long_cached_input_per_million,omitempty"`
-	LongCacheWritePerMillion  float64 `json:"long_cache_write_per_million,omitempty"`
-	LongOutputPerMillion      float64 `json:"long_output_per_million,omitempty"`
-	CacheAccounting           string  `json:"cache_accounting,omitempty"`
-	SourceURL                 string  `json:"source_url,omitempty"`
+	ID                    string  `json:"id"`
+	Provider              string  `json:"provider,omitempty"`
+	Model                 string  `json:"model"`
+	InputPerMillion       float64 `json:"input_per_million"`
+	CachedInputPerMillion float64 `json:"cached_input_per_million"`
+	CacheWritePerMillion  float64 `json:"cache_write_per_million"`
+	// CacheWrite1hPerMillion prices one-hour cache writes when the provider
+	// bills them above the default (five-minute) write rate.
+	CacheWrite1hPerMillion     float64 `json:"cache_write_1h_per_million,omitempty"`
+	OutputPerMillion           float64 `json:"output_per_million"`
+	LongContextThreshold       int64   `json:"long_context_threshold,omitempty"`
+	LongInputPerMillion        float64 `json:"long_input_per_million,omitempty"`
+	LongCachedInputPerMillion  float64 `json:"long_cached_input_per_million,omitempty"`
+	LongCacheWritePerMillion   float64 `json:"long_cache_write_per_million,omitempty"`
+	LongCacheWrite1hPerMillion float64 `json:"long_cache_write_1h_per_million,omitempty"`
+	LongOutputPerMillion       float64 `json:"long_output_per_million,omitempty"`
+	CacheAccounting            string  `json:"cache_accounting,omitempty"`
+	SourceURL                  string  `json:"source_url,omitempty"`
 }
 
 type TokenDetail struct {
@@ -59,7 +63,10 @@ type TokenDetail struct {
 	CachedTokens        int64 `json:"cached_tokens"`
 	CacheReadTokens     int64 `json:"cache_read_tokens"`
 	CacheCreationTokens int64 `json:"cache_creation_tokens"`
-	TotalTokens         int64 `json:"total_tokens"`
+	// CacheCreation1hTokens is the part of CacheCreationTokens written with a
+	// one-hour TTL.
+	CacheCreation1hTokens int64 `json:"cache_creation_1h_tokens,omitempty"`
+	TotalTokens           int64 `json:"total_tokens"`
 }
 
 type CostDetail struct {
@@ -182,6 +189,9 @@ func (s *Store) eventFromRecord(ctx context.Context, record coreusage.Record) Ev
 		CacheReadTokens:     record.Detail.CacheReadTokens,
 		CacheCreationTokens: record.Detail.CacheCreationTokens,
 		TotalTokens:         record.Detail.TotalTokens,
+	}
+	if record.Detail.CacheCreation1hTokens != nil {
+		tokens.CacheCreation1hTokens = min(max(*record.Detail.CacheCreation1hTokens, 0), tokens.CacheCreationTokens)
 	}
 	if tokens.TotalTokens == 0 {
 		tokens.TotalTokens = tokens.InputTokens + tokens.OutputTokens + tokens.ReasoningTokens + tokens.CacheReadTokens + tokens.CacheCreationTokens
@@ -321,6 +331,7 @@ func (s *Store) price(event Event) CostDetail {
 	inputRate := rule.InputPerMillion
 	cachedRate := rule.CachedInputPerMillion
 	writeRate := rule.CacheWritePerMillion
+	write1hRate := fallbackRate(rule.CacheWrite1hPerMillion, writeRate)
 	outputRate := rule.OutputPerMillion
 	contextTokens := event.Tokens.InputTokens
 	if strings.EqualFold(rule.CacheAccounting, "separate") {
@@ -331,6 +342,7 @@ func (s *Store) price(event Event) CostDetail {
 		inputRate = fallbackRate(rule.LongInputPerMillion, inputRate)
 		cachedRate = fallbackRate(rule.LongCachedInputPerMillion, cachedRate)
 		writeRate = fallbackRate(rule.LongCacheWritePerMillion, writeRate)
+		write1hRate = fallbackRate(rule.LongCacheWrite1hPerMillion, writeRate)
 		outputRate = fallbackRate(rule.LongOutputPerMillion, outputRate)
 	}
 
@@ -360,7 +372,7 @@ func (s *Store) price(event Event) CostDetail {
 	cost := CostDetail{
 		InputUSD:       perMillionCost(regularInput, inputRate) * multiplier,
 		CachedInputUSD: perMillionCost(cacheRead, cachedRate) * multiplier,
-		CacheWriteUSD:  perMillionCost(cacheWrite, writeRate) * multiplier,
+		CacheWriteUSD:  cacheWriteCost(cacheWrite, event.Tokens.CacheCreation1hTokens, writeRate, write1hRate) * multiplier,
 		OutputUSD:      perMillionCost(billableOutput, outputRate) * multiplier,
 		Priced:         true,
 		RuleID:         rule.ID,
@@ -411,6 +423,13 @@ func fallbackRate(value, fallback float64) float64 {
 		return value
 	}
 	return fallback
+}
+
+// cacheWriteCost prices the one-hour part of a cache write at its own rate and
+// the rest at the default write rate.
+func cacheWriteCost(total, oneHour int64, rate, oneHourRate float64) float64 {
+	oneHour = min(oneHour, total)
+	return perMillionCost(total-oneHour, rate) + perMillionCost(oneHour, oneHourRate)
 }
 
 func perMillionCost(tokens int64, rate float64) float64 {

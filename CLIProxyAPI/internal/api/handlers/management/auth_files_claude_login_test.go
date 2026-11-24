@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MoeForge/moego/json"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -61,8 +61,10 @@ func waitFor(t *testing.T, what string, done func() bool) {
 func TestClaudeLongLivedLoginStoresBothTokens(t *testing.T) {
 	authDir := t.TempDir()
 	h := NewHandler(&config.Config{AuthDir: authDir}, "", nil)
+	anthropic := fakeAnthropic(t, "acct-1")
 	login := claudeLogin{
-		auth:        fakeAnthropic(t, "acct-1"),
+		auth:        anthropic,
+		longAuth:    anthropic,
 		state:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01",
 		pkce:        &claude.PKCECodes{CodeVerifier: "v1"},
 		accountName: "Work",

@@ -393,6 +393,7 @@
     "filter_devin": "Devin",
     "filter_antigravity": "Antigravity",
     "filter_xai": "xAI",
+    "filter_copilot": "GitHub Copilot",
     "filter_opencode-go": "OpenCode Go",
     "filter_devin-cli": "Devin CLI",
     "filter_iflow": "iFlow",
@@ -648,6 +649,17 @@
     "load_failed": "額度查詢失敗：{{message}}",
     "empty_title": "暫無 Devin 憑證",
     "empty_desc": "上傳 Devin 憑證檔案或透過後端 CLI 登入後，即可查詢額度。"
+  },
+  "copilot_quota": {
+    "title": "GitHub Copilot 配額",
+    "empty_title": "暫無 GitHub Copilot 憑證",
+    "empty_desc": "使用 GitHub Copilot OAuth 登入或上傳 GitHub Copilot 驗證檔案以查詢配額。",
+    "idle": "點擊查詢 GitHub Copilot 配額",
+    "loading": "正在查詢 GitHub Copilot 配額…",
+    "load_failed": "配額查詢失敗：{{message}}",
+    "remaining": "剩餘 {{percent}}%",
+    "premium": "每月進階請求",
+    "unavailable": "配額無法取得。請檢查 Copilot 憑證後重試。"
   },
   "meta_quota": {
     "title": "Muse (Meta) 額度",
@@ -1018,6 +1030,15 @@
     "meta_oauth_status_error": "驗證失敗:",
     "meta_oauth_start_error": "啟動 Muse OAuth 失敗:",
     "meta_oauth_polling_error": "檢查驗證狀態失敗:",
+    "copilot_oauth_button": "使用 GitHub Copilot 登入",
+    "copilot_oauth_hint": "使用你的 GitHub 帳號登入即可新增 Copilot。如有提示，請輸入裝置碼。",
+    "copilot_open_link": "開啟連結",
+    "copilot_copy_link": "複製連結",
+    "copilot_oauth_status_waiting": "等待驗證中...",
+    "copilot_oauth_status_success": "驗證成功！",
+    "copilot_oauth_status_error": "驗證失敗:",
+    "copilot_oauth_start_error": "啟動 GitHub Copilot OAuth 失敗:",
+    "copilot_oauth_polling_error": "檢查驗證狀態失敗:",
     "device_code_label": "裝置碼:",
     "device_code_copy": "複製裝置碼",
     "xai_oauth_button": "開始 xAI 登入",
@@ -1112,6 +1133,8 @@
     "view_auth_files": "查看驗證檔案",
     "account_name_label": "名稱（選填）",
     "account_name_placeholder": "工作、個人",
+    "login_proxy_label": "登入代理",
+    "login_proxy_invalid": "請輸入代理 URL，如 socks5://host:1080 或 http://host:8080。",
     "anthropic_second_step": "再次授權以取得長期權杖",
     "anthropic_reconnect_hint": "以 {{name}} 登入以重新顯示其額度。請求仍使用長期權杖。"
   },
@@ -1465,6 +1488,10 @@
         "codexLiveMediaRelayICEServers": {
           "label": "ICE 伺服器",
           "hint": "選填的 STUN 或 TURN 伺服器。"
+        },
+        "serverShutdownTimeout": {
+          "label": "關閉等待時間（秒）",
+          "hint": "服務停止時等待進行中請求完成的時長。0 表示立即關閉。"
         }
       },
       "search": {
@@ -1574,6 +1601,8 @@
           "devin_sensitive_words_label": "OAuth 敏感詞",
           "devin_sensitive_words_placeholder": "敏感短語",
           "devin_sensitive_words_hint": "每項填寫一個詞或短語。請謹慎設定：命中內容會導致整行系統提示詞被刪除；儲存時移除空項",
+          "sensitive_replacements_label": "取代",
+          "sensitive_replacements_desc": "將系統提示詞中符合的文字或正規表示式取代為自訂文字。",
           "antigravity_signature_cache": "啟用 Antigravity 簽名快取",
           "antigravity_signature_cache_desc": "優先使用並校驗快取的 thinking block 簽名",
           "antigravity_signature_strict": "嚴格校驗旁路簽名",
@@ -1662,7 +1691,9 @@
           "override_raw_rules": "覆寫 Raw 規則",
           "override_raw_rules_desc": "同上，使用原始 JSON 值。",
           "filter_rules": "篩選規則",
-          "filter_rules_desc": "依 JSON 路徑移除請求中的參數。"
+          "filter_rules_desc": "依 JSON 路徑移除請求中的參數。",
+          "replace_rules": "取代規則",
+          "replace_rules_desc": "在指定訊息或 JSON 路徑中尋找並取代文字。"
         }
       },
       "api_keys": {
@@ -1701,6 +1732,18 @@
         "remove_params": "移除參數",
         "json_path": "JSON 路徑（如 temperature）",
         "json_path_filter": "JSON 路徑（gjson/sjson），如 generationConfig.thinkingConfig.thinkingBudget",
+        "target": "套用於",
+        "target_role": "訊息",
+        "target_paths": "JSON 路徑",
+        "role": "訊息角色",
+        "role_system": "系統",
+        "role_developer": "開發者",
+        "role_user": "使用者",
+        "all_messages": "全部訊息",
+        "positions": "位置",
+        "positions_placeholder": "位置，如 1, 2",
+        "json_path_replace": "JSON 路徑，如 messages.0.content",
+        "replacements": "取代",
         "param_type": "參數類型",
         "param_value": "參數值",
         "add_param": "新增參數",
@@ -1741,6 +1784,15 @@
         "boolean_true": "true",
         "boolean_false": "false"
       },
+      "replacements": {
+        "kind": "比對方式",
+        "kind_text": "文字",
+        "kind_regex": "正規表示式",
+        "find": "要尋找的文字",
+        "pattern": "正規表示式",
+        "replace_with": "取代為",
+        "add": "新增取代"
+      },
       "validation": {
         "invalid_trusted_proxies": "每個可信任代理必須是有效的 IP 位址或 CIDR。",
         "invalid_discovery_service_type": "請使用 _名稱._tcp 格式：名稱為 1–15 位英文字母、數字或連字號，首尾不能是連字號。",
@@ -1759,7 +1811,10 @@
         "integer_range_1_3600": "請輸入 1 到 3600 之間的整數",
         "payload_invalid_number": "請輸入有效數字",
         "payload_invalid_boolean": "請選擇 true 或 false",
-        "payload_invalid_json": "請輸入有效的 JSON"
+        "payload_invalid_json": "請輸入有效的 JSON",
+        "payload_replace_positions": "位置請填從 1 開始的整數，以逗號分隔，或選擇全部訊息。",
+        "payload_replace_paths": "至少新增一個 JSON 路徑。",
+        "payload_replace_replacements": "至少新增一條含尋找文字的取代。"
       },
       "common": {
         "edit": "編輯",

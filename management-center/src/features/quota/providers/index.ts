@@ -19,6 +19,8 @@ import { DEVIN_CONFIG } from './devin/data';
 import { DevinQuotaBody } from './devin/DevinQuotaBody';
 import { CODEX_CONFIG } from './codex/data';
 import { CodexQuotaBody } from './codex/CodexQuotaBody';
+import { COPILOT_CONFIG } from './copilot/data';
+import { CopilotQuotaBody } from './copilot/CopilotQuotaBody';
 import { CURSOR_CONFIG } from './cursor/data';
 import { CursorQuotaBody } from './cursor/CursorQuotaBody';
 import { DEVIN_CLI_CONFIG } from './devinCli/data';
@@ -62,6 +64,7 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
   } as unknown as QuotaAdapter,
   claude: { ...CLAUDE_CONFIG, Body: ClaudeQuotaBody } as unknown as QuotaAdapter,
   codex: { ...CODEX_CONFIG, Body: CodexQuotaBody } as unknown as QuotaAdapter,
+  copilot: { ...COPILOT_CONFIG, Body: CopilotQuotaBody } as unknown as QuotaAdapter,
   cursor: { ...CURSOR_CONFIG, Body: CursorQuotaBody } as unknown as QuotaAdapter,
   'devin-cli': { ...DEVIN_CLI_CONFIG, Body: DevinCliQuotaBody } as unknown as QuotaAdapter,
   devin: { ...DEVIN_CONFIG, Body: DevinQuotaBody } as unknown as QuotaAdapter,

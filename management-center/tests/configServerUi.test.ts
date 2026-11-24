@@ -49,6 +49,7 @@ describe('server configuration UI', () => {
     }
     expect(SECTION_VALIDATION_FIELDS.connectivity).toEqual([
       'port',
+      'serverShutdownTimeout',
       'trustedProxies',
       'discoveryServiceType',
     ]);

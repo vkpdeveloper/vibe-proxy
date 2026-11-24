@@ -337,6 +337,7 @@
     "filter_codex": "Codex",
     "filter_antigravity": "Antigravity",
     "filter_xai": "xAI",
+    "filter_copilot": "GitHub Copilot",
     "filter_iflow": "iFlow",
     "filter_vertex": "Vertex AI",
     "filter_empty": "Trống",
@@ -946,10 +947,21 @@
     "meta_oauth_status_error": "Xác thực thất bại:",
     "meta_oauth_start_error": "Không thể bắt đầu Muse OAuth:",
     "meta_oauth_polling_error": "Không thể kiểm tra trạng thái xác thực:",
+    "copilot_oauth_button": "Đăng nhập bằng GitHub Copilot",
+    "copilot_oauth_hint": "Đăng nhập bằng tài khoản GitHub để thêm Copilot. Nhập mã thiết bị nếu được yêu cầu.",
+    "copilot_open_link": "Mở liên kết",
+    "copilot_copy_link": "Sao chép liên kết",
+    "copilot_oauth_status_waiting": "Đang chờ xác thực...",
+    "copilot_oauth_status_success": "Xác thực thành công!",
+    "copilot_oauth_status_error": "Xác thực thất bại:",
+    "copilot_oauth_start_error": "Không thể bắt đầu GitHub Copilot OAuth:",
+    "copilot_oauth_polling_error": "Không thể kiểm tra trạng thái xác thực:",
     "device_code_label": "Mã thiết bị:",
     "device_code_copy": "Sao chép mã thiết bị",
     "account_name_label": "Tên (tùy chọn)",
     "account_name_placeholder": "Công việc, Cá nhân",
+    "login_proxy_label": "Proxy đăng nhập",
+    "login_proxy_invalid": "Nhập URL proxy như socks5://host:1080 hoặc http://host:8080.",
     "anthropic_second_step": "Phê duyệt thêm một lần để lấy token dài hạn",
     "anthropic_reconnect_hint": "Đăng nhập bằng {{name}} để hiển thị lại hạn mức. Yêu cầu vẫn dùng token dài hạn."
   },
@@ -1251,7 +1263,9 @@
           "devin_sensitive_words_desc": "Xóa các dòng system prompt Devin chứa những từ này.",
           "devin_sensitive_words_label": "Từ nhạy cảm OAuth",
           "devin_sensitive_words_placeholder": "cụm từ nhạy cảm",
-          "devin_sensitive_words_hint": "Mỗi hàng một từ hoặc cụm từ. Cấu hình cẩn thận: nội dung khớp sẽ khiến toàn bộ dòng system prompt bị xóa; các mục trống sẽ bị xóa khi lưu"
+          "devin_sensitive_words_hint": "Mỗi hàng một từ hoặc cụm từ. Cấu hình cẩn thận: nội dung khớp sẽ khiến toàn bộ dòng system prompt bị xóa; các mục trống sẽ bị xóa khi lưu",
+          "sensitive_replacements_label": "Thay thế",
+          "sensitive_replacements_desc": "Thay văn bản hoặc mẫu regex khớp trong system prompt bằng văn bản của bạn."
         },
         "headers": {
           "title": "Header mặc định",
@@ -1336,7 +1350,9 @@
           "override_raw_rules": "Quy tắc thô ghi đè",
           "override_raw_rules_desc": "Tương tự, với giá trị JSON thô.",
           "filter_rules": "Quy tắc lọc",
-          "filter_rules_desc": "Xóa tham số khỏi yêu cầu theo đường dẫn JSON."
+          "filter_rules_desc": "Xóa tham số khỏi yêu cầu theo đường dẫn JSON.",
+          "replace_rules": "Quy tắc thay thế",
+          "replace_rules_desc": "Tìm và thay văn bản trong các tin nhắn hoặc đường dẫn JSON đã chọn."
         }
       },
       "api_keys": {
@@ -1375,6 +1391,18 @@
         "remove_params": "Xóa tham số",
         "json_path": "JSON Path (ví dụ temperature)",
         "json_path_filter": "JSON Path (gjson/sjson), ví dụ generationConfig.thinkingConfig.thinkingBudget",
+        "target": "Áp dụng cho",
+        "target_role": "Tin nhắn",
+        "target_paths": "Đường dẫn JSON",
+        "role": "Vai trò tin nhắn",
+        "role_system": "Hệ thống",
+        "role_developer": "Nhà phát triển",
+        "role_user": "Người dùng",
+        "all_messages": "Tất cả tin nhắn",
+        "positions": "Vị trí",
+        "positions_placeholder": "Vị trí, ví dụ 1, 2",
+        "json_path_replace": "Đường dẫn JSON, ví dụ messages.0.content",
+        "replacements": "Thay thế",
         "param_type": "Loại tham số",
         "param_value": "Giá trị tham số",
         "add_param": "Thêm tham số",
@@ -1415,6 +1443,15 @@
         "boolean_true": "true",
         "boolean_false": "false"
       },
+      "replacements": {
+        "kind": "Kiểu khớp",
+        "kind_text": "Văn bản",
+        "kind_regex": "Regex",
+        "find": "Văn bản cần tìm",
+        "pattern": "Mẫu regex",
+        "replace_with": "Thay bằng",
+        "add": "Thêm thay thế"
+      },
       "validation": {
         "validation_blocked": "Hãy sửa lỗi xác thực trước khi lưu",
         "port_range": "Nhập cổng hợp lệ từ 1 đến 65535",
@@ -1423,6 +1460,9 @@
         "payload_invalid_number": "Nhập số hợp lệ",
         "payload_invalid_boolean": "Chọn true hoặc false",
         "payload_invalid_json": "Nhập JSON hợp lệ",
+        "payload_replace_positions": "Nhập vị trí là số nguyên từ 1, cách nhau bằng dấu phẩy, hoặc chọn tất cả tin nhắn.",
+        "payload_replace_paths": "Thêm ít nhất một đường dẫn JSON.",
+        "payload_replace_replacements": "Thêm ít nhất một thay thế có văn bản cần tìm.",
         "invalid_trusted_proxies": "Mỗi proxy đáng tin cậy phải là một địa chỉ IP hoặc CIDR hợp lệ.",
         "invalid_discovery_service_type": "Sử dụng định dạng _tên._tcp: tên phải gồm 1–15 chữ cái, chữ số hoặc dấu gạch nối, không bắt đầu hoặc kết thúc bằng dấu gạch nối.",
         "invalid_duration": "Nhập khoảng thời gian hợp lệ, chẳng hạn như 30s hoặc 3h",
@@ -1601,6 +1641,10 @@
         "codexLiveMediaRelayICEServers": {
           "label": "Máy chủ ICE",
           "hint": "Máy chủ STUN hoặc TURN tùy chọn."
+        },
+        "serverShutdownTimeout": {
+          "label": "Thời gian chờ tắt (giây)",
+          "hint": "Thời gian chờ các yêu cầu đang chạy hoàn tất khi máy chủ dừng. 0 sẽ đóng ngay."
         }
       }
     },
@@ -2230,6 +2274,17 @@
     "load_failed": "Truy vấn quota thất bại: {{message}}",
     "empty_title": "Không có credential Devin",
     "empty_desc": "Tải lên file credential Devin hoặc đăng nhập bằng CLI backend để truy vấn quota."
+  },
+  "copilot_quota": {
+    "title": "Quota GitHub Copilot",
+    "empty_title": "Không có credential GitHub Copilot",
+    "empty_desc": "Đăng nhập bằng GitHub Copilot OAuth hoặc tải lên file credential GitHub Copilot để truy vấn quota.",
+    "idle": "Nhấn để truy vấn quota GitHub Copilot",
+    "loading": "Đang truy vấn quota GitHub Copilot…",
+    "load_failed": "Truy vấn quota thất bại: {{message}}",
+    "remaining": "Còn lại {{percent}}%",
+    "premium": "Yêu cầu premium hằng tháng",
+    "unavailable": "Không thể lấy hạn mức. Hãy kiểm tra thông tin xác thực Copilot và thử lại."
   },
   "meta_quota": {
     "title": "Quota Muse (Meta)",
