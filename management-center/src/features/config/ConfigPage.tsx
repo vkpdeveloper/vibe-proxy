@@ -4,11 +4,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { RefreshIcon } from '@hugeicons/core-free-icons';
-import { Page, PageBarContent } from '@/components/layout/Page';
+import { PAGE_FRAME, Page, PageBarContent, PageHeader } from '@/components/layout/Page';
 import { usePageBar } from '@/components/layout/pageBar';
 import { Button } from '@/components/ui/button';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useAuthStore, useNotificationStore } from '@/stores';
@@ -138,6 +139,9 @@ export function ConfigPage() {
     shouldBlock: doc.isDirty,
     dialog: unsavedChangesDialog,
   });
+
+  // The top bar's refresh reloads the document; it asks first when there are unsaved edits.
+  useHeaderRefresh(doc.handleReload, isCurrentLayer);
 
   // YAML 解析失败：切换到源码模式；修复后仍可重试进入可视化模式。
   useEffect(() => {
@@ -324,12 +328,13 @@ export function ConfigPage() {
         disabled={doc.saving || doc.loading || doc.diffModalOpen || doc.recoveryRequired}
         onChange={handleModeChange}
       />
+      {/* Phones put the page actions where the top bar's refresh sits, so they keep their own. */}
       <Hint label={t('common.refresh')}>
         <Button
-          variant={pageBar ? 'ghost' : 'outline'}
+          variant="ghost"
           size="icon-lg"
-          className="max-sm:size-10"
-          onClick={doc.handleReload}
+          className="max-sm:size-10 sm:hidden"
+          onClick={() => void doc.handleReload()}
           disabled={doc.loading || doc.saving}
           aria-label={t('common.refresh')}
         >
@@ -353,62 +358,71 @@ export function ConfigPage() {
     </div>
   ) : null;
 
-  const overlays = (
-    <>
-      <FloatingSaveBar
-        visible={isCurrentLayer && doc.isDirty}
-        statusText={t(
-          doc.recoveryRequired
-            ? 'config_management.precise_save_recovery_required'
-            : isMobile
-              ? status.shortLabelKey
-              : status.labelKey
-        )}
-        statusTone={status.tone}
-        saving={doc.saving}
-        saveDisabled={saveDisabled}
-        discardDisabled={doc.loading || doc.saving}
-        onSave={doc.handleSave}
-        onDiscard={doc.handleDiscard}
-      />
+  const saveBar = (inlineClassName: string) => (
+    <FloatingSaveBar
+      inlineClassName={inlineClassName}
+      visible={isCurrentLayer && doc.isDirty}
+      statusText={t(
+        doc.recoveryRequired
+          ? 'config_management.precise_save_recovery_required'
+          : isMobile
+            ? status.shortLabelKey
+            : status.labelKey
+      )}
+      statusTone={status.tone}
+      saving={doc.saving}
+      saveDisabled={saveDisabled}
+      discardDisabled={doc.loading || doc.saving}
+      onSave={doc.handleSave}
+      onDiscard={doc.handleDiscard}
+    />
+  );
 
-      <DiffModal
-        open={doc.diffModalOpen}
-        original={doc.serverYaml}
-        modified={doc.mergedYaml}
-        onConfirm={doc.handleConfirmSave}
-        onCancel={doc.closeDiff}
-        loading={doc.saving}
-      />
-    </>
+  const diffModal = (
+    <DiffModal
+      open={doc.diffModalOpen}
+      original={doc.serverYaml}
+      modified={doc.mergedYaml}
+      onConfirm={doc.handleConfirmSave}
+      onCancel={doc.closeDiff}
+      loading={doc.saving}
+    />
   );
 
   if (mode === 'source') {
-    // The YAML editor uses the full width and height, so it skips Page's narrow content column.
+    // The YAML editor uses the full height, so it skips Page's scrolling content area.
     // On phones the title and actions go into the app's top bar, as Page does.
     return (
-      <div className="flex h-full flex-col">
+      <div className="relative flex h-full flex-col">
         {pageBar ? (
           <PageBarContent bar={pageBar} title={t('config_management.title')} actions={actions} />
         ) : (
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-6 sm:px-10 sm:py-8">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {t('config_management.title')}
-            </h1>
-            {actions}
-          </header>
+          // Visual mode's header, so switching modes never moves the controls.
+          <PageHeader
+            title={t('config_management.title')}
+            actions={actions}
+            frame={PAGE_FRAME.tabs}
+          />
         )}
-        <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 max-sm:px-4 sm:px-10">
-          {alert}
-          <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
+        {/* Search and editor share the header's column on desktop, so they line up with it. */}
+        <div className="shrink-0 border-b px-5 py-3 max-sm:px-4 sm:px-10">
+          <div className={cn('flex flex-col gap-3', PAGE_FRAME.tabs)}>
+            {alert}
+            <SourceSearchBar search={sourceSearch} disabled={disableControls || doc.loading} />
+          </div>
         </div>
-        <SourcePanel
-          search={sourceSearch}
-          value={doc.content}
-          onChange={doc.handleChange}
-          editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
-        />
-        {overlays}
+        <div className="flex min-h-0 flex-1 flex-col sm:px-10">
+          <div className={cn('flex min-h-0 w-full flex-1 flex-col', PAGE_FRAME.tabs)}>
+            <SourcePanel
+              search={sourceSearch}
+              value={doc.content}
+              onChange={doc.handleChange}
+              editable={!disableControls && !doc.loading && !doc.saving && !doc.diffModalOpen}
+            />
+          </div>
+        </div>
+        {saveBar('absolute inset-x-0 bottom-6')}
+        {diffModal}
       </div>
     );
   }
@@ -421,17 +435,18 @@ export function ConfigPage() {
       tab={activeSection}
       onTab={handleSectionChange}
     >
-      <div className="flex flex-col gap-8 max-sm:gap-4">
+      {/* A query container: setting rows put long inputs under their label when the column is
+          narrow (see FieldPrimitives). */}
+      <div className="@container flex flex-col gap-8 max-sm:gap-4">
         {alert}
         <ConfigSearch disabled={disableControls || doc.loading} onJump={jumpToField} />
-        {/* The tab row right above already names the section, so phones skip its heading. */}
-        <div className="contents max-sm:[&>section>div:first-child]:hidden">
-          {renderActiveSection()}
-        </div>
-        {/* Room for the save bar so it never covers the last setting. */}
-        {doc.isDirty ? <div aria-hidden="true" className="h-14" /> : null}
+        {/* The section tabs already name the section, so its heading is only for screen readers. */}
+        <div className="contents [&>section>div:first-child]:sr-only">{renderActiveSection()}</div>
+        {/* Phones: room for the docked save bar so it never covers the last setting. */}
+        {doc.isDirty ? <div aria-hidden="true" className="h-14 sm:hidden" /> : null}
+        {saveBar('sticky bottom-6')}
       </div>
-      {overlays}
+      {diffModal}
     </Page>
   );
 }

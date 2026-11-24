@@ -130,9 +130,10 @@ export function ApiKeyImportDialog({
                     onChange={(event) => onApiKeyChange(event.target.value)}
                   />
                   <InputGroupAddon align="inline-end">
-                    {/* 40px on phones; it overlaps the field's 1px border, which is invisible. */}
+                    {/* 32px inside the 36px field on desktop, 40px on phones; there it overlaps the
+                        field's 1px border, which is invisible. */}
                     <InputGroupButton
-                      size="icon-xs"
+                      size="icon-sm"
                       className="max-sm:-mr-1.5 max-sm:size-10"
                       onClick={onToggleShowKey}
                       aria-label={toggleLabel}

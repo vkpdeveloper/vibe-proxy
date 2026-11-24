@@ -5,7 +5,7 @@
  * - 现有提供商保持点击加载；Devin 首次可见时主动查询一次，不轮询；
  * - cacheGeneration 会话隔离 + request-id 去重（见 useQuotaBatchLoader）；
  * - 文件列表变化后按 provider 剪枝额度缓存（已删文件不残留）；
- * - useHeaderRefresh 单槽位：本页唯一注册者，全局刷新 = 重取文件列表。
+ * - useHeaderRefresh 单槽位：本页唯一注册者，全局刷新 = 手机端刷新按钮 = 重取文件列表后批量拉当前页额度。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +15,6 @@ import { DashboardSpeed01Icon, RefreshIcon, SortByDown02Icon } from '@hugeicons/
 import { authFilesApi } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Hint } from '@/components/ui/tooltip';
 import {
   Empty,
   EmptyContent,
@@ -95,6 +94,7 @@ export function QuotaPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isPhone = useMediaQuery('(max-width: 639px)');
+  const isWide = useMediaQuery('(min-width: 1280px)');
 
   /* ---------- 文件列表 ---------- */
 
@@ -134,8 +134,6 @@ export function QuotaPage() {
     },
     [connectionStatus, sessionGeneration, t]
   );
-
-  useHeaderRefresh(loadFiles);
 
   useEffect(startQuotaDetailsSync, []);
 
@@ -317,8 +315,10 @@ export function QuotaPage() {
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
     pendingRefreshRef.current = sessionGeneration;
-    void loadFiles();
+    return loadFiles();
   }, [disableControls, loadFiles, sessionGeneration]);
+  // The top bar's refresh (desktop) does the same as the phone's page button.
+  useHeaderRefresh(handleRefreshAll);
 
   useEffect(() => {
     const wasLoading = prevLoadingRef.current;
@@ -361,6 +361,13 @@ export function QuotaPage() {
   /* ---------- 渲染 ---------- */
 
   const isEmpty = !loading && filteredEntries.length === 0;
+  // Alternating keeps the sort order reading left to right, row by row.
+  const columns = isWide
+    ? [
+        pageItems.filter((_, index) => index % 2 === 0),
+        pageItems.filter((_, index) => index % 2 === 1),
+      ]
+    : [pageItems];
 
   const emptyTitle = search.trim()
     ? t('quota_management.search_empty_title')
@@ -376,7 +383,7 @@ export function QuotaPage() {
   return (
     <Page
       wide
-      title={t('nav.quota_management')}
+      title={t('nav_short.quota')}
       actions={
         <div className="flex items-center gap-2">
           {attentionCount > 0 && (
@@ -385,21 +392,18 @@ export function QuotaPage() {
               {t('quota_management.meta_attention', { count: attentionCount })}
             </Badge>
           )}
-          <Hint label={t('quota_management.refresh_all_credentials')}>
-            {/* In the phone top bar refresh is a plain ghost icon; purple is kept for create actions. */}
+          {isPhone && (
             <Button
               size="lg"
-              variant={isPhone ? 'ghost' : 'default'}
-              className="h-9 px-4 max-sm:size-10 max-sm:px-0!"
+              variant="ghost"
+              className="size-10 px-0!"
               onClick={handleRefreshAll}
               disabled={disableControls || loading || batchLoading}
               aria-label={t('common.refresh')}
             >
               <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-              {/* The visible text matches the accessible name; the hint says what it covers. */}
-              <span className="max-sm:hidden">{t('common.refresh')}</span>
             </Button>
-          </Hint>
+          )}
         </div>
       }
     >
@@ -467,12 +471,15 @@ export function QuotaPage() {
             ))}
           </div>
         ) : isEmpty ? (
-          <Empty className="border border-dashed">
+          // Desktop empty states are plain muted text; phones keep the framed version.
+          <Empty className="border border-dashed sm:border-0 sm:py-16">
             <EmptyHeader>
-              <EmptyMedia variant="icon">
+              <EmptyMedia variant="icon" className="sm:hidden">
                 <HugeiconsIcon icon={DashboardSpeed01Icon} strokeWidth={1.75} />
               </EmptyMedia>
-              <EmptyTitle>{emptyTitle}</EmptyTitle>
+              <EmptyTitle className="sm:font-normal sm:text-muted-foreground">
+                {emptyTitle}
+              </EmptyTitle>
               <EmptyDescription>{emptyDescription}</EmptyDescription>
             </EmptyHeader>
             {(search.trim() || tab !== 'all') && (
@@ -487,17 +494,26 @@ export function QuotaPage() {
             )}
           </Empty>
         ) : (
-          <div className="grid items-start gap-3 xl:grid-cols-2">
-            {pageItems.map((entry) => (
-              <QuotaCard
-                key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
-                entry={entry}
-                quota={getQuota(entry)}
-                canRefresh={canUseActions && !entry.file.disabled}
-                resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                onReset={(targetId) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type], targetId)}
-              />
+          // Two fixed column lists rather than a grid or CSS columns: cards differ a lot in
+          // height, grid rows left holes, and CSS columns moved cards between columns whenever
+          // one expanded. Here an expanding card only pushes down its own column.
+          <div className="flex items-start gap-3">
+            {columns.map((column, columnIndex) => (
+              <div key={columnIndex} className="flex min-w-0 flex-1 flex-col gap-3">
+                {column.map((entry) => (
+                  <QuotaCard
+                    key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
+                    entry={entry}
+                    quota={getQuota(entry)}
+                    canRefresh={canUseActions && !entry.file.disabled}
+                    resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
+                    onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                    onReset={(targetId) =>
+                      resetQuota(entry.file, QUOTA_ADAPTERS[entry.type], targetId)
+                    }
+                  />
+                ))}
+              </div>
             ))}
           </div>
         )}

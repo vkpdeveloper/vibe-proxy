@@ -5,7 +5,7 @@ import { SettingList, TextSetting, ToggleSetting } from '../fields/FieldPrimitiv
 import { DebugToggle, LoggingToFileToggle } from '../fields/sharedFields';
 import { getValidationMessage } from '../blocks/shared';
 
-/** 03 日志与诊断：调试、商业模式（重启生效）、日志输出与使用统计。 */
+/** Logging: debug and commercial mode, log files and usage statistics, in one list. */
 export function SectionLogging({
   values,
   validationErrors,
@@ -28,9 +28,6 @@ export function SectionLogging({
           onChange={(commercialMode) => onChange({ commercialMode })}
         />
         <LoggingToFileToggle {...fieldProps} />
-      </SettingList>
-
-      <SettingList>
         <TextSetting
           fieldId="logsMaxTotalSizeMb"
           size="sm"
@@ -53,6 +50,13 @@ export function SectionLogging({
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.errorLogsMaxFiles)}
         />
+        <ToggleSetting
+          fieldId="usageStatisticsEnabled"
+          label={t('config_management.visual.sections.system.usage_statistics_enabled')}
+          checked={values.usageStatisticsEnabled}
+          disabled={disabled}
+          onChange={(usageStatisticsEnabled) => onChange({ usageStatisticsEnabled })}
+        />
         <TextSetting
           fieldId="redisUsageQueueRetentionSeconds"
           size="sm"
@@ -68,16 +72,6 @@ export function SectionLogging({
           }
           disabled={disabled}
           error={getValidationMessage(t, validationErrors?.redisUsageQueueRetentionSeconds)}
-        />
-      </SettingList>
-
-      <SettingList>
-        <ToggleSetting
-          fieldId="usageStatisticsEnabled"
-          label={t('config_management.visual.sections.system.usage_statistics_enabled')}
-          checked={values.usageStatisticsEnabled}
-          disabled={disabled}
-          onChange={(usageStatisticsEnabled) => onChange({ usageStatisticsEnabled })}
         />
       </SettingList>
     </Section>

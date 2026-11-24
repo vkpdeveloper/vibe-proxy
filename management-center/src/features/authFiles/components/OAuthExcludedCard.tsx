@@ -50,6 +50,7 @@ export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
           </Button>
           <Button
             variant="outline"
+            size="lg"
             className="max-sm:hidden"
             onClick={onAdd}
             disabled={disableControls || excludedError !== null}
@@ -76,11 +77,7 @@ export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
                 <ProviderLogo type={provider} className="size-8 rounded-lg" />
               </ItemMedia>
               <ItemContent className="min-w-0">
-                {/* Phones show the provider's display name; desktop keeps the config key. */}
-                <ItemTitle className="font-mono max-sm:font-sans">
-                  <span className="max-sm:hidden">{provider}</span>
-                  <span className="sm:hidden">{getTypeLabel(t, provider)}</span>
-                </ItemTitle>
+                <ItemTitle>{getTypeLabel(t, provider)}</ItemTitle>
                 <ItemDescription>
                   {models?.length
                     ? t('oauth_excluded.model_count', { count: models.length })
@@ -93,7 +90,7 @@ export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('common.edit')}
-                    className="text-muted-foreground hover:text-foreground max-sm:size-10"
+                    className="text-muted-foreground hover:text-foreground max-sm:size-10 sm:size-8"
                     onClick={() => onEdit(provider)}
                   >
                     <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
@@ -104,7 +101,7 @@ export function OAuthExcludedCard(props: OAuthExcludedCardProps) {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('oauth_excluded.delete')}
-                    className="text-muted-foreground hover:text-destructive max-sm:size-10"
+                    className="text-muted-foreground hover:text-destructive max-sm:size-10 sm:size-8"
                     onClick={() => onDelete(provider)}
                   >
                     <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />

@@ -9,7 +9,7 @@ import { QUOTA_CLASS_KEYS, bindQuotaClasses } from '@/features/quota/types';
 import { quotaClasses } from '@/features/quota/components/quotaClasses';
 
 const textSize = (classes: string) =>
-  classes.split(/\s+/).find((c) => /^text-(xs|sm|base)$/.test(c));
+  classes.split(/\s+/).find((c) => /^text-(xs|sm|base|\[\d+px\])$/.test(c));
 
 describe('quota class contract', () => {
   test('the shared class map defines every QuotaClassMap key', () => {
@@ -18,13 +18,15 @@ describe('quota class contract', () => {
     expect(Object.keys(quotaClasses).sort()).toEqual([...QUOTA_CLASS_KEYS].sort());
   });
 
-  test('standalone amounts match quota metadata: same size, mono, medium, tabular', () => {
+  test('standalone amounts match quota metadata: same size, sans, medium, normal figures', () => {
     const amount = quotaClasses.quotaAmount;
     expect(textSize(amount)).toBeDefined();
     expect(textSize(amount)).toBe(textSize(quotaClasses.quotaMeta));
-    for (const token of ['font-mono', 'font-medium', 'tabular-nums']) {
-      expect(amount.split(/\s+/)).toContain(token);
-    }
+    expect(amount.split(/\s+/)).toContain('font-medium');
+    // Mona Sans tabular figures draw slashed zeros that read like code.
+    expect(`${amount} ${quotaClasses.quotaMeta}`).not.toContain('tabular-nums');
+    // Amounts and reset times are prose with numbers in them, not code.
+    expect(`${amount} ${quotaClasses.quotaMeta}`).not.toContain('font-mono');
   });
 
   test('bindQuotaClasses reports every missing key rather than the first', () => {

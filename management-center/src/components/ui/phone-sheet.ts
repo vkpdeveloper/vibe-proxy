@@ -40,6 +40,10 @@ export const PHONE_SHEET_TITLE =
 export const PHONE_SHEET_FOOTER =
   'max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:mb-0 max-sm:rounded-b-none max-sm:bg-muted max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] max-sm:[&>button]:flex-1';
 
+/** Desktop dialog footers: every regular button 36px tall, whatever size the caller picked. */
+export const DIALOG_FOOTER_BUTTONS =
+  'sm:[&_:is([data-slot=button],[data-slot=alert-dialog-action],[data-slot=alert-dialog-cancel]):not([data-size^=icon])]:h-9';
+
 export const SHEET_GRABBER =
   'absolute top-2 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-foreground/20';
 

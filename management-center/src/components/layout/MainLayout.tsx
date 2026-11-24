@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import {
@@ -270,7 +270,6 @@ export function MainLayout() {
 
   const pathname = location.pathname;
   const currentDestination = destinations.find((entry) => isActivePath(entry.path, pathname));
-  const pageName = currentDestination?.label ?? '';
   // Top-level pages take the short name in the phone top bar; sub-pages keep their own title.
   const shortTitle =
     currentDestination &&
@@ -305,7 +304,6 @@ export function MainLayout() {
             />
           )}
         </span>
-        <span className="text-lg text-faint max-sm:hidden">/</span>
         {/* Pages fill this with their title and actions on phones (see PageBarContent). */}
         <div
           ref={setPageBar}
@@ -316,11 +314,15 @@ export function MainLayout() {
             !barTitle && 'hidden'
           )}
         />
-        <nav className={cn('flex min-w-0 items-center gap-2 text-sm', barTitle && 'max-sm:hidden')}>
-          <span className="truncate font-medium max-sm:text-base max-sm:font-semibold">
-            {phone ? (shortTitle ?? pageName) : pageName}
-          </span>
-        </nav>
+        {/* Phones name the page here; desktop pages carry their own title right below. */}
+        <span
+          className={cn(
+            'min-w-0 truncate text-base font-semibold sm:hidden',
+            barTitle && 'max-sm:hidden'
+          )}
+        >
+          {shortTitle ?? currentDestination?.label}
+        </span>
         {/* On phones a page's own actions, which carry their own refresh, take this spot. */}
         <div className={cn('ml-auto flex items-center gap-3', barActions && 'max-sm:hidden')}>
           <Tooltip>
@@ -331,7 +333,7 @@ export function MainLayout() {
                 aria-label={t('common.refresh')}
                 disabled={refreshing}
                 onClick={() => void handleRefreshAll()}
-                className="max-sm:size-10"
+                className="size-8 max-sm:size-10"
               >
                 <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
               </Button>
@@ -479,21 +481,23 @@ function Rail({
                   aria-label={
                     entry.count ? `${name}, ${phone ? entry.count.value : entry.count.label}` : name
                   }
-                  aria-current={active ? 'page' : undefined}
-                  onClick={() => onNavigate(entry.path)}
                   className={cn(
                     railButton,
                     bottomItem,
                     !entry.phone && 'max-sm:hidden',
                     active && 'text-foreground'
                   )}
+                  asChild
                 >
-                  <span className={cn(bottomPill, active && 'max-sm:bg-foreground/12')}>
-                    {entry.icon}
-                  </span>
-                  <span aria-hidden className={bottomLabel}>
-                    {entry.short}
-                  </span>
+                  {/* A real link, so a middle or modified click opens the page in a new tab. */}
+                  <Link to={entry.path} aria-current={active ? 'page' : undefined}>
+                    <span className={cn(bottomPill, active && 'max-sm:bg-foreground/12')}>
+                      {entry.icon}
+                    </span>
+                    <span aria-hidden className={bottomLabel}>
+                      {entry.short}
+                    </span>
+                  </Link>
                 </Button>
               );
             })}

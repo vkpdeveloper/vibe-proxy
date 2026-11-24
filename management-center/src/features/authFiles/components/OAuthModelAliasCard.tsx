@@ -109,6 +109,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
           </Button>
           <Button
             variant="outline"
+            size="lg"
             className="max-sm:hidden"
             onClick={onAdd}
             disabled={unavailable}
@@ -135,6 +136,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="sm:size-8"
                 onClick={() => diagramRef.current?.collapseAll()}
                 disabled={unavailable}
                 aria-label={t('oauth_model_alias.diagram_collapse')}
@@ -165,11 +167,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
                 <ProviderLogo type={provider} className="size-8 rounded-lg" />
               </ItemMedia>
               <ItemContent className="min-w-0">
-                {/* Phones show the provider's display name; desktop keeps the config key. */}
-                <ItemTitle className="font-mono max-sm:font-sans">
-                  <span className="max-sm:hidden">{provider}</span>
-                  <span className="sm:hidden">{getTypeLabel(t, provider)}</span>
-                </ItemTitle>
+                <ItemTitle>{getTypeLabel(t, provider)}</ItemTitle>
                 <ItemDescription>
                   {mappings?.length
                     ? t('oauth_model_alias.model_count', { count: mappings.length })
@@ -182,7 +180,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('common.edit')}
-                    className="text-muted-foreground hover:text-foreground max-sm:size-10"
+                    className="text-muted-foreground hover:text-foreground max-sm:size-10 sm:size-8"
                     onClick={() => onEditProvider(provider)}
                   >
                     <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={1.75} />
@@ -193,7 +191,7 @@ export function OAuthModelAliasCard(props: OAuthModelAliasCardProps) {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={t('oauth_model_alias.delete')}
-                    className="text-muted-foreground hover:text-destructive max-sm:size-10"
+                    className="text-muted-foreground hover:text-destructive max-sm:size-10 sm:size-8"
                     onClick={() => onDeleteProvider(provider)}
                   >
                     <HugeiconsIcon icon={Delete02Icon} strokeWidth={1.75} />

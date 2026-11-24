@@ -86,23 +86,25 @@ export function OAuthAliasMappingRow({
         />
       </div>
       <div className="flex items-center justify-between gap-3 max-sm:contents">
-        <div className="flex items-center gap-2 max-sm:col-span-2">
+        {/* The label wraps the switch, so the whole 32px row toggles it. */}
+        <Label
+          htmlFor={`${id}-fork`}
+          className="cursor-pointer font-normal text-muted-foreground max-sm:col-span-2 sm:min-h-8"
+        >
+          {/* Default size: phones draw both sizes at 40x24, desktop gets the app's 32px switch. */}
           <Switch
             id={`${id}-fork`}
-            size="sm"
             checked={Boolean(entry.fork)}
             onCheckedChange={(value) => onChange('fork', value)}
             disabled={disabled}
           />
-          <Label htmlFor={`${id}-fork`} className="font-normal text-muted-foreground">
-            {t('oauth_model_alias.alias_fork_label')}
-          </Label>
-        </div>
+          {t('oauth_model_alias.alias_fork_label')}
+        </Label>
         <Hint label={removeLabel}>
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-muted-foreground hover:text-destructive max-sm:col-start-2 max-sm:row-start-1 max-sm:-mr-2 max-sm:size-10"
+            className="text-muted-foreground hover:text-destructive max-sm:col-start-2 max-sm:row-start-1 max-sm:-mr-2 max-sm:size-10 sm:size-8"
             onClick={onRemove}
             disabled={disabled || !canRemove}
             aria-label={removeLabel}

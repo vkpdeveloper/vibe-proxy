@@ -29,8 +29,9 @@ const buttonVariants = cva(
         icon: 'size-8 max-sm:size-10',
         'icon-xs':
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+        // 32px on desktop: the smallest icon button a pointer should have to hit.
         'icon-sm':
-          'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
+          'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg sm:size-8',
         'icon-lg': 'size-9 max-sm:size-10',
       },
     },

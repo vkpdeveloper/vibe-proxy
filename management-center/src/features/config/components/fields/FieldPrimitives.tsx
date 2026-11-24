@@ -47,7 +47,8 @@ const rowClass =
   'scroll-mt-24 px-4 py-3.5 transition-colors duration-200 ease-out data-highlight:bg-primary/10 motion-reduce:transition-none';
 
 // Short controls sit beside the copy on wider screens. On a phone switches and short numbers
-// stay beside the title; longer inputs and selects go full width below it.
+// stay beside the title; longer inputs and selects go full width below it, as they do in a
+// narrow form column (under 32rem, ConfigPage's @container), where a long label would wrap.
 type RowLayout = ControlSize | 'toggle' | 'block';
 
 /* On a phone the copy column dissolves (`contents`) so its parts join the row. A switch or a
@@ -59,7 +60,7 @@ const besideOnPhone =
 const layoutClass: Record<RowLayout, string> = {
   toggle: cn('flex items-center justify-between gap-4', besideOnPhone),
   sm: cn('flex sm:items-center sm:justify-between sm:gap-4', besideOnPhone),
-  md: 'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
+  md: 'flex flex-col gap-2 sm:@lg:flex-row sm:@lg:items-center sm:@lg:justify-between sm:@lg:gap-6',
   lg: 'flex flex-col gap-2 sm:gap-3',
   block: 'flex flex-col gap-2 sm:gap-3',
 };
@@ -67,7 +68,7 @@ const layoutClass: Record<RowLayout, string> = {
 const controlClass: Record<RowLayout, string> = {
   toggle: 'flex shrink-0 max-sm:col-start-2 max-sm:row-start-1',
   sm: 'w-28 shrink-0 max-sm:col-start-2 max-sm:row-start-1',
-  md: 'w-full sm:w-64 sm:shrink-0',
+  md: 'w-full sm:@lg:w-64 sm:@lg:shrink-0',
   lg: 'w-full',
   block: 'w-full min-w-0',
 };

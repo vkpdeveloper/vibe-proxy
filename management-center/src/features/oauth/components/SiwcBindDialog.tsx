@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Private } from '@/components/ui/private';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import iconCodex from '../codex-glyph.svg';
 import { authFilesApi } from '@/services/api/authFiles';
 import { captureSiwcBindingApi, oauthApi, type SiwcBindResponse } from '@/services/api/oauth';
@@ -34,6 +34,7 @@ import {
   Step,
   Steps,
 } from './FlowDialogParts';
+import { useNextStepFocus } from '../nextStepFocus';
 import { SiwcStatusBadge } from './SiwcStatusBadge';
 
 type Phase = 'idle' | 'starting' | 'wait' | 'ok' | 'error' | 'unsupported' | 'expired';
@@ -209,6 +210,8 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
     }
   };
 
+  // With one credential it is picked already, so the dialog moves on to Start once it loads.
+  const startButtonRef = useNextStepFocus<HTMLButtonElement>(Boolean(name));
   const selected = targets?.find((file) => file.name === name);
   const expiresOf = (file: AuthFileItem) =>
     file.siwcExpiresAt ? formatDateTimeValue(file.siwcExpiresAt, i18n.language) : '';
@@ -247,6 +250,8 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
             </Button>
             {view === 'pick' ? (
               <Button
+                ref={startButtonRef}
+                data-next-step
                 size="lg"
                 className="h-10 px-4 sm:h-9"
                 disabled={!name}
@@ -335,7 +340,7 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
                 <Trans
                   i18nKey="siwc.ok_hint"
                   components={{
-                    name: <IdentityText text={deriveAuthFileIdentity(selected).primary} />,
+                    name: <EmailPrivacyText text={deriveAuthFileIdentity(selected).primary} />,
                   }}
                 />
               </p>
@@ -347,13 +352,9 @@ export function SiwcBindDialog({ open, onClose, onViewAuthFiles }: SiwcBindDialo
   );
 }
 
-// Clipping only sideways (not truncate) keeps Private's 40px tap area intact.
+// Clipping only sideways (not truncate) keeps the email reveal button's 40px tap area intact.
+// Emails (Codex file names usually contain one too) stay masked until revealed, as elsewhere.
 const clipLine = 'min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap';
-
-/** Emails stay blurred like on the auth file cards; Codex file names usually contain one too. */
-function IdentityText({ text }: { text: string }) {
-  return text.includes('@') ? <Private>{text}</Private> : text;
-}
 
 /** The hover title would reveal a blurred email, so it is left out for those. */
 const identityTitle = (fullName: string) => (fullName.includes('@') ? undefined : fullName);
@@ -375,6 +376,8 @@ function TargetPicker({
 }) {
   const { t } = useTranslation();
   const groupName = useId();
+  // Several credentials and none picked yet: the choice is the next step.
+  const firstRef = useNextStepFocus<HTMLInputElement>(Boolean(targets?.length) && !value);
 
   let content: ReactNode;
   if (loadFailed) {
@@ -395,7 +398,7 @@ function TargetPicker({
   } else {
     content = (
       <div className="grid gap-2">
-        {targets.map((file) => {
+        {targets.map((file, index) => {
           const identity = deriveAuthFileIdentity(file);
           const expires = expiresOf(file);
           return (
@@ -404,6 +407,7 @@ function TargetPicker({
               className="flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors duration-150 ease-out hover:bg-muted/50 has-checked:border-primary/20 has-checked:bg-primary/10 has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
             >
               <input
+                ref={index === 0 ? firstRef : undefined}
                 type="radio"
                 className="grid size-4 shrink-0 appearance-none place-items-center rounded-full border border-input outline-none before:size-2 before:rounded-full before:bg-primary-foreground before:opacity-0 checked:border-primary checked:bg-primary checked:before:opacity-100 dark:bg-input/30 dark:checked:bg-primary"
                 name={groupName}
@@ -420,13 +424,13 @@ function TargetPicker({
                   )}
                   title={identityTitle(identity.fullName)}
                 >
-                  <IdentityText text={identity.primary || stripJsonExtension(file.name)} />
+                  <EmailPrivacyText text={identity.primary || stripJsonExtension(file.name)} />
                 </span>
                 {(expires || identity.secondary) && (
                   <span className={cn(clipLine, 'text-sm text-muted-foreground')}>
                     {expires && t('siwc.expires', { date: expires })}
                     {expires && identity.secondary && ' · '}
-                    {identity.secondary && <IdentityText text={identity.secondary} />}
+                    {identity.secondary && <EmailPrivacyText text={identity.secondary} />}
                   </span>
                 )}
               </span>
@@ -463,7 +467,7 @@ function TargetSummary({ file }: { file: AuthFileItem }) {
         )}
         title={identityTitle(identity.fullName)}
       >
-        <IdentityText text={identity.primary || stripJsonExtension(file.name)} />
+        <EmailPrivacyText text={identity.primary || stripJsonExtension(file.name)} />
       </span>
       <SiwcStatusBadge status={getSiwcBindingStatus(file)} withLabel={false} />
     </div>

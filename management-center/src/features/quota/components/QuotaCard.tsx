@@ -191,6 +191,9 @@ export function QuotaCard({
             id: 'claude',
             label: t(`claude_reset.${claudeReset.buttonLabel}`),
             disabled: claudeReset.blocked,
+            // No saved resets and nothing to retry: desktop drops the button instead of showing
+            // it disabled with no reason. The phone menu keeps the item.
+            empty: claudeReset.count === 0 && !claudeReset.message,
             run: () => claudeReset.confirm(),
           },
         ]
@@ -201,6 +204,7 @@ export function QuotaCard({
             id: 'quota',
             label: t('codex_quota.reset_button'),
             disabled: !canRefresh || loading || resetting,
+            empty: false,
             run: () => onReset(),
           },
         ]
@@ -241,25 +245,26 @@ export function QuotaCard({
               </Badge>
             )}
           </div>
-          <span className="text-xs text-muted-foreground">{typeLabel}</span>
+          <span className="text-xs text-muted-foreground sm:text-[13px]">{typeLabel}</span>
         </div>
         {showActions && (
           <div className="ml-auto flex items-center gap-1.5 max-sm:hidden">
-            {resetActions.map((action) => (
-              <Button
-                key={action.id}
-                variant="outline"
-                size="sm"
-                disabled={action.disabled}
-                onClick={action.run}
-              >
-                {action.label}
-              </Button>
-            ))}
+            {resetActions
+              .filter((action) => !action.empty)
+              .map((action) => (
+                <Button
+                  key={action.id}
+                  variant="outline"
+                  disabled={action.disabled}
+                  onClick={action.run}
+                >
+                  {action.label}
+                </Button>
+              ))}
             <Hint label={t('auth_files.quota_refresh_hint')}>
               <Button
                 variant="ghost"
-                size="icon-sm"
+                size="icon"
                 onClick={onRefresh}
                 disabled={refreshDisabled}
                 aria-label={t('auth_files.quota_refresh_single')}
@@ -336,7 +341,7 @@ export function QuotaCard({
               </div>
             );
           })}
-          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-faint max-sm:font-sans max-sm:text-muted-foreground">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-faint max-sm:text-muted-foreground">
             {storedSnapshot.fetchedAt && (
               <span>
                 {t('quota_management.snapshot_updated', {

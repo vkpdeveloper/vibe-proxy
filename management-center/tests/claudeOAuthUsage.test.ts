@@ -454,8 +454,8 @@ describe('Claude usage snapshot rendering and retention', () => {
 
   test('renders enabled extra usage in minor units and each balance in dollars', () => {
     const markup = render(quota);
-    expect(markup).toContain('Extra Usage');
-    expect(markup).toContain('Enabled');
+    expect(markup).toContain('Extra usage');
+    expect(markup).toContain('>On<');
     expect(markup).toContain('Spent $12.50 / Limit $50.00');
     expect(markup).toContain('25% used');
     expect(markup).toContain('iguana_necktie');
@@ -473,9 +473,9 @@ describe('Claude usage snapshot rendering and retention', () => {
 
   test('extra usage and balances share the window-row typography', () => {
     const markup = render({ ...quota, planType: 'plan_max' });
-    // Same anatomy as plan windows: label + mono telemetry header, never bare reset text.
+    // Same anatomy as plan windows: label + telemetry header, never bare reset text.
     expect(markup).toContain(
-      '<div class="quotaRowHeader"><span class="quotaModel">Extra Usage</span><div class="quotaMeta"><span class="quotaPercent">Enabled</span><span class="quotaResetRelative">25% used</span>'
+      '<div class="quotaRowHeader"><span class="quotaModel">Extra usage</span><div class="quotaMeta"><span class="quotaPercent">On</span><span class="quotaResetRelative">25% used</span>'
     );
     expect(markup).toContain(
       '<span class="quotaModel" title="iguana_necktie">iguana_necktie</span><div class="quotaMeta"><span class="quotaPercent">$94.96 remaining</span>'
@@ -502,13 +502,13 @@ describe('Claude usage snapshot rendering and retention', () => {
     );
     const plan = markup.indexOf('class="codexPlan"');
     const after = markup.indexOf('data-slot="after"');
-    const extra = markup.indexOf('Extra Usage');
+    const extra = markup.indexOf('Extra usage');
     expect(plan).toBeGreaterThanOrEqual(0);
     expect(after).toBeGreaterThan(plan);
     expect(extra).toBeGreaterThan(after);
   });
 
-  test('renders disabled extra usage, reasons, and zero amounts', () => {
+  test('renders disabled extra usage as one line with its reasons on hover', () => {
     const markup = render({
       ...quota,
       extraUsage: {
@@ -522,11 +522,13 @@ describe('Claude usage snapshot rendering and retention', () => {
         disabledReason: 'user_disabled',
       },
     });
-    expect(markup).toContain('Disabled');
-    expect(markup).toContain('Spent $0.00 / Limit $0.00');
-    expect(markup).toContain('Disabled by user');
-    expect(markup).toContain('Spending limit reached');
-    expect(markup).toContain('Reason: user_disabled');
+    expect(markup).toContain(
+      'title="Disabled by user. Spending limit reached. Reason: user_disabled"'
+    );
+    expect(markup).toContain(
+      '<span class="quotaModel">Extra usage</span><div class="quotaMeta"><span class="quotaReset">Off</span></div>'
+    );
+    expect(markup).not.toContain('Spent $0.00 / Limit $0.00');
   });
 
   test('shows the last observation time when a retained snapshot is stale', () => {

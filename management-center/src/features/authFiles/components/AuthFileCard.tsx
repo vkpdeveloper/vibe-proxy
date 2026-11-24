@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { Link, useNavigate } from 'react-router-dom';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Delete02Icon,
   Key01Icon,
@@ -20,7 +20,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,7 +45,9 @@ import {
   getAuthFileStatusMessage,
   hasAuthFileStatusWarning,
   getTypeLabel,
+  isProblemAuthFile,
   isRuntimeOnlyAuthFile,
+  isSignInProblem,
   normalizeProviderKey,
   supportsAuthFileManualRefresh,
 } from '@/features/authFiles/constants';
@@ -92,28 +93,6 @@ export type AuthFileCardProps = {
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onToggleSelect: (name: string) => void;
 };
-
-function IconAction({
-  icon,
-  label,
-  className,
-  ...props
-}: React.ComponentProps<typeof Button> & { icon: IconSvgElement; label: string }) {
-  return (
-    <Hint label={label}>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={label}
-        // Phones reach these through the card menu, where each action has a text label.
-        className={cn('text-muted-foreground hover:text-foreground max-sm:hidden', className)}
-        {...props}
-      >
-        <HugeiconsIcon icon={icon} strokeWidth={1.75} />
-      </Button>
-    </Hint>
-  );
-}
 
 /** One credential: account, state, quota, request counts and its actions. */
 export function AuthFileCard(props: AuthFileCardProps) {
@@ -224,25 +203,34 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const quotaUnknown = quota?.status === 'unavailable';
   // Signing in again only matters while the card has no limits to show.
   const showReconnectInMenu = Boolean(limitsReconnectId) && quota?.remainingPercent == null;
-  const hasPhoneMenu =
+  const hasMenu =
     showAccountPreference ||
     showModelsButton ||
     showReconnectInMenu ||
     showManualRefreshButton ||
     !isRuntimeOnly;
+  const problem = isProblemAuthFile(file);
+  // A sign-in failure gets its fix on the card: refresh the token where the provider can,
+  // otherwise sign in again on the OAuth page.
+  const signInFix =
+    !isRuntimeOnly && isSignInProblem(file)
+      ? showManualRefreshButton
+        ? 'refresh'
+        : 'oauth'
+      : null;
   // Phones show the state only when it needs attention: the switch already says "enabled".
   const stateNeedsAttention = isRuntimeOnly || disabled || Boolean(statusError);
-  const chip = (label: string) => (
-    <Badge variant="secondary" className="gap-1.5">
-      <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-      {label}
+  const preferredShown = showAccountPreference && accountPreferred;
+  const preferredBadge = (
+    <Badge variant="secondary" className="gap-1">
+      <HugeiconsIcon icon={Route01Icon} strokeWidth={1.75} className="size-3.5 text-primary" />
+      {t('auth_files.preferred_short')}
     </Badge>
   );
-  const preferredShown = showAccountPreference && accountPreferred;
-  // Phones have room for one chip beside the provider: "In use" wins, since routing picks the
-  // preferred account anyway, and carries the menu's route icon when the account is preferred too.
-  // A preferred account that isn't in use gets the route icon instead of the live dot.
-  const phoneChip = isRoutingSelected ? (
+  // Phones fit one chip beside the provider: "In use" wins, since routing picks the preferred
+  // account anyway, and carries the menu's route icon when the account is preferred too. Desktop
+  // has room beside the name for both badges.
+  const chip = isRoutingSelected ? (
     <Badge variant="secondary" className="gap-1.5">
       <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
       {t('auth_files.routing_selected')}
@@ -259,44 +247,68 @@ export function AuthFileCard(props: AuthFileCardProps) {
       )}
     </Badge>
   ) : preferredShown ? (
-    <Badge variant="secondary" className="gap-1">
-      <HugeiconsIcon icon={Route01Icon} strokeWidth={1.75} className="size-3.5 text-primary" />
-      {t('auth_files.preferred_short')}
-    </Badge>
+    preferredBadge
   ) : null;
+  const inUseBadge = isRoutingSelected && (
+    <Badge variant="secondary" className="gap-1.5">
+      <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+      {t('auth_files.routing_selected')}
+    </Badge>
+  );
   const hasCounts = successCount > 0 || failureCount > 0;
-  // A phone tap on the card body opens its details (or selects it in select mode). Controls keep
-  // their own taps, and clicks bubbling out of portalled menus and dialogs are ignored.
+  // A click on the card body opens its details (or selects it while selecting). Controls keep
+  // their own clicks, and clicks bubbling out of portalled menus and dialogs are ignored, as is
+  // the end of a drag that selected text to copy.
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!phone || isRuntimeOnly) return;
+    if (isRuntimeOnly) return;
     const target = event.target as Element;
     if (!event.currentTarget.contains(target)) return;
     if (target.closest('button, a, input, label, [role="button"], [role="switch"]')) return;
+    if (!phone && window.getSelection()?.toString()) return;
     if (selecting) onToggleSelect(file.name);
-    else if (!disableControls && !isManualRefreshing) onOpenPrefixProxyEditor(file);
+    else if (!disableControls && !isManualRefreshing) {
+      // The card itself can't take focus, so the sheet hands focus back to its ⋯ button on close
+      // instead of dropping it to the page.
+      if (!phone)
+        event.currentTarget
+          .querySelector<HTMLElement>('[data-card-menu]')
+          ?.focus({ preventScroll: true });
+      onOpenPrefixProxyEditor(file);
+    }
   };
   // Imports save notes like "OpenCode Go quota tracking", which only repeat the provider.
   const noteRepeatsProvider = noteValue.toLowerCase().startsWith(typeLabel.toLowerCase());
+  // Desktop rows below the header line up with the name, past the logo.
+  const indentClass = 'sm:pl-12';
 
   return (
     <Item
       variant="outline"
       role="listitem"
       className={cn(
-        'items-start gap-x-3 gap-y-3 p-4',
-        !isRuntimeOnly && 'max-sm:cursor-pointer',
-        selected && 'border-primary/50 bg-primary/5',
-        isRoutingSelected && !selected && 'border-primary/30'
+        'items-start gap-x-3 gap-y-3 p-4 sm:relative',
+        !isRuntimeOnly && 'cursor-pointer',
+        // Desktop: the border marks selection only, and a problem gets an amber tint. Phones
+        // also outline the account in use.
+        selected
+          ? 'border-primary/50 bg-primary/5'
+          : problem
+            ? 'sm:border-warning/40 sm:bg-warning/[0.04] sm:hover:bg-warning/[0.08]'
+            : !isRuntimeOnly && 'sm:hover:bg-muted/40',
+        isRoutingSelected && !selected && 'max-sm:border-primary/30'
       )}
       onClick={handleCardClick}
     >
       {!isRuntimeOnly && (
         // On phones the label stretches from the card edge to the logo, so the whole leading
         // cell selects; the negative margins keep the layout where the bare checkbox put it.
+        // Desktop lays it over the logo tile, shown on hover or focus and while selecting, so
+        // the card keeps no empty column for it.
         <label
           className={cn(
-            'mt-2.5 flex cursor-pointer max-sm:-mt-4 max-sm:-mr-3 max-sm:-mb-4 max-sm:-ml-4 max-sm:self-stretch max-sm:pt-6.5 max-sm:pr-3 max-sm:pb-4 max-sm:pl-4',
-            !selecting && 'max-sm:hidden'
+            'flex cursor-pointer max-sm:-mt-4 max-sm:-mr-3 max-sm:-mb-4 max-sm:-ml-4 max-sm:self-stretch max-sm:pt-6.5 max-sm:pr-3 max-sm:pb-4 max-sm:pl-4 sm:absolute sm:top-4 sm:left-4 sm:z-10 sm:size-9 sm:items-center sm:justify-center sm:rounded-lg sm:bg-secondary sm:ring-1 sm:ring-white/10',
+            !selecting &&
+              'max-sm:hidden sm:opacity-0 sm:transition-opacity sm:group-hover/item:opacity-100 sm:focus-within:opacity-100'
           )}
         >
           <Checkbox
@@ -327,8 +339,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
               identity.primary || typeLabel
             )}
           </span>
-          {isRoutingSelected && (
-            <span className="contents max-sm:hidden">{chip(t('auth_files.routing_selected'))}</span>
+          {(inUseBadge || preferredShown) && (
+            <span className="contents max-sm:hidden">
+              {inUseBadge}
+              {preferredShown && preferredBadge}
+            </span>
           )}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground max-sm:text-[13px]">
@@ -343,17 +358,19 @@ export function AuthFileCard(props: AuthFileCardProps) {
             {stateLabel}
           </span>
           {/* Phones keep the title for the account and put the chip here. */}
-          {phoneChip && <span className="contents sm:hidden">{phoneChip}</span>}
-          <span
-            className="font-mono text-xs tabular-nums max-sm:hidden"
-            title={`${t('stats.success')} / ${t('stats.failure')}`}
-          >
-            <span className={successCount > 0 ? 'text-success' : undefined}>{successCount}</span>
-            <span className="text-faint"> / </span>
-            <span className={failureCount > 0 ? 'text-destructive' : undefined}>
-              {failureCount}
+          {chip && <span className="contents sm:hidden">{chip}</span>}
+          {/* Phones give the counts their own line below. */}
+          {hasCounts && (
+            <span className="max-sm:hidden" title={t('auth_files.count_since_restart')}>
+              <span className={successCount > 0 ? 'text-success' : undefined}>
+                {t('auth_files.count_success', { count: successCount })}
+              </span>
+              <span aria-hidden="true"> · </span>
+              <span className={failureCount > 0 ? 'text-destructive' : undefined}>
+                {t('auth_files.count_failure', { count: failureCount })}
+              </span>
             </span>
-          </span>
+          )}
           {noteValue && (
             <span
               className={cn('min-w-0 truncate text-faint', noteRepeatsProvider && 'max-sm:hidden')}
@@ -363,124 +380,21 @@ export function AuthFileCard(props: AuthFileCardProps) {
             </span>
           )}
         </div>
-        {statusError &&
-          (phone && !isRuntimeOnly ? (
-            // Phones tap through to the details, which show the whole message, as the card does.
-            <p className="line-clamp-2 text-[13px] text-warning">
-              {statusError.kind && <span className="font-medium">{statusError.kind}: </span>}
-              {statusError.message}
-            </p>
-          ) : (
-            // A click shows the whole message beyond the title tooltip.
-            <button
-              type="button"
-              aria-expanded={errorExpanded}
-              className={cn(
-                'text-left text-xs text-warning max-sm:text-[13px]',
-                !errorExpanded && 'line-clamp-2'
-              )}
-              title={statusError.message}
-              onClick={() => setErrorExpanded((current) => !current)}
-            >
-              {statusError.kind && <span className="font-medium">{statusError.kind}: </span>}
-              {statusError.message}
-            </button>
-          ))}
+        {/* Phones tap through to the details, which show the whole message. */}
+        {statusError && phone && (
+          <p className="line-clamp-2 text-[13px] text-warning">
+            {statusError.kind && <span className="font-medium">{statusError.kind}: </span>}
+            {statusError.message}
+          </p>
+        )}
       </ItemContent>
-      {/* Phones reach these actions through the ⋯ menu in the header. */}
-      <ItemActions className="-my-0.5 gap-0 max-sm:hidden">
-        {showAccountPreference && (
-          <IconAction
-            icon={Route01Icon}
-            label={t(
-              accountPreferred ? 'auth_files.account_preferred' : 'auth_files.prefer_account'
-            )}
-            aria-label={t('auth_files.prefer_account_aria', { name: identity.primary })}
-            aria-pressed={accountPreferred === true}
-            className={cn(accountPreferred && 'text-primary hover:text-primary')}
-            onClick={() => onPreferAccount?.(file)}
-            disabled={preferDisabled}
-          />
-        )}
-        {showModelsButton && (
-          <IconAction
-            icon={Layers01Icon}
-            label={t('auth_files.models_button')}
-            onClick={() => onShowModels(file)}
-            disabled={disableControls}
-          />
-        )}
-        {limitsReconnectId && (
-          <IconAction
-            icon={Key01Icon}
-            label={t('auth_files.reconnect_limits_button')}
-            onClick={reconnectLimits}
-            disabled={reconnectDisabled}
-          />
-        )}
-        {showManualRefreshButton && (
-          <IconAction
-            icon={RefreshIcon}
-            label={t('auth_files.manual_refresh_button')}
-            onClick={() => onManualRefresh(file)}
-            disabled={manualRefreshDisabled}
-          />
-        )}
-        {!isRuntimeOnly && (
-          <>
-            <IconAction
-              icon={Settings02Icon}
-              label={t('auth_files.prefix_proxy_button')}
-              onClick={() => onOpenPrefixProxyEditor(file)}
-              disabled={disableControls || isManualRefreshing}
-            />
-            <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-              <AlertDialogTrigger asChild>
-                <IconAction
-                  icon={Delete02Icon}
-                  label={t('auth_files.delete_button')}
-                  className="hover:text-destructive"
-                  disabled={deleteDisabled}
-                />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t('auth_files.delete_title')}</AlertDialogTitle>
-                  {/* Name the account and provider, as the card does, rather than the file. */}
-                  <AlertDialogDescription className="flex flex-col gap-1">
-                    <span className="flex min-w-0 items-center gap-2 text-foreground">
-                      <ProviderLogo type={providerKey} className="size-5 rounded-[5px]" />
-                      <span className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap">
-                        {identity.kind === 'email' ? (
-                          <Private>{identity.primary}</Private>
-                        ) : (
-                          identity.primary || typeLabel
-                        )}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">{typeLabel}</span>
-                    </span>
-                    <span>{t('auth_files.delete_confirm')}</span>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={() => onDelete(file.name)}>
-                    {t('common.delete')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        )}
-      </ItemActions>
-      {/* The switch and, on phones, the ⋯ menu share the header's top-right corner. The
-          negative margins keep the 40px menu target from making the header taller. Phone select
-          mode hides both so the checkbox is the card's only control. */}
-      {hasPhoneMenu && (
+      {/* The switch and the ⋯ menu share the header's top-right corner. The negative margins
+          keep the menu target from making the header taller. Phone select mode hides both so
+          the checkbox is the card's only control. */}
+      {hasMenu && (
         <ItemActions
           className={cn(
-            'mt-1.5 sm:ml-1 max-sm:-mr-2 max-sm:gap-1',
-            isRuntimeOnly && 'sm:hidden',
+            'mt-1.5 max-sm:-mr-2 max-sm:gap-1 sm:-mr-1.5 sm:ml-1 sm:gap-1',
             selecting && 'max-sm:hidden'
           )}
         >
@@ -496,31 +410,21 @@ export function AuthFileCard(props: AuthFileCardProps) {
             />
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              {/* The square pseudo-element keeps the rounded button's corners tappable. */}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('common.more')}
-                className="relative -my-2.5 size-10 text-muted-foreground after:absolute after:-inset-px hover:text-foreground sm:hidden"
-              >
-                <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" collisionPadding={16} className="w-auto min-w-52">
-              {showAccountPreference && (
-                // An action, ticked while this account is the one used until exhausted.
-                <DropdownMenuCheckboxItem
-                  checked={accountPreferred === true}
-                  onSelect={() => {
-                    if (!accountPreferred) onPreferAccount?.(file);
-                  }}
-                  disabled={preferDisabled && !accountPreferred}
+            <Hint label={t('common.more')}>
+              <DropdownMenuTrigger asChild>
+                {/* The square pseudo-element keeps the rounded button's corners tappable. */}
+                <Button
+                  data-card-menu=""
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('common.more')}
+                  className="relative -my-2.5 size-10 text-muted-foreground after:absolute after:-inset-px hover:text-foreground sm:-my-1.5 sm:size-8"
                 >
-                  <HugeiconsIcon icon={Route01Icon} strokeWidth={1.75} />
-                  {t('auth_files.prefer_account')}
-                </DropdownMenuCheckboxItem>
-              )}
+                  <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
+                </Button>
+              </DropdownMenuTrigger>
+            </Hint>
+            <DropdownMenuContent align="end" collisionPadding={16} className="w-auto min-w-52">
               {showModelsButton && (
                 <DropdownMenuItem onSelect={() => onShowModels(file)} disabled={disableControls}>
                   <HugeiconsIcon icon={Layers01Icon} strokeWidth={1.75} />
@@ -551,6 +455,22 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {t('auth_files.manual_refresh_button')}
                 </DropdownMenuItem>
               )}
+              {showAccountPreference && (
+                <>
+                  <DropdownMenuSeparator />
+                  {/* An action, ticked while this account is the one used until exhausted. */}
+                  <DropdownMenuCheckboxItem
+                    checked={accountPreferred === true}
+                    onSelect={() => {
+                      if (!accountPreferred) onPreferAccount?.(file);
+                    }}
+                    disabled={preferDisabled && !accountPreferred}
+                  >
+                    <HugeiconsIcon icon={Route01Icon} strokeWidth={1.75} />
+                    {t('auth_files.prefer_account')}
+                  </DropdownMenuCheckboxItem>
+                </>
+              )}
               {!isRuntimeOnly && (
                 <>
                   <DropdownMenuSeparator />
@@ -569,18 +489,77 @@ export function AuthFileCard(props: AuthFileCardProps) {
         </ItemActions>
       )}
 
+      {/* Desktop gives a problem the card's full width, with its fix beside it. */}
+      {statusError && !phone && (
+        <div className={cn('flex basis-full flex-col items-start gap-2', indentClass)}>
+          {/* A click shows the whole message beyond the title tooltip. */}
+          <button
+            type="button"
+            aria-expanded={errorExpanded}
+            className={cn('text-left text-[13px] text-warning', !errorExpanded && 'line-clamp-2')}
+            title={statusError.message}
+            onClick={() => setErrorExpanded((current) => !current)}
+          >
+            {statusError.kind && <span className="font-medium">{statusError.kind}: </span>}
+            {statusError.message}
+          </button>
+          {signInFix === 'refresh' && (
+            <Button
+              variant="outline"
+              onClick={() => onManualRefresh(file)}
+              disabled={manualRefreshDisabled}
+            >
+              <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
+              {t('auth_files.manual_refresh_button')}
+            </Button>
+          )}
+          {signInFix === 'oauth' && (
+            <Button variant="outline" asChild>
+              <Link to="/oauth">{t('auth_files.sign_in_again')}</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!isRuntimeOnly && (
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('auth_files.delete_title')}</AlertDialogTitle>
+              {/* Name the account and provider, as the card does, rather than the file. */}
+              <AlertDialogDescription className="flex flex-col gap-1">
+                <span className="flex min-w-0 items-center gap-2 text-foreground">
+                  <ProviderLogo type={providerKey} className="size-5 rounded-[5px]" />
+                  <span className="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap">
+                    {identity.kind === 'email' ? (
+                      <Private>{identity.primary}</Private>
+                    ) : (
+                      identity.primary || typeLabel
+                    )}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">{typeLabel}</span>
+                </span>
+                <span>{t('auth_files.delete_confirm')}</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => onDelete(file.name)}>
+                {t('common.delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
       {quota && (
         <ItemFooter
-          className={cn(
-            'flex-col items-stretch gap-1.5',
-            isRuntimeOnly ? 'sm:pl-12' : 'sm:pl-19',
-            disabled && 'opacity-60'
-          )}
+          className={cn('flex-col items-stretch gap-1.5', indentClass, disabled && 'opacity-60')}
           title={quota.state.last_error || undefined}
         >
-          {/* Phones use sans numbers at the card's 13px, name the window as Quota does and give
-              the reset as a short countdown ("Resets in 3d 12h"). */}
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 font-mono text-xs tabular-nums max-sm:font-sans max-sm:text-[13px] max-sm:normal-nums">
+          {/* Phones name the window as Quota does and give the reset as a short countdown
+              ("Resets in 3d 12h"). */}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[13px]">
             <span className={cn('text-foreground', quotaUnknown && 'max-sm:text-muted-foreground')}>
               {quotaLabel}
               {windowLabel && (
@@ -609,7 +588,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
       )}
 
       {Boolean(file.cooldownSnapshot?.records?.length) && (
-        <div className={cn('basis-full', isRuntimeOnly ? 'sm:pl-12' : 'sm:pl-19')}>
+        <div className={cn('basis-full', indentClass)}>
           <AuthFileCooldownSection
             snapshot={file.cooldownSnapshot}
             resetting={Boolean(authIndexKey && cooldownResetting[authIndexKey])}

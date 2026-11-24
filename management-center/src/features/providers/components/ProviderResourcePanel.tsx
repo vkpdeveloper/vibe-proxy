@@ -73,7 +73,7 @@ export function ProviderResourcePanel({
         />
 
         {filteredResources.length === 0 ? (
-          <Empty className="rounded-xl border border-dashed py-10">
+          <Empty className="py-10 max-sm:rounded-xl max-sm:border max-sm:border-dashed">
             <EmptyDescription>{t('providersPage.table.noMatches')}</EmptyDescription>
           </Empty>
         ) : (

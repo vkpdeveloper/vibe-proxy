@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -65,9 +66,11 @@ export function ConfirmationModal() {
             )}
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
+            {/* Radix focuses the Cancel on open, which keeps Tab inside the dialog. Closing it
+                goes through onOpenChange, which runs handleCancel. */}
+            <AlertDialogCancel disabled={isLoading}>
               {options.cancelText || t('common.cancel')}
-            </Button>
+            </AlertDialogCancel>
             <Button
               variant={options.variant === 'danger' ? 'destructive' : 'default'}
               onClick={() => void handleConfirm()}

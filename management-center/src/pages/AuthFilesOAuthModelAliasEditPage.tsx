@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Add01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
   Empty,
   EmptyContent,
@@ -124,9 +123,6 @@ export function AuthFilesOAuthModelAliasEditPage() {
     ? t('oauth_model_alias.edit_title', { provider: provider.trim() || resolvedProviderKey })
     : t('oauth_model_alias.add_title');
   const headerHint = useMemo(() => {
-    if (!provider.trim()) {
-      return t('oauth_model_alias.provider_hint');
-    }
     if (modelsLoading) {
       return t('oauth_model_alias.model_source_loading');
     }
@@ -134,7 +130,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
       return t('oauth_model_alias.model_source_unsupported');
     }
     return t('oauth_model_alias.model_source_loaded', { count: modelsList.length });
-  }, [modelsError, modelsList.length, modelsLoading, provider, t]);
+  }, [modelsError, modelsList.length, modelsLoading, t]);
 
   const handleBack = useCallback(() => {
     const state = location.state as LocationState;
@@ -398,22 +394,21 @@ export function AuthFilesOAuthModelAliasEditPage() {
             onClick={handleSave}
             disabled={!canSave}
           >
-            <span className="sm:hidden">{t('common.save')}</span>
-            <span className="max-sm:hidden">{t('oauth_model_alias.save')}</span>
+            {t('common.save')}
           </Button>
         }
       >
         {initialLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : modelAliasUnsupported ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyTitle>{t('oauth_model_alias.upgrade_required_title')}</EmptyTitle>
               <EmptyDescription>{t('oauth_model_alias.upgrade_required_desc')}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : initialLoadError !== null ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyTitle>{t('notification.refresh_failed')}</EmptyTitle>
               <EmptyDescription>
@@ -440,6 +435,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
               actions={
                 <Button
                   variant="outline"
+                  size="lg"
                   className="max-sm:hidden"
                   onClick={addMappingEntry}
                   disabled={disableControls || saving || modelAliasUnsupported}
@@ -450,15 +446,8 @@ export function AuthFilesOAuthModelAliasEditPage() {
               }
             >
               <div className="flex flex-col gap-3">
-                {/* Without a provider this repeats the provider hint above; phones skip it. */}
-                <p
-                  className={cn(
-                    'text-sm text-muted-foreground',
-                    !provider.trim() && 'max-sm:hidden'
-                  )}
-                >
-                  {headerHint}
-                </p>
+                {/* Without a provider this would repeat the provider hint above. */}
+                {provider.trim() && <p className="text-sm text-muted-foreground">{headerHint}</p>}
                 <div className="flex flex-col divide-y rounded-xl border">
                   {mappings.map((entry, index) => (
                     <OAuthAliasMappingRow

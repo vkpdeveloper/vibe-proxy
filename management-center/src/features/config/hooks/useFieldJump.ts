@@ -73,6 +73,10 @@ export function useFieldJump({ values, setActiveSection }: UseFieldJumpArgs) {
         block: 'center',
         inline: 'nearest',
       });
+      // Keyboard users land on the field itself, not back in the search box.
+      el.querySelector<HTMLElement>(
+        'input:not([type=hidden]), textarea, select, button, summary, [tabindex="0"]'
+      )?.focus({ preventScroll: true });
       el.setAttribute(FIELD_HIGHLIGHT_ATTR, '');
       highlightedElRef.current = el;
       highlightTimerRef.current = window.setTimeout(() => {

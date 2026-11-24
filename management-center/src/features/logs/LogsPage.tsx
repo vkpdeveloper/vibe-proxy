@@ -8,9 +8,14 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { ComponentProps, Dispatch, ReactNode, SetStateAction } from 'react';
+import type {
+  Dispatch,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode,
+  SetStateAction,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
@@ -23,14 +28,11 @@ import {
   File01Icon,
   FilterHorizontalIcon,
   MoreHorizontalIcon,
-  PauseIcon,
   PlayIcon,
-  RefreshIcon,
   Search01Icon,
 } from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import {
   Dialog,
   DialogContent,
@@ -73,7 +75,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Hint, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Hint } from '@/components/ui/tooltip';
 import { lockScroll, unlockScroll } from '@/components/legacy/scrollLock';
 import { usePhone } from '@/components/layout/pageBar';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
@@ -95,7 +97,7 @@ import {
   type LogEntry,
 } from '@/features/logs/model/logSelectors';
 import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
-import { formatDateTimeValue, formatDateValue, formatUnixTimestamp } from '@/utils/format';
+import { formatDateTimeValue, formatDateValue, parseDateValue } from '@/utils/format';
 import { HTTP_METHODS, STATUS_GROUPS, type LogState } from './model/logTypes';
 import { createLogRequestGuard } from './model/logRequests';
 import { errorLogViewerReducer } from './model/errorLogViewer';
@@ -124,7 +126,21 @@ type TabType = 'logs' | 'errors';
 const SHEET_CLASS =
   'max-h-[85dvh] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)] outline-none';
 
+/** Keeps the rows clear of the open detail panel (448px wide) where both fit with the path. */
+const PANEL_ROOM = 'xl:pr-[27rem]';
+
 const formatSize = (size?: number) => (size ? `${(size / 1024).toFixed(1)} KB` : '');
+
+/** Log rows: one tab stop for the whole list, arrow keys move between rows. */
+const ROW_SELECTOR = '[role="button"][data-log-id]';
+
+function siblingRow(row: Element, forward: boolean) {
+  let node = forward ? row.nextElementSibling : row.previousElementSibling;
+  while (node && !node.matches(ROW_SELECTOR)) {
+    node = forward ? node.nextElementSibling : node.previousElementSibling;
+  }
+  return node;
+}
 
 /** The colored bar at the start of a row: failures first, then requests, then everything else. */
 function rowTone(line: LogEntry) {
@@ -154,33 +170,6 @@ function statusTone(code: number) {
   return 'text-success max-sm:text-muted-foreground';
 }
 
-function IconAction({
-  label,
-  icon,
-  className,
-  ...props
-}: Omit<ComponentProps<typeof Button>, 'children'> & {
-  label: string;
-  icon: IconSvgElement;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon-lg"
-          aria-label={label}
-          className={className}
-          {...props}
-        >
-          <HugeiconsIcon icon={icon} strokeWidth={1.75} />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 function Notice({
   tone = 'muted',
   children,
@@ -192,7 +181,7 @@ function Notice({
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex items-center gap-2 border-b px-4 py-2 text-xs',
+        'flex items-center gap-2 border-b px-10 py-2 text-xs max-sm:px-4',
         tone === 'muted' && 'text-muted-foreground',
         tone === 'warning' && 'bg-warning/8 text-warning',
         tone === 'error' && 'bg-destructive/8 text-destructive'
@@ -333,6 +322,12 @@ export function LogsPage() {
   const [requestLogDownloading, setRequestLogDownloading] = useState(false);
   const [fullscreenLogs, setFullscreenLogs] = useState(false);
   const [detail, setDetail] = useState<LogEntry | null>(null);
+  const [focusedRowId, setFocusedRowId] = useState<number | null>(null);
+  // The row the detail panel showed last, for focus to return to once it closes.
+  const lastDetailId = useRef<number | null>(null);
+  useEffect(() => {
+    if (detail) lastDetailId.current = detail.id;
+  }, [detail]);
   const phone = usePhone();
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -367,7 +362,6 @@ export function LogsPage() {
   });
 
   const disableControls = connectionStatus !== 'connected';
-  const refreshDisabled = disableControls || loading || clearingLogs || cpaNeedsFileLogging;
   const autoRefreshDisabled = disableControls || showFileLoggingRequired;
   const clearDisabled = disableControls || clearingLogs || showFileLoggingRequired;
 
@@ -574,6 +568,15 @@ export function LogsPage() {
     setVisibleCount(next.buffer.length - next.visibleFrom);
   };
   const parsedVisibleLines = filteredParsedLines.slice(logState.visibleFrom);
+  // The row keyboard users return to: the last one they focused, else the newest.
+  const tabRowId = parsedVisibleLines.some((line) => line.id === focusedRowId)
+    ? focusedRowId
+    : parsedVisibleLines.at(-1)?.id;
+  // Rows and dividers show the viewer's own clock and date.
+  const timeFormat = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { timeStyle: 'medium' }),
+    [i18n.language]
+  );
 
   const {
     canLoadMore,
@@ -613,6 +616,9 @@ export function LogsPage() {
     filters.statusFilterSet,
     filters.pathFilterSet,
   ]);
+
+  const rowElement = (id: number) =>
+    logViewerRef.current?.querySelector<HTMLElement>(`${ROW_SELECTOR}[data-log-id="${id}"]`);
 
   const copyLogLine = async (raw: string) => {
     const ok = await copyToClipboard(raw);
@@ -698,6 +704,13 @@ export function LogsPage() {
         ? 'logs.read_status_live'
         : 'logs.read_status_paused';
   const live = autoRefresh && !disableControls;
+  const lastUpdatedText =
+    lastUpdated &&
+    t('logs.last_updated', { time: new Date(lastUpdated).toLocaleTimeString(i18n.language) });
+  const bufferScope = t('logs.buffer_scope', {
+    count: logBuffer.buffer.length.toLocaleString(i18n.language),
+    matched: filteredLines.length.toLocaleString(i18n.language),
+  });
   const fullscreenLabel = fullscreenLogs
     ? t('logs.exit_fullscreen_button')
     : t('logs.fullscreen_button');
@@ -707,41 +720,42 @@ export function LogsPage() {
     setActiveTab(tab);
   };
 
-  // Phone: a full-width segmented control with short names.
-  const tabs = phone ? (
+  // Each tab has its own toolbar, so the control remounts on a switch; this puts focus back on
+  // the selected item when the switch came from the control itself.
+  const refocusTab = useRef(false);
+  const focusSelectedTab = (element: HTMLButtonElement | null) => {
+    if (!element || !refocusTab.current) return;
+    refocusTab.current = false;
+    element.focus();
+  };
+
+  // The shared segmented control; full width on phones.
+  const tabs = (
     <ToggleGroup
       type="single"
       variant="outline"
       spacing={0}
       aria-label={t('nav_short.logs')}
-      className="w-full"
+      className={phone ? 'w-full' : undefined}
       value={activeTab}
       // Radix sends an empty value when the active tab is pressed again; keep it.
       onValueChange={(value) => {
-        if (value === 'logs' || value === 'errors') selectTab(value);
+        if (value !== 'logs' && value !== 'errors') return;
+        refocusTab.current = true;
+        selectTab(value);
       }}
     >
       {(['logs', 'errors'] as const).map((tab) => (
-        <ToggleGroupItem key={tab} value={tab} className="flex-1">
+        <ToggleGroupItem
+          key={tab}
+          ref={activeTab === tab ? focusSelectedTab : undefined}
+          value={tab}
+          className={phone ? 'flex-1' : 'px-3'}
+        >
           {t(tab === 'logs' ? 'logs.tab_logs' : 'logs.tab_errors')}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
-  ) : (
-    <ButtonGroup aria-label={t('nav_short.logs')}>
-      {(['logs', 'errors'] as const).map((tab) => (
-        <Button
-          key={tab}
-          variant={activeTab === tab ? 'secondary' : 'outline'}
-          size="lg"
-          className="h-9"
-          aria-pressed={activeTab === tab}
-          onClick={() => selectTab(tab)}
-        >
-          {t(tab === 'logs' ? 'logs.log_content' : 'logs.error_logs_modal_title')}
-        </Button>
-      ))}
-    </ButtonGroup>
   );
 
   const levelSelect = (className: string) => (
@@ -763,51 +777,70 @@ export function LogsPage() {
     </Select>
   );
 
+  const onRowKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, line: LogEntry) => {
+    if (event.target !== event.currentTarget) return;
+    const row = event.currentTarget;
+    const rows = row.parentElement?.querySelectorAll<HTMLElement>(ROW_SELECTOR);
+    let target: Element | null | undefined;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setDetail(line);
+      return;
+    }
+    if (event.key === 'ArrowDown') target = siblingRow(row, true);
+    else if (event.key === 'ArrowUp') target = siblingRow(row, false);
+    else if (event.key === 'Home') target = rows?.[0];
+    else if (event.key === 'End') target = rows?.[rows.length - 1];
+    else return;
+    event.preventDefault();
+    if (target instanceof HTMLElement) target.focus();
+  };
+
   const renderRow = (line: LogEntry) => {
     const failed =
       line.level === 'error' || line.level === 'fatal' || (line.statusCode ?? 0) >= 500;
     const tone = rowTone(line);
-    const time = phone && line.timestamp ? logInstant(line.timestamp, serverOffset) : null;
+    const time = line.timestamp ? logInstant(line.timestamp, serverOffset) : null;
     const text = wrapLogs ? 'whitespace-pre-wrap break-all' : 'truncate';
+    const open = detail?.id === line.id;
     return (
       <div
         key={line.id}
         data-log-id={line.id}
+        role="button"
+        tabIndex={line.id === tabRowId ? 0 : -1}
+        aria-current={open || undefined}
         className={cn(
-          'group/row flex items-start gap-3 px-4 py-[5px] leading-5 hover:bg-muted/60 focus-within:bg-muted/60',
-          'max-sm:relative max-sm:mx-2 max-sm:grid max-sm:cursor-pointer max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-y-0.5 max-sm:rounded-lg max-sm:px-2 max-sm:py-1.5 max-sm:outline-none',
-          failed && 'bg-destructive/8 hover:bg-destructive/12'
+          'group/row relative flex cursor-pointer items-start gap-3 px-10 py-[5px] leading-5 outline-none hover:bg-muted/60 focus-within:bg-muted/60 sm:focus-visible:ring-2 sm:focus-visible:ring-ring/50 sm:focus-visible:ring-inset',
+          'max-sm:mx-2 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-y-0.5 max-sm:rounded-lg max-sm:px-2 max-sm:py-1.5',
+          failed && 'bg-destructive/8 hover:bg-destructive/12',
+          open && (failed ? 'sm:bg-destructive/15' : 'sm:bg-muted')
         )}
-        onDoubleClick={() => {
-          void copyLogLine(line.raw);
+        // A row opens the whole entry, unless the click ended a text selection.
+        onClick={() => {
+          if (window.getSelection()?.type === 'Range') return;
+          setDetail(line);
         }}
-        // Phone rows can't show everything, so a tap opens the whole entry.
-        role={phone ? 'button' : undefined}
-        tabIndex={phone ? 0 : undefined}
-        onClick={phone ? () => setDetail(line) : undefined}
-        onKeyDown={
-          phone
-            ? (event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                setDetail(line);
-              }
-            : undefined
-        }
-        title={t('logs.double_click_copy_hint', { defaultValue: 'Double-click to copy' })}
+        onKeyDown={(event) => onRowKeyDown(event, line)}
+        onFocus={(event) => {
+          if (event.target !== event.currentTarget) return;
+          setFocusedRowId(line.id);
+          // The desktop panel follows the row as arrow keys move through the list.
+          if (detail && !phone) setDetail(line);
+        }}
       >
-        {/* Phone keeps the bar for warnings and failures only, so they stand out. */}
+        {/* The bar marks warnings and failures only, so they stand out. */}
         <span
           aria-hidden="true"
           className={cn(
-            'mt-0.5 h-4 w-[3px] shrink-0 rounded-full max-sm:absolute max-sm:inset-y-2 max-sm:left-0 max-sm:mt-0 max-sm:h-auto',
+            'absolute top-[7px] left-7 h-4 w-[3px] rounded-full max-sm:inset-y-2 max-sm:left-0 max-sm:h-auto',
             tone,
-            (tone === 'bg-primary' || tone === 'bg-faint') && 'max-sm:hidden'
+            (tone === 'bg-primary' || tone === 'bg-faint') && 'hidden'
           )}
         />
-        <span className="w-[4.25rem] shrink-0 whitespace-nowrap text-faint tabular-nums max-sm:col-start-1 max-sm:row-start-2 max-sm:w-auto max-sm:font-sans max-sm:text-xs max-sm:leading-4 max-sm:text-muted-foreground max-sm:normal-nums">
+        <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-faint tabular-nums max-sm:col-start-1 max-sm:row-start-2 max-sm:w-auto max-sm:font-sans max-sm:text-xs max-sm:leading-4 max-sm:text-muted-foreground max-sm:normal-nums">
           {time
-            ? time.toLocaleTimeString(i18n.language, { timeStyle: 'medium' })
+            ? timeFormat.format(time)
             : line.timestamp && splitLogTimestamp(line.timestamp).time}
         </span>
         <span
@@ -839,18 +872,7 @@ export function LogsPage() {
             </span>
           )}
           {line.requestId && (
-            <Hint label={t('logs.view_request', { id: line.requestId })}>
-              <button
-                type="button"
-                aria-label={t('logs.view_request', { id: line.requestId })}
-                onClick={() =>
-                  void openErrorLog({ name: `request-${line.requestId}.log` }, line.requestId)
-                }
-                className="-mx-1 shrink-0 cursor-pointer rounded-sm px-1 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 max-sm:hidden"
-              >
-                {line.requestId}
-              </button>
-            </Hint>
+            <span className="shrink-0 text-faint max-sm:hidden">{line.requestId}</span>
           )}
           {showLineDetails && line.ip && (
             <span className="shrink-0 text-faint max-lg:hidden">{line.ip}</span>
@@ -872,12 +894,17 @@ export function LogsPage() {
         <span className="w-16 shrink-0 text-right text-muted-foreground tabular-nums max-sm:col-start-2 max-sm:row-start-2 max-sm:w-auto max-sm:justify-self-end max-sm:font-sans max-sm:text-xs max-sm:leading-4 max-sm:normal-nums">
           {line.latency}
         </span>
+        {/* Out of the tab order: the row is the stop, and its detail sheet copies too. */}
         <Hint label={t('logs.copy_line')}>
           <Button
             variant="ghost"
-            size="icon-xs"
-            className="-my-0.5 shrink-0 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-visible:opacity-100 max-sm:hidden pointer-coarse:opacity-100 motion-reduce:transition-none"
-            onClick={() => void copyLogLine(line.raw)}
+            size="icon-sm"
+            tabIndex={-1}
+            className="-my-1.5 size-8 shrink-0 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100 max-sm:hidden pointer-coarse:opacity-100 motion-reduce:transition-none"
+            onClick={(event) => {
+              event.stopPropagation();
+              void copyLogLine(line.raw);
+            }}
             aria-label={t('logs.copy_line')}
           >
             <HugeiconsIcon icon={Copy01Icon} strokeWidth={1.75} />
@@ -1021,7 +1048,11 @@ export function LogsPage() {
   const errorFileTime = (item: ErrorLogFile) => {
     const nameTime = parseErrorLogName(item.name)?.time;
     const time = nameTime ? logInstant(nameTime, serverOffset) : null;
-    return formatDateTimeValue(time ?? item.modified, i18n.language);
+    const date = time ?? parseDateValue(item.modified);
+    // The app's date style plus seconds, which tell apart failures in the same minute.
+    return date
+      ? date.toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'medium' })
+      : '';
   };
 
   const errorFileSummary = (item: ErrorLogFile) => {
@@ -1045,12 +1076,13 @@ export function LogsPage() {
     );
   };
 
+  const fileMetaText = (item: ErrorLogFile) =>
+    [formatSize(item.size), formatDateTimeValue(item.modified, i18n.language)]
+      .filter(Boolean)
+      .join(' · ');
+
   const fileMeta = (item: ErrorLogFile) => (
-    <span className="truncate text-xs text-muted-foreground">
-      {[formatSize(item.size), item.modified ? formatUnixTimestamp(item.modified) : '']
-        .filter(Boolean)
-        .join(' · ')}
-    </span>
+    <span className="truncate text-xs text-muted-foreground">{fileMetaText(item)}</span>
   );
 
   const emptyState = (title: string, description: string) => (
@@ -1078,9 +1110,9 @@ export function LogsPage() {
                 'fixed inset-0 z-50 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]'
             )}
           >
-            <div className="flex flex-wrap items-center gap-2 border-b p-3 max-sm:px-4">
+            <div className="flex flex-wrap items-center gap-2 border-b px-10 py-3 max-sm:px-4">
               {tabs}
-              <InputGroup className="h-9 min-w-48 flex-1 max-sm:h-10 max-sm:min-w-0">
+              <InputGroup className="h-9 min-w-40 flex-1 max-sm:h-10 max-sm:min-w-0">
                 <InputGroupAddon>
                   <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
                 </InputGroupAddon>
@@ -1109,65 +1141,53 @@ export function LogsPage() {
                 </InputGroupAddon>
               </InputGroup>
 
-              {levelSelect('w-32 data-[size=default]:h-9 max-sm:hidden')}
+              {levelSelect('w-28 data-[size=default]:h-9 max-sm:hidden lg:w-32')}
 
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-9 max-sm:h-10 max-sm:min-w-10"
-                onClick={() => setStructuredFiltersExpanded((prev) => !prev)}
-                aria-haspopup="dialog"
-                aria-controls={structuredFiltersPanelId}
-                aria-label={t('logs.filter_panel_title')}
-              >
-                <HugeiconsIcon
-                  icon={FilterHorizontalIcon}
-                  data-icon="inline-start"
-                  strokeWidth={1.75}
-                />
-                <span className="max-md:hidden">{t('logs.filter_panel_title')}</span>
-                {structuredFilterCount > 0 && (
-                  <Badge
-                    className="max-sm:hidden"
-                    aria-label={t('logs.filter_panel_active_count', {
-                      count: structuredFilterCount,
-                    })}
-                  >
-                    {structuredFilterCount}
-                  </Badge>
-                )}
-                {/* On phone the level filter sits in the dialog, so it counts here too. */}
-                {phoneFilterCount > 0 && (
-                  <Badge
-                    className="sm:hidden"
-                    aria-label={t('logs.filter_panel_active_count', { count: phoneFilterCount })}
-                  >
-                    {phoneFilterCount}
-                  </Badge>
-                )}
-              </Button>
+              {/* The label hides below lg, so the tooltip names the icon there. */}
+              <Hint label={t('logs.filter_panel_title')}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="h-9 max-sm:h-10 max-sm:min-w-10"
+                  onClick={() => setStructuredFiltersExpanded((prev) => !prev)}
+                  aria-haspopup="dialog"
+                  aria-controls={structuredFiltersPanelId}
+                  aria-label={t('logs.filter_panel_title')}
+                >
+                  <HugeiconsIcon
+                    icon={FilterHorizontalIcon}
+                    data-icon="inline-start"
+                    strokeWidth={1.75}
+                  />
+                  <span className="max-lg:hidden">{t('logs.filter_panel_title')}</span>
+                  {structuredFilterCount > 0 && (
+                    <Badge
+                      className="max-sm:hidden"
+                      aria-label={t('logs.filter_panel_active_count', {
+                        count: structuredFilterCount,
+                      })}
+                    >
+                      {structuredFilterCount}
+                    </Badge>
+                  )}
+                  {/* On phone the level filter sits in the dialog, so it counts here too. */}
+                  {phoneFilterCount > 0 && (
+                    <Badge
+                      className="sm:hidden"
+                      aria-label={t('logs.filter_panel_active_count', { count: phoneFilterCount })}
+                    >
+                      {phoneFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Hint>
 
               <div className="flex items-center gap-2">
-                <IconAction
-                  label={t('common.refresh')}
-                  icon={RefreshIcon}
-                  onClick={() => loadLogs(false)}
-                  disabled={refreshDisabled}
-                  className="max-sm:hidden"
-                />
-                <IconAction
-                  label={t('logs.reading_enabled')}
-                  icon={autoRefresh ? PauseIcon : PlayIcon}
-                  aria-pressed={autoRefresh}
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  disabled={autoRefreshDisabled}
-                  className="max-sm:hidden"
-                />
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-10 gap-2 px-3 sm:hidden"
+                  className="h-9 gap-2 px-3 max-sm:h-10"
                   aria-pressed={autoRefresh}
                   onClick={() => setAutoRefresh(!autoRefresh)}
                   disabled={autoRefreshDisabled}
@@ -1179,38 +1199,19 @@ export function LogsPage() {
                   )}
                   {t(autoRefresh ? 'logs.live' : 'logs.go_live')}
                 </Button>
-                <IconAction
-                  label={t('logs.download_cached')}
-                  icon={Download01Icon}
-                  onClick={downloadLogs}
-                  disabled={logBuffer.buffer.length === 0}
-                  className="max-sm:hidden"
-                />
-                <IconAction
-                  label={t('logs.clear_button')}
-                  icon={Delete02Icon}
-                  onClick={clearLogs}
-                  disabled={clearDisabled}
-                  className="hover:text-destructive max-sm:hidden"
-                />
-                <IconAction
-                  label={fullscreenLabel}
-                  icon={fullscreenLogs ? ArrowShrink01Icon : ArrowExpand01Icon}
-                  aria-pressed={fullscreenLogs}
-                  onClick={() => setFullscreenLogs((prev) => !prev)}
-                  className="max-sm:hidden"
-                />
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon-lg"
-                      className="size-10 sm:hidden"
-                      aria-label={t('common.more')}
-                    >
-                      <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <Hint label={t('common.more')}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon-lg"
+                        className="size-9 max-sm:size-10"
+                        aria-label={t('common.more')}
+                      >
+                        <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </Hint>
                   <DropdownMenuContent align="end" className="min-w-48">
                     <DropdownMenuItem
                       className="py-2"
@@ -1261,21 +1262,23 @@ export function LogsPage() {
             {!showRawLogs && filteredLines.length > 0 && (
               <div
                 aria-hidden="true"
-                className="flex gap-3 border-b px-4 py-2 text-xs text-muted-foreground max-sm:hidden"
+                className={cn(
+                  'flex gap-3 border-b px-10 py-2 text-xs text-muted-foreground max-sm:hidden',
+                  detail && PANEL_ROOM
+                )}
               >
-                <span className="w-[3px] shrink-0" />
-                <span className="w-[4.25rem] shrink-0">{t('logs.column_time')}</span>
+                <span className="w-[5.5rem] shrink-0">{t('logs.column_time')}</span>
                 <span className="w-11 shrink-0 max-sm:hidden">{t('logs.column_level')}</span>
                 <span className="flex-1">{t('logs.column_request')}</span>
                 <span className="w-8 shrink-0 text-right">{t('logs.filter_status')}</span>
                 <span className="w-16 shrink-0 text-right max-sm:hidden">
                   {t('logs.column_duration')}
                 </span>
-                <span className="w-6 shrink-0 max-sm:hidden" />
+                <span className="w-8 shrink-0 max-sm:hidden" />
               </div>
             )}
 
-            <div className="relative min-h-0 flex-1">
+            <div className={cn('relative min-h-0 flex-1', detail && PANEL_ROOM)}>
               {loading && logBuffer.buffer.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">{t('logs.loading')}</div>
               ) : logBuffer.buffer.length > 0 && filteredLines.length > 0 ? (
@@ -1283,17 +1286,18 @@ export function LogsPage() {
                   ref={logViewerRef}
                   className="h-full overflow-auto py-1 font-mono text-[12.5px] outline-none max-sm:pb-8 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                   onScroll={handleLogScroll}
-                  tabIndex={0}
+                  // Rows are focusable themselves; raw text needs the region to scroll by keys.
+                  tabIndex={showRawLogs ? 0 : -1}
                   role="region"
                   aria-label={t('logs.log_content')}
                   aria-busy={loading}
                 >
                   {canLoadMore && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 font-sans text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-10 py-2 font-sans text-xs text-muted-foreground max-sm:px-4">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="max-sm:h-10"
+                        className="max-sm:h-10 sm:h-8"
                         onClick={() =>
                           setVisibleCount((count) => Math.min(filteredLines.length, count + 200))
                         }
@@ -1317,7 +1321,7 @@ export function LogsPage() {
                   {showRawLogs ? (
                     <pre
                       className={cn(
-                        'px-4 leading-5 text-foreground',
+                        'px-10 leading-5 text-foreground max-sm:px-4',
                         wrapLogs
                           ? 'whitespace-pre-wrap break-all'
                           : 'w-max min-w-full whitespace-pre'
@@ -1331,23 +1335,18 @@ export function LogsPage() {
                       ))}
                     </pre>
                   ) : (
-                    withDateDividers(
-                      parsedVisibleLines,
-                      phone
-                        ? (entry) => {
-                            const time = entry.timestamp
-                              ? logInstant(entry.timestamp, serverOffset)
-                              : null;
-                            return time ? formatDateValue(time, i18n.language) : undefined;
-                          }
-                        : undefined
-                    ).map((item) =>
+                    withDateDividers(parsedVisibleLines, (entry) => {
+                      const time = entry.timestamp
+                        ? logInstant(entry.timestamp, serverOffset)
+                        : null;
+                      return time ? formatDateValue(time, i18n.language) : undefined;
+                    }).map((item) =>
                       item.kind === 'entry' ? (
                         renderRow(item.entry)
                       ) : (
                         <div
                           key={item.key}
-                          className="flex items-center gap-3 px-4 pt-3 pb-1 font-sans text-[11px] text-faint tabular-nums max-sm:text-xs max-sm:text-muted-foreground max-sm:normal-nums"
+                          className="flex items-center gap-3 px-10 pt-3 pb-1 font-sans text-[11px] text-faint max-sm:px-4 max-sm:text-xs max-sm:text-muted-foreground"
                         >
                           <span>{item.date}</span>
                           <span aria-hidden="true" className="h-px flex-1 bg-border" />
@@ -1390,12 +1389,9 @@ export function LogsPage() {
               )}
             </div>
 
-            <footer className="flex items-center justify-between gap-3 border-t px-4 py-2 text-xs text-muted-foreground max-sm:hidden">
-              <span className="truncate max-md:hidden">
-                {t('logs.buffer_scope', {
-                  count: logBuffer.buffer.length,
-                  matched: filteredLines.length,
-                })}
+            <footer className="flex items-center justify-between gap-3 border-t px-10 py-2 text-xs text-muted-foreground max-sm:hidden">
+              <span className="truncate max-md:hidden" title={bufferScope}>
+                {bufferScope}
               </span>
               <span
                 role="status"
@@ -1406,14 +1402,13 @@ export function LogsPage() {
                   aria-hidden="true"
                   className={cn('size-2 shrink-0 rounded-full', live ? 'bg-success' : 'bg-faint')}
                 />
-                <span className="truncate">
+                <span
+                  className="truncate"
+                  title={lastUpdated ? `${t(readStatusKey)} · ${lastUpdatedText}` : undefined}
+                >
                   {t(readStatusKey)}
                   {lastUpdated && (
-                    <span className="text-faint max-sm:hidden">
-                      {' '}
-                      ·{' '}
-                      {t('logs.last_updated', { time: new Date(lastUpdated).toLocaleTimeString() })}
-                    </span>
+                    <span className="text-faint max-sm:hidden"> · {lastUpdatedText}</span>
                   )}
                 </span>
               </span>
@@ -1423,101 +1418,54 @@ export function LogsPage() {
 
         {activeTab === 'errors' && (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3 max-sm:px-4">
+            <div className="flex flex-wrap items-center gap-2 border-b px-10 py-3 max-sm:px-4">
               {tabs}
-              <Button
-                variant="outline"
-                size="lg"
-                className="h-9 max-sm:hidden"
-                onClick={loadErrorLogs}
-                disabled={disableControls || loadingErrors}
-              >
-                <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
-                {t('common.refresh')}
-              </Button>
             </div>
             {requestLogEnabled && (
               <Notice tone="warning">{t('logs.error_logs_request_log_enabled')}</Notice>
             )}
             {errorLogsError && <Notice tone="error">{errorLogsError}</Notice>}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="flex max-w-3xl flex-col gap-4 p-4 max-sm:pb-8 sm:p-6">
-                <p className="text-[13px] text-muted-foreground">
+              <div className="flex flex-col gap-4 p-4 max-sm:max-w-3xl max-sm:pb-8 sm:px-10 sm:py-6">
+                <p className="text-[13px] text-muted-foreground sm:hidden">
                   {t('logs.error_logs_description')}
                 </p>
                 {loadingErrors ? (
                   <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
                 ) : errorLogs.length === 0 ? (
-                  <Empty className="rounded-xl border border-dashed">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <HugeiconsIcon icon={File01Icon} strokeWidth={1.75} />
-                      </EmptyMedia>
-                      <EmptyTitle>{t('logs.error_logs_empty')}</EmptyTitle>
-                    </EmptyHeader>
-                  </Empty>
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    {t('logs.error_logs_empty')}
+                  </p>
                 ) : (
                   <div className="divide-y overflow-hidden rounded-xl border bg-card">
                     {errorLogs.map((item) => (
                       <div
                         key={item.name}
-                        className="flex items-center gap-3 p-3 max-sm:gap-0 max-sm:py-0 max-sm:pr-2 max-sm:pl-0"
+                        className="flex items-center pr-2 transition-colors sm:has-[>button:first-child:hover]:bg-muted/40"
                       >
-                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground max-sm:hidden">
-                          <HugeiconsIcon
-                            icon={File01Icon}
-                            className="size-[18px]"
-                            strokeWidth={1.75}
-                          />
-                        </span>
-                        {/* Phone: the button fills the row beside Download, and reads as a time,
-                            not a file name. */}
-                        {phone ? (
-                          <button
-                            type="button"
-                            className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 self-stretch py-3 pr-3 pl-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/40"
-                            onClick={() => {
-                              void openErrorLog(item);
-                            }}
-                            disabled={disableControls}
-                          >
-                            {errorFileSummary(item)}
-                          </button>
-                        ) : (
-                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            <EmailPrivacyText
-                              className="truncate font-mono text-[13px]"
-                              text={item.name}
-                            />
-                            {fileMeta(item)}
-                          </div>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="max-sm:hidden"
+                        {/* The row opens the file and reads as a time, not a file name. */}
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 cursor-pointer flex-col justify-center gap-0.5 self-stretch py-3 pr-3 pl-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/40"
                           onClick={() => {
                             void openErrorLog(item);
                           }}
                           disabled={disableControls}
                         >
-                          {t('logs.error_logs_open')}
-                        </Button>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="max-sm:size-10"
-                              aria-label={t('logs.error_logs_download')}
-                              onClick={() => downloadErrorLog(item.name)}
-                              disabled={disableControls}
-                            >
-                              <HugeiconsIcon icon={Download01Icon} strokeWidth={1.75} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t('logs.error_logs_download')}</TooltipContent>
-                        </Tooltip>
+                          {errorFileSummary(item)}
+                        </button>
+                        <Hint label={t('logs.error_logs_download')}>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-8 max-sm:size-10"
+                            aria-label={t('logs.error_logs_download')}
+                            onClick={() => downloadErrorLog(item.name)}
+                            disabled={disableControls}
+                          >
+                            <HugeiconsIcon icon={Download01Icon} strokeWidth={1.75} />
+                          </Button>
+                        </Hint>
                       </div>
                     ))}
                   </div>
@@ -1583,17 +1531,57 @@ export function LogsPage() {
           </Dialog>
         )}
 
+        {/* Phones get a modal bottom sheet. Desktop gets a side panel beside the list, without
+            a dimmer: focus stays on the rows, so arrow keys move through requests while the
+            panel follows, and clicking another row shows that one. */}
         <Sheet
           open={detail !== null}
+          modal={phone}
           onOpenChange={(open) => {
             if (!open) setDetail(null);
           }}
         >
-          <SheetContent side="bottom" className={SHEET_CLASS}>
+          <SheetContent
+            side={phone ? 'bottom' : 'right'}
+            className={phone ? SHEET_CLASS : 'gap-0 sm:max-w-md'}
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              // Phone: focus the sheet, not the request ID's copy button, whose tooltip would
+              // cover the fields and take the first Escape.
+              if (phone && event.currentTarget instanceof HTMLElement)
+                event.currentTarget.focus({ preventScroll: true });
+            }}
+            onFocusOutside={(event) => {
+              if (!phone) event.preventDefault();
+            }}
+            onPointerDownOutside={(event) => {
+              if (event.target instanceof Element && event.target.closest(ROW_SELECTOR))
+                event.preventDefault();
+            }}
+            // Back to the row on close, the one the user ended on, unless focus already moved
+            // somewhere else on purpose (another row, the search, the request viewer).
+            onCloseAutoFocus={(event) => {
+              const active = document.activeElement;
+              const container = event.currentTarget;
+              if (
+                active instanceof HTMLElement &&
+                active !== document.body &&
+                active.isConnected &&
+                !(container instanceof Node && container.contains(active))
+              ) {
+                event.preventDefault();
+                return;
+              }
+              const row = lastDetailId.current === null ? null : rowElement(lastDetailId.current);
+              if (!row) return;
+              event.preventDefault();
+              row.focus({ preventScroll: true });
+            }}
+          >
             <SheetHeader>
               <SheetTitle
                 className={cn(
-                  'font-mono wrap-break-word',
+                  'font-mono wrap-break-word sm:pr-8',
                   detail && rowTone(detail) === 'bg-destructive' && 'text-destructive'
                 )}
               >
@@ -1604,7 +1592,7 @@ export function LogsPage() {
               </SheetTitle>
               <SheetDescription className="sr-only">{t('logs.detail_title')}</SheetDescription>
             </SheetHeader>
-            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4 sm:flex-1">
               <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2 text-sm">
                 {detailFields.map(
                   (field) =>
@@ -1627,13 +1615,18 @@ export function LogsPage() {
                   </pre>
                 </div>
               )}
+              {detail?.requestId && !canOpenRequestLog(detail) && (
+                <p className="text-sm text-muted-foreground max-sm:hidden">
+                  {t('logs.request_log_failed_only')}
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2 border-t p-4">
               {detail?.requestId && canOpenRequestLog(detail) && (
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-10"
+                  className="h-10 sm:h-9"
                   onClick={() => {
                     const requestId = detail.requestId;
                     setDetail(null);
@@ -1648,7 +1641,7 @@ export function LogsPage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="h-10"
+                className="h-10 sm:h-9"
                 onClick={() => {
                   if (detail) void copyLogLine(detail.raw);
                 }}
@@ -1666,10 +1659,31 @@ export function LogsPage() {
             if (!open) closeErrorLogViewer();
           }}
         >
-          <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-4xl">
+          <DialogContent
+            className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-4xl"
+            // Desktop starts on the text, so arrow keys scroll it and Escape closes at once.
+            onOpenAutoFocus={
+              phone
+                ? undefined
+                : (event) => {
+                    event.preventDefault();
+                    viewerScrollRef.current?.focus({ preventScroll: true });
+                  }
+            }
+            // Opened from a row's panel, whose button is gone by now: return to that row.
+            onCloseAutoFocus={(event) => {
+              const row =
+                !phone && viewerRequestId && lastDetailId.current !== null
+                  ? rowElement(lastDetailId.current)
+                  : null;
+              if (!row) return;
+              event.preventDefault();
+              row.focus({ preventScroll: true });
+            }}
+          >
             <DialogHeader className="min-w-0 pr-8">
-              {/* Phone names an error file by when and where it failed, like its row. */}
-              {phone && selectedErrorLog && viewerFile ? (
+              {/* An error file is named by when and where it failed, like its row. */}
+              {selectedErrorLog && viewerFile ? (
                 <>
                   <DialogTitle>{errorFileTime(selectedErrorLog)}</DialogTitle>
                   {/* The name already holds the endpoint; it wraps at its hyphens. */}
@@ -1683,29 +1697,23 @@ export function LogsPage() {
                   <DialogTitle className="truncate font-mono sm:text-sm">
                     {selectedErrorLog?.name ?? t('logs.error_log_view_title')}
                   </DialogTitle>
-                  <DialogDescription className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                    {selectedErrorLog && (
-                      <>
-                        <span>
-                          {t('logs.error_logs_size')}: {formatSize(selectedErrorLog.size) || '-'}
-                        </span>
-                        <span>
-                          {t('logs.error_logs_modified')}:{' '}
-                          {phone
-                            ? errorFileTime(selectedErrorLog) || '-'
-                            : selectedErrorLog.modified
-                              ? formatUnixTimestamp(selectedErrorLog.modified)
-                              : '-'}
-                        </span>
-                      </>
-                    )}
-                  </DialogDescription>
+                  {/* A request looked up by ID has no size or date until it loads. */}
+                  {selectedErrorLog && fileMetaText(selectedErrorLog) ? (
+                    <DialogDescription className="text-xs">
+                      {fileMetaText(selectedErrorLog)}
+                    </DialogDescription>
+                  ) : (
+                    <DialogDescription className="sr-only">
+                      {t('logs.error_log_view_title')}
+                    </DialogDescription>
+                  )}
                 </>
               )}
             </DialogHeader>
             <div
               ref={viewerScrollRef}
-              className="relative min-h-0 overflow-auto rounded-lg border bg-background"
+              tabIndex={0}
+              className="relative min-h-0 overflow-auto rounded-lg border bg-background outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               onScroll={(event) => {
                 const top = viewerResponseTop();
                 setViewerAtResponse(top !== null && event.currentTarget.scrollTop >= top - 1);
@@ -1770,7 +1778,7 @@ export function LogsPage() {
                       </div>
                     )}
                     <pre
-                      className="w-max min-w-full p-4 font-mono text-[12.5px] leading-5 whitespace-pre text-foreground max-sm:w-auto max-sm:p-3 max-sm:text-xs max-sm:wrap-break-word max-sm:whitespace-pre-wrap"
+                      className="p-4 font-mono text-[12.5px] leading-5 wrap-break-word whitespace-pre-wrap text-foreground max-sm:p-3 max-sm:text-xs"
                       spellCheck={false}
                     >
                       {viewerResponseAt === null ? (

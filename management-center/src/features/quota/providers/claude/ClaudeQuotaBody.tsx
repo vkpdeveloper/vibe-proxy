@@ -72,14 +72,22 @@ export function ClaudeQuotaBody({ quota, classes, afterPlan }: QuotaBodyProps<Cl
       )}
       {afterPlan}
       {/* Extra usage and dollar balances share the window-row anatomy:
-          label + mono telemetry header, then one mono detail line. */}
-      {extraUsage && (
-        // Disabled extra usage has nothing to act on, so phones skip the row to save space.
+          label + telemetry header, then one detail line. */}
+      {extraUsage?.isEnabled === false ? (
+        // Off has nothing to act on: one line, with the reasons on hover. Phones skip it.
         <div
-          className={
-            extraUsage.isEnabled === false ? `${classes.quotaRow} max-sm:hidden` : classes.quotaRow
-          }
+          className={`${classes.quotaRow} max-sm:hidden`}
+          title={extraUsageNotes.join('. ') || undefined}
         >
+          <div className={classes.quotaRowHeader}>
+            <span className={classes.quotaModel}>{t('claude_quota.extra_usage_label')}</span>
+            <div className={classes.quotaMeta}>
+              <span className={classes.quotaReset}>{t('claude_quota.extra_usage_disabled')}</span>
+            </div>
+          </div>
+        </div>
+      ) : extraUsage ? (
+        <div className={classes.quotaRow}>
           <div className={classes.quotaRowHeader}>
             <span className={classes.quotaModel}>{t('claude_quota.extra_usage_label')}</span>
             <div className={classes.quotaMeta}>
@@ -87,9 +95,7 @@ export function ClaudeQuotaBody({ quota, classes, afterPlan }: QuotaBodyProps<Cl
                 {t(
                   extraUsage.isEnabled === null
                     ? 'claude_quota.plan_unknown'
-                    : extraUsage.isEnabled
-                      ? 'claude_quota.extra_usage_enabled'
-                      : 'claude_quota.extra_usage_disabled'
+                    : 'claude_quota.extra_usage_enabled'
                 )}
               </span>
               {extraUsage.utilization !== null && (
@@ -119,7 +125,7 @@ export function ClaudeQuotaBody({ quota, classes, afterPlan }: QuotaBodyProps<Cl
             </div>
           )}
         </div>
-      )}
+      ) : null}
       {(quota.dollarWindows ?? []).map((balance) => {
         const resetDisplay = buildResetDisplay(
           formatQuotaResetTime(balance.resetsAt ?? undefined),

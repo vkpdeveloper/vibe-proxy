@@ -224,7 +224,7 @@ export function LoginPage() {
               type="button"
               aria-expanded={showServer}
               onClick={() => setShowServer((shown) => !shown)}
-              className="flex min-w-0 items-center gap-1.5 rounded-md text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:min-h-10"
+              className="flex min-w-0 items-center gap-1.5 rounded-md text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:min-h-10 sm:min-h-8"
             >
               {/* On phones the address gets its own line and wraps instead of losing its end. */}
               <span className="flex min-w-0 flex-col max-sm:py-1 sm:block sm:truncate">
@@ -250,7 +250,7 @@ export function LoginPage() {
                   type="button"
                   variant="ghost"
                   size="xs"
-                  className="shrink-0 text-muted-foreground max-sm:-mr-2.5 max-sm:h-10 max-sm:px-2.5"
+                  className="shrink-0 text-muted-foreground max-sm:-mr-2.5 max-sm:h-10 max-sm:px-2.5 sm:-mr-2 sm:h-8"
                   aria-label={t('language.switch')}
                 >
                   <HugeiconsIcon icon={GlobeIcon} strokeWidth={1.75} />

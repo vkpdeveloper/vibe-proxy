@@ -79,7 +79,7 @@ export function ListPagination({
       <Button variant="outline" onClick={() => onPage(page - 1)} disabled={page <= 1}>
         {t('auth_files.pagination_prev')}
       </Button>
-      <span className="font-mono text-xs text-muted-foreground tabular-nums">
+      <span className="font-mono text-xs text-muted-foreground tabular-nums sm:font-sans sm:text-[13px]">
         {t('auth_files.pagination_info', { current: page, total: totalPages, count })}
       </span>
       <Button variant="outline" onClick={() => onPage(page + 1)} disabled={page >= totalPages}>

@@ -65,19 +65,28 @@ describe('auth file row', () => {
     for (const tag of actions) expect(tag).not.toContain('opacity-');
   });
 
-  test('keeps the per-credential actions, each with an accessible name', () => {
+  test('folds the actions into one named menu beside the switch', () => {
     const markup = render();
-    for (const key of [
-      'auth_files.models_button',
-      'auth_files.manual_refresh_button',
-      'auth_files.prefix_proxy_button',
-      'auth_files.delete_button',
-    ]) {
-      expect(markup).toContain(`aria-label="${i18n.t(key)}"`);
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).toMatch(
+      new RegExp(`aria-label="${i18n.t('common.more')}"[^>]*aria-haspopup="menu"`)
+    );
+    // No bare icon actions on the card itself.
+    for (const key of ['auth_files.models_button', 'auth_files.delete_button']) {
+      expect(markup).not.toContain(`aria-label="${i18n.t(key)}"`);
     }
     expect(markup).toContain(
       `aria-label="${i18n.t('auth_files.card_select', { name: 'person@example.com' })}"`
     );
+  });
+
+  test('offers the sign-in fix as a labelled button on a sign-in problem', () => {
+    const label = i18n.t('auth_files.manual_refresh_button');
+    expect(render()).not.toContain(`>${label}</button>`);
+    const markup = render({
+      file: { ...file, status: 'error', status_message: '401 invalid_grant' } as AuthFileItem,
+    });
+    expect(markup).toMatch(new RegExp(`<button[^>]*>(<svg.*?</svg>)?${label}</button>`));
   });
 
   test('hides the selection cell on phones until select mode', () => {
@@ -88,14 +97,29 @@ describe('auth file row', () => {
     expect(cell(render({ selecting: true }))).not.toContain('max-sm:hidden');
   });
 
-  test('locks the actions while controls are disabled', () => {
+  test('labels request counts and names both badges when in use and preferred', () => {
+    const markup = render({
+      file: {
+        ...file,
+        successCount: 66,
+        failureCount: 0,
+        routing_selection: {
+          selected: true,
+          expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+      } as AuthFileItem,
+      showAccountPreference: true,
+      accountPreferred: true,
+    });
+    expect(markup).not.toContain('> / <');
+    expect(markup).toContain(i18n.t('auth_files.count_success', { count: 66 }));
+    expect(markup).toContain(i18n.t('auth_files.count_failure', { count: 0 }));
+    expect(markup).toContain(`${i18n.t('auth_files.preferred_short')}</span>`);
+    expect(markup).toContain(i18n.t('auth_files.routing_selected'));
+  });
+
+  test('locks the switch while controls are disabled', () => {
     const markup = render({ disableControls: true });
-    const label = i18n.t('auth_files.delete_button');
-    expect(markup).toMatch(
-      new RegExp(
-        `<button[^>]*disabled=""[^>]*aria-label="${label}"|<button[^>]*aria-label="${label}"[^>]*disabled=""`
-      )
-    );
     expect(markup).toMatch(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/);
   });
 

@@ -31,7 +31,7 @@ export function ModeSwitch({ mode, disabled = false, onChange }: ModeSwitchProps
       aria-label={t('config_management.mode.label')}
     >
       {MODES.map((entry) => (
-        <ToggleGroupItem key={entry} value={entry} className="h-9 px-3 max-sm:h-10 max-sm:px-2.5">
+        <ToggleGroupItem key={entry} value={entry} className="px-3 max-sm:px-2.5">
           {t(`config_management.mode.${entry}`)}
         </ToggleGroupItem>
       ))}

@@ -54,6 +54,7 @@ import { deriveAuthFileIdentity } from '../identity';
 import { getAuthFileRefreshKey } from '../manualRefresh';
 import { resolveProblemResetAt } from '../quotaDrain';
 import { useNow } from '@/hooks/useNow';
+import { usePhone } from '@/components/layout/pageBar';
 import { formatDurationNarrow } from '@/utils/quota/relativeTime';
 import type { AuthFileItem } from '@/types';
 
@@ -80,7 +81,8 @@ type ToggleField = 'disableCooling' | 'websockets' | 'useSiwc' | 'usingApi';
 
 /**
  * Credential details and settings. Closing with unsaved changes (Escape, overlay, close button,
- * cancel) asks first.
+ * cancel) asks first. Desktop text fields (sm:h-9) match the 36px models picker and the policy
+ * selects.
  */
 export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
   const { t, i18n } = useTranslation();
@@ -97,6 +99,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
     manualRefreshing,
   } = props;
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
+  const phone = usePhone();
   const saving = editor?.saving === true;
 
   const confirmClose = useCallback((): Promise<boolean> => {
@@ -181,6 +184,13 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
       <SheetContent
         side="right"
         className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+        // Desktop starts in the note field (autoFocus, once the file has loaded) rather than on
+        // the title's reveal button. Phones keep the default so the keyboard stays down.
+        onOpenAutoFocus={(event) => {
+          if (phone) return;
+          event.preventDefault();
+          if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
+        }}
       >
         <SheetHeader className="pr-12 sm:border-b">
           {/* Named like the card. overflow-x-clip, not truncate: hiding overflow would cut
@@ -255,7 +265,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="mt-2 self-start max-sm:h-10"
+                              className="mt-2 self-start max-sm:h-10 sm:h-8"
                               disabled={disableControls || refreshingSignIn}
                               onClick={() => onManualRefresh(signInProblem)}
                             >
@@ -270,7 +280,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="mt-2 self-start max-sm:h-10"
+                              className="mt-2 self-start max-sm:h-10 sm:h-8"
                               asChild
                             >
                               <Link to="/oauth" onClick={handleLeaveLinkClick}>
@@ -284,6 +294,8 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                       <FieldLabel htmlFor="auth-file-note">{t('auth_files.note_label')}</FieldLabel>
                       <Input
                         id="auth-file-note"
+                        className="sm:h-9"
+                        autoFocus={!phone}
                         value={editor.note}
                         placeholder={t('auth_files.note_placeholder')}
                         disabled={fieldDisabled}
@@ -305,6 +317,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                             </FieldLabel>
                             <Input
                               id="auth-file-priority"
+                              className="sm:h-9"
                               value={editor.priority}
                               placeholder={t('auth_files.priority_placeholder')}
                               disabled={fieldDisabled}
@@ -318,6 +331,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                             </FieldLabel>
                             <Input
                               id="auth-file-weight"
+                              className="sm:h-9"
                               type="number"
                               step="1"
                               max={MAX_CREDENTIAL_WEIGHT}
@@ -395,6 +409,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                           </FieldLabel>
                           <Input
                             id="auth-file-prefix"
+                            className="sm:h-9"
                             value={editor.prefix}
                             disabled={fieldDisabled}
                             onChange={(e) => onChange('prefix', e.target.value)}
@@ -406,6 +421,7 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                           </FieldLabel>
                           <Input
                             id="auth-file-proxy"
+                            className="sm:h-9"
                             value={editor.proxyUrl}
                             placeholder={t('auth_files.proxy_url_placeholder')}
                             disabled={fieldDisabled}

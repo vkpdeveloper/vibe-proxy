@@ -6,6 +6,7 @@ import { Loading03Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { prefersReducedMotion } from '@/hooks/motion';
 import { useToastLift } from '@/hooks/useToastLift';
+import { usePhone } from '@/components/layout/pageBar';
 import { cn } from '@/lib/utils';
 import type { ConfigStatusTone } from '../uiState';
 
@@ -19,6 +20,12 @@ export type FloatingSaveBarProps = {
   discardDisabled: boolean;
   onSave: () => void;
   onDiscard: () => void;
+  /**
+   * Wider screens render the bar in place, centred on its container, positioned by these
+   * classes (sticky at the end of a scrolling column, or absolute over a panel). Phones always
+   * dock it above the bottom nav.
+   */
+  inlineClassName: string;
 };
 
 const toneDot: Record<ConfigStatusTone, string> = {
@@ -30,7 +37,7 @@ const toneDot: Record<ConfigStatusTone, string> = {
 };
 
 /**
- * A small bar at the bottom of the screen while the config has unsaved changes.
+ * A small bar at the bottom of the form while the config has unsaved changes.
  * It slides in and out with CSS (ease-out in, ease-in out) and unmounts after the exit.
  */
 export function FloatingSaveBar({
@@ -42,8 +49,10 @@ export function FloatingSaveBar({
   discardDisabled,
   onSave,
   onDiscard,
+  inlineClassName,
 }: FloatingSaveBarProps) {
   const { t } = useTranslation();
+  const phone = usePhone();
   // Stays mounted through the exit animation; reduced motion has no animation, so it unmounts now.
   const [leaving, setLeaving] = useState(false);
   const [wasVisible, setWasVisible] = useState(visible);
@@ -56,11 +65,13 @@ export function FloatingSaveBar({
 
   if ((!visible && !leaving) || typeof document === 'undefined') return null;
 
-  return createPortal(
+  const bar = (
     <div
       className={cn(
-        'fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 sm:bottom-6',
-        'pointer-events-none'
+        'pointer-events-none z-40 flex justify-center px-4',
+        phone
+          ? 'fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))]'
+          : inlineClassName
       )}
     >
       <div
@@ -103,7 +114,7 @@ export function FloatingSaveBar({
           {t('config_management.actions.save')}
         </Button>
       </div>
-    </div>,
-    document.body
+    </div>
   );
+  return phone ? createPortal(bar, document.body) : bar;
 }

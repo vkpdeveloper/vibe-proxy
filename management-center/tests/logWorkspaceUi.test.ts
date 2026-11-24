@@ -8,7 +8,7 @@ const page = readSource('src/features/logs/LogsPage.tsx');
 // assert browser layout: the important contract is a single flexible scrolling viewer.
 describe('log workspace layout contract', () => {
   test('viewer uses remaining space instead of resolution-specific height budgets', () => {
-    expect(page).toContain('<div className="relative min-h-0 flex-1">');
+    expect(page).toContain("cn('relative min-h-0 flex-1'");
     expect(page).toMatch(/ref=\{logViewerRef\}\s+className="h-full overflow-auto\b/);
     expect(page).not.toMatch(/\b(?:h|max-h|min-h)-\[(?:\d+px|calc\(100vh)/);
     expect(page).not.toMatch(/\b(?:h|max-h|min-h)-(?:90|96|\[360px\]|\[420px\]|\[480px\])\b/);
@@ -30,9 +30,11 @@ describe('log workspace layout contract', () => {
   test('row actions stay reachable by keyboard', () => {
     expect(page).toContain("useLocalStorage('logsPage.wrapLogs', false)");
     expect(page).toContain("aria-label={t('logs.copy_line')}");
-    // The copy button is hidden until hover, but focus must reveal it.
-    expect(page).toMatch(/opacity-0[^"]*focus-visible:opacity-100/);
-    expect(page).toContain('tabIndex={0}');
+    // The copy button is hidden until hover; focusing its row reveals it.
+    expect(page).toMatch(/opacity-0[^"]*group-focus-visible\/row:opacity-100/);
+    // Rows are one roving tab stop, moved with the arrow keys.
+    expect(page).toContain('tabIndex={line.id === tabRowId ? 0 : -1}');
+    expect(page).toContain("event.key === 'ArrowDown'");
     expect(page).toContain("aria-label={t('logs.log_content')}");
     expect(page).toContain('aria-pressed={autoRefresh}');
   });

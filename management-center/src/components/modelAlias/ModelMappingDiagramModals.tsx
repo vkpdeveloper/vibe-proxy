@@ -176,7 +176,7 @@ function LinkRow({
         <Hint label={unlinkLabel}>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             className="text-destructive hover:text-destructive"
             onClick={() => onUnlink(source.provider, source.name, alias)}
             aria-label={unlinkLabel}

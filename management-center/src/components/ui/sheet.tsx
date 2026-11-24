@@ -1,13 +1,16 @@
 'use client';
 
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Dialog as SheetPrimitive } from 'radix-ui';
 
 import { Button } from '@/components/ui/button';
+import { useReturnFocus } from '@/components/ui/return-focus';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import {
+  DIALOG_FOOTER_BUTTONS,
   PHONE_SHEET_CLOSE,
   PHONE_SHEET_OVERLAY,
   PHONE_SHEET_TITLE,
@@ -76,6 +79,7 @@ function SheetContent({
   showCloseButton = true,
   overlayClassName,
   onOpenAutoFocus,
+  onCloseAutoFocus,
   onInteractOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
@@ -83,14 +87,21 @@ function SheetContent({
   showCloseButton?: boolean;
   overlayClassName?: string;
 }) {
+  const { t } = useTranslation();
+  const focus = useReturnFocus();
   return (
     <SheetPortal>
       <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         onOpenAutoFocus={(event) => {
+          focus.remember();
           onOpenAutoFocus?.(event);
           focusSheetOnPhone(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          focus.restore(event);
         }}
         onInteractOutside={(event) => {
           ignoreToastPress(event);
@@ -118,9 +129,9 @@ function SheetContent({
               variant="ghost"
               className={cn('absolute top-3 right-3', PHONE_SHEET_CLOSE)}
               size="icon-sm"
+              aria-label={t('common.close')}
             >
               <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-              <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>
         )}
@@ -147,6 +158,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="sheet-footer"
       className={cn(
         'mt-auto flex flex-col gap-2 p-4 max-sm:flex-row max-sm:flex-wrap max-sm:[&>button]:flex-1',
+        DIALOG_FOOTER_BUTTONS,
         className
       )}
       {...props}

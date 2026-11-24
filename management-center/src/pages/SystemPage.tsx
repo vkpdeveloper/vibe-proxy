@@ -24,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Item,
@@ -50,6 +49,7 @@ import {
 import { configApi, versionApi } from '@/services/api';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import { useConfirmLogout } from '@/hooks/useConfirmLogout';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { formatDateTimeValue } from '@/utils/format';
 import { classifyModels } from '@/utils/models';
 import iconGemini from '@/assets/icons/gemini.svg';
@@ -99,8 +99,10 @@ const LINKS = [
 
 type SystemTab = 'about' | 'models' | 'links';
 
-/** Wraps a Section whose heading only repeats its tab name: phones see the tab row right above. */
-const TAB_NAMES_SECTION = 'contents max-sm:[&>section>div:first-child]:hidden';
+/** Wraps a Section whose heading phones skip: they see the tab row right above. */
+const PHONE_UNTITLED_SECTION = 'contents max-sm:[&>section>div:first-child]:hidden';
+/** Wraps a Section whose heading only repeats its tab name. */
+const UNTITLED_SECTION = 'contents [&>section>div:first-child]:hidden';
 const TAB_IDS: SystemTab[] = ['about', 'models', 'links'];
 
 const STATUS_DOT = {
@@ -358,9 +360,11 @@ export function SystemPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.connectionStatus, auth.apiBase]);
 
-  const refreshModels = () => void fetchModels({ forceRefresh: true });
-  // Phones hide the section heading, so the models refresh moves into the top bar, where it
-  // replaces the app-wide one instead of adding a second refresh.
+  const refreshModels = () => fetchModels({ forceRefresh: true });
+  // The app's refresh reloads the models list while it is open.
+  useHeaderRefresh(tab === 'models' ? refreshModels : null);
+  // On phones the page's own actions replace the app's refresh in the top bar, so the models
+  // tab brings its own.
   const phoneRefresh =
     tab === 'models' && pageBar ? (
       <Button
@@ -368,7 +372,7 @@ export function SystemPage() {
         size="icon-lg"
         className="size-10"
         disabled={modelsLoading}
-        onClick={refreshModels}
+        onClick={() => void refreshModels()}
         aria-label={t('common.refresh')}
       >
         <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
@@ -377,7 +381,7 @@ export function SystemPage() {
 
   // Laid out like the Links rows: icon, label, and a chevron for rows that lead somewhere.
   const actionRow =
-    'flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 disabled:pointer-events-none disabled:opacity-50';
+    'flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50';
   const rowIcon = 'size-4 shrink-0 text-muted-foreground';
 
   const connectionDot =
@@ -397,7 +401,7 @@ export function SystemPage() {
     >
       {tab === 'about' && (
         // Phones already show the logo and name in the top bar, so they skip this heading.
-        <div className={TAB_NAMES_SECTION}>
+        <div className={PHONE_UNTITLED_SECTION}>
           <Section title={t('system_info.about_title')} icon={<Logo className="size-6" />}>
             <div className="divide-y overflow-hidden rounded-xl border bg-card text-sm">
               {/* A plain row to the eye; also the seven-tap target for the request log switch. */}
@@ -447,8 +451,11 @@ export function SystemPage() {
               <button
                 type="button"
                 className={actionRow}
-                disabled={checkingVersion}
-                onClick={() => void handleVersionCheck()}
+                // Not `disabled`: that would drop keyboard focus to the page while it checks.
+                aria-disabled={checkingVersion || undefined}
+                onClick={() => {
+                  if (!checkingVersion) void handleVersionCheck();
+                }}
               >
                 <HugeiconsIcon icon={Download04Icon} className={rowIcon} strokeWidth={1.75} />
                 {t('system_info.version_check_button')}
@@ -502,23 +509,15 @@ export function SystemPage() {
       )}
 
       {tab === 'models' && (
-        <div className={TAB_NAMES_SECTION}>
-          <Section
-            title={t('system_info.models_title')}
-            actions={
-              <Button
-                variant="outline"
-                size="lg"
-                className="h-9"
-                disabled={modelsLoading}
-                onClick={refreshModels}
-              >
-                <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
-                {t('common.refresh')}
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
+        <div className={UNTITLED_SECTION}>
+          <Section title={t('system_info.models_title')}>
+            {/* Desktop keeps only problems here: the list itself shows the count and loading. */}
+            <div
+              className={cn(
+                'flex flex-col gap-3',
+                !modelsError && modelStatus?.type !== 'error' && 'sm:hidden'
+              )}
+            >
               {modelStatus && (
                 <span className="flex min-w-0 items-center gap-2 text-[13px]">
                   <span
@@ -534,14 +533,9 @@ export function SystemPage() {
             {modelsLoading ? (
               <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : models.length === 0 ? (
-              <Empty className="border border-dashed">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <HugeiconsIcon icon={AiBrain01Icon} strokeWidth={1.75} />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('system_info.models_empty')}</EmptyTitle>
-                </EmptyHeader>
-              </Empty>
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t('system_info.models_empty')}
+              </p>
             ) : (
               <div className="divide-y overflow-hidden rounded-xl border bg-card">
                 {groupedModels.map((group) => {
@@ -588,15 +582,15 @@ export function SystemPage() {
       )}
 
       {tab === 'links' && (
-        <div className={TAB_NAMES_SECTION}>
+        <div className={UNTITLED_SECTION}>
           <Section title={t('system_info.quick_links_title')}>
-            {/* One grouped list on phones instead of a box per link. */}
-            <ItemGroup className="gap-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border">
+            {/* One card with dividers, like About, instead of a box per link. */}
+            <ItemGroup className="gap-0 overflow-hidden rounded-xl border sm:bg-card">
               {LINKS.map((link) => (
                 <Item
                   key={link.href}
                   variant="outline"
-                  className="max-sm:min-h-11 max-sm:rounded-none max-sm:border-x-0 max-sm:border-t-0 max-sm:py-2 max-sm:last:border-b-0"
+                  className="rounded-none border-x-0 border-t-0 last:border-b-0 max-sm:min-h-11 max-sm:py-2 sm:min-h-12 sm:gap-3 sm:px-4 sm:py-3"
                   asChild
                 >
                   <a href={link.href} target="_blank" rel="noopener noreferrer">

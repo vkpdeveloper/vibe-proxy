@@ -4,11 +4,8 @@ export const AUTH_FILES_STATUS_FILTER_MODES = ['all', 'enabled', 'disabled', 'pr
 export type AuthFilesSortMode = (typeof AUTH_FILES_SORT_MODES)[number];
 export type AuthFilesStatusFilterMode = (typeof AUTH_FILES_STATUS_FILTER_MODES)[number];
 
+/** Filters are not saved: the page reads them from its URL. */
 export type AuthFilesUiState = {
-  filter?: string;
-  problemOnly?: boolean;
-  disabledOnly?: boolean;
-  statusFilterMode?: AuthFilesStatusFilterMode;
   search?: string;
   page?: number;
   sortMode?: AuthFilesSortMode;

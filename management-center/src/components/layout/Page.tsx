@@ -1,9 +1,16 @@
-import { useContext, useEffect, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import { Hint } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { NavIndicator, useSlidingNav } from './nav';
 import { PageBarContext, usePageBar } from './pageBar';
@@ -17,6 +24,16 @@ export interface Tab<T extends string> {
   /** What the dot means, for screen readers (for example "2 errors, Unsaved"). */
   attentionLabel?: string;
 }
+
+/**
+ * Header and content share one centred column, so the header's actions end where the content
+ * does. Wide pages stop where a card grid still reads as one block; forms and lists stay narrow.
+ */
+export const PAGE_FRAME = {
+  wide: 'mx-auto max-w-[88rem]',
+  tabs: 'mx-auto max-w-3xl lg:max-w-[63rem]',
+  narrow: 'mx-auto max-w-3xl',
+};
 
 /** A settings-style page: a title, an optional list of sub-pages on the left, and the content. */
 export function Page<T extends string>({
@@ -32,7 +49,7 @@ export function Page<T extends string>({
   title: string;
   /** Shown beside the title, for state that applies to every tab. */
   actions?: ReactNode;
-  /** For sub-pages: a Back button, before the title on phones and before the actions otherwise. */
+  /** For sub-pages: a Back button before the title. */
   onBack?: () => void;
   tabs?: Tab<T>[];
   tab?: T;
@@ -43,6 +60,8 @@ export function Page<T extends string>({
 }) {
   const { t } = useTranslation();
   const pageBar = usePageBar();
+
+  const frame = wide ? PAGE_FRAME.wide : tabs ? PAGE_FRAME.tabs : PAGE_FRAME.narrow;
 
   return (
     <div className="flex h-full flex-col">
@@ -66,42 +85,61 @@ export function Page<T extends string>({
           }
         />
       ) : (
-        // The top bar already names the page, so this stays a slim row. A fixed minimum height
-        // keeps pages with and without actions the same height.
-        <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-5 py-2 sm:px-10">
-          <h1 className="min-w-0 truncate text-base font-semibold tracking-tight sm:text-lg">
-            {title}
-          </h1>
-          {onBack ? (
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                variant="ghost"
-                size="lg"
-                className="h-9 px-3"
-                onClick={onBack}
-                aria-label={t('common.back')}
-              >
-                <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={1.75} data-icon="inline-start" />
-                {t('common.back')}
-              </Button>
-              {actions}
-            </div>
-          ) : (
-            actions
-          )}
-        </header>
+        <PageHeader title={title} actions={actions} onBack={onBack} frame={frame} />
       )}
       {/* Positioned so absolute children (sr-only text, popovers) scroll and clip with the page,
           instead of stretching the layout's own scroller. */}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-4 px-4 pt-4 pb-8 sm:gap-6 sm:px-10 sm:py-8 md:flex-row md:gap-12">
-          {tabs && <Tabs tabs={tabs} tab={tab} onTab={onTab} />}
-          <div className={cn('flex min-w-0 flex-1 flex-col gap-8 sm:gap-10', !wide && 'max-w-2xl')}>
-            {children}
+        <div className="px-4 pt-4 pb-8 sm:px-10 sm:py-8">
+          <div className={cn('flex flex-col gap-4 sm:gap-6 lg:flex-row lg:gap-12', frame)}>
+            {tabs && <Tabs tabs={tabs} tab={tab} onTab={onTab} />}
+            <div className="flex min-w-0 flex-1 flex-col gap-8 sm:gap-10">{children}</div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The desktop page header. Pages with their own layout (Config's source mode) use it directly so
+ * their title and actions sit exactly where Page puts them.
+ */
+export function PageHeader({
+  title,
+  actions,
+  onBack,
+  frame,
+}: {
+  title: string;
+  actions?: ReactNode;
+  onBack?: () => void;
+  frame: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    // A fixed minimum height keeps pages with and without actions the same height.
+    <header className="shrink-0 border-b px-5 py-2 sm:px-10">
+      <div className={cn('flex min-h-10 items-center gap-3', frame)}>
+        {onBack && (
+          <Hint label={t('common.back')} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              className="-mr-1 -ml-2 shrink-0"
+              onClick={onBack}
+              aria-label={t('common.back')}
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5" strokeWidth={1.75} />
+            </Button>
+          </Hint>
+        )}
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight sm:text-xl">
+          {title}
+        </h1>
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      </div>
+    </header>
   );
 }
 
@@ -161,6 +199,15 @@ function revealTab(item: HTMLElement | null) {
   else if (nav.scrollLeft < end) nav.scrollTo({ left: end, behavior: 'smooth' });
 }
 
+// Tailwind's lg, where the tab strip turns into a vertical list.
+const WIDE_QUERY = '(min-width: 64rem)';
+const watchWide = (onChange: () => void) => {
+  const media = window.matchMedia(WIDE_QUERY);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
+};
+const isWide = () => window.matchMedia(WIDE_QUERY).matches;
+
 function Tabs<T extends string>({
   tabs,
   tab,
@@ -171,8 +218,9 @@ function Tabs<T extends string>({
   onTab?: (tab: T) => void;
 }) {
   const { hover, current, navProps, itemProps } = useSlidingNav(tab);
+  const vertical = useSyncExternalStore(watchWide, isWide, () => false);
 
-  // Tab pattern: one tab stop, arrow keys (either axis, the strip turns vertical on desktop)
+  // Tab pattern: one tab stop, arrow keys (either axis, the strip turns vertical from lg)
   // and Home/End move between tabs and select them.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const index = tabs.findIndex((entry) => entry.id === tab);
@@ -191,14 +239,17 @@ function Tabs<T extends string>({
   };
 
   return (
-    // Phones keep the strip pinned while the page scrolls under it. The background sits on this
-    // wrapper because the strip's own edge fade is a mask, which would let content show through.
-    <div className="max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:-mx-4 max-sm:-my-2 max-sm:bg-background max-sm:py-2 sm:contents">
+    // Until it turns vertical (lg) the strip stays pinned while the page scrolls under it. The
+    // background sits on this wrapper because the strip's own edge fade is a mask, which would
+    // let content show through.
+    <div className="max-lg:sticky max-lg:top-0 max-lg:z-10 max-lg:-my-2 max-lg:bg-background max-lg:py-2 max-sm:-mx-4 lg:contents">
       <nav
         {...navProps}
         role="tablist"
         onKeyDown={onKeyDown}
-        className="relative -mx-1 flex shrink-0 gap-1 overflow-x-auto max-sm:mx-0 max-sm:scroll-fade-x max-sm:px-4 md:mx-0 md:w-48 md:flex-col"
+        aria-orientation={vertical ? 'vertical' : 'horizontal'}
+        // A vertical list beside the content from lg; it stays in view while the content scrolls.
+        className="relative -mx-1 flex shrink-0 gap-1 overflow-x-auto max-sm:mx-0 max-sm:scroll-fade-x max-sm:px-4 lg:sticky lg:top-8 lg:mx-0 lg:w-48 lg:flex-col lg:self-start"
       >
         {hover && (
           <NavIndicator
@@ -223,13 +274,13 @@ function Tabs<T extends string>({
             ref={entry.id === tab ? revealTab : undefined}
             onClick={() => onTab?.(entry.id)}
             className={cn(
-              'relative h-10 shrink-0 justify-start gap-2 px-3 text-sm text-muted-foreground hover:bg-transparent md:gap-3 dark:hover:bg-transparent',
+              'relative h-10 shrink-0 justify-start gap-2 px-3 text-sm text-muted-foreground hover:bg-transparent lg:gap-3 dark:hover:bg-transparent',
               entry.id === tab && 'text-foreground'
             )}
           >
             <HugeiconsIcon
               icon={entry.icon}
-              className={cn('size-5 max-md:hidden', entry.id === tab && 'text-primary')}
+              className={cn('size-5 max-lg:hidden', entry.id === tab && 'text-primary')}
               strokeWidth={1.75}
             />
             {entry.label}
@@ -256,7 +307,7 @@ export function Section({
   return (
     <section className="flex flex-col gap-3 sm:gap-5">
       <div className="flex min-h-9 items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight sm:text-base">
           {icon}
           {title}
         </h2>

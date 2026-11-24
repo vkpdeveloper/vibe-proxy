@@ -101,7 +101,7 @@ export function BlockLabel({ children }: { children: ReactNode }) {
 
 export function EmptyRules({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed px-3 py-4 text-center text-[13px] text-muted-foreground">
+    <div className="py-4 text-center text-[13px] text-muted-foreground max-sm:rounded-lg max-sm:border max-sm:border-dashed max-sm:px-3">
       {children}
     </div>
   );

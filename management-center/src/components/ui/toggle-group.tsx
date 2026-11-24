@@ -5,6 +5,8 @@ import { ToggleGroup as ToggleGroupPrimitive } from 'radix-ui';
 
 import { toggleVariants } from '@/components/ui/toggle';
 
+const ARROW_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
     spacing?: number;
@@ -24,14 +26,32 @@ function ToggleGroup({
   spacing = 2,
   orientation = 'horizontal',
   children,
+  onKeyDown,
+  onFocus,
   ...props
 }: React.ComponentProps<typeof ToggleGroupPrimitive.Root> &
   VariantProps<typeof toggleVariants> & {
     spacing?: number;
     orientation?: 'horizontal' | 'vertical';
   }) {
+  // A single-choice group is a radio group: arrow keys select, not only move focus. Radix moves
+  // focus after the keydown, so the arrow is remembered until the next item takes focus.
+  const arrowed = React.useRef(false);
+  const single = props.type === 'single';
+
   return (
     <ToggleGroupPrimitive.Root
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        arrowed.current = single && ARROW_KEYS.has(event.key);
+      }}
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (!arrowed.current) return;
+        arrowed.current = false;
+        const item = event.target;
+        if (item instanceof HTMLElement && item.dataset.state === 'off') item.click();
+      }}
       data-slot="toggle-group"
       data-variant={variant}
       data-size={size}

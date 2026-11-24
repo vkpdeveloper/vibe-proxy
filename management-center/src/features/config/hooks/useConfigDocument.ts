@@ -444,10 +444,8 @@ export function useConfigDocument({
   }, []);
 
   const handleReload = useCallback(() => {
-    if (!isDirty) {
-      void loadConfig();
-      return;
-    }
+    // Returned so the top bar's refresh can wait for the load.
+    if (!isDirty) return loadConfig();
 
     showConfirmation({
       title: t('common.unsaved_changes_title'),
@@ -465,7 +463,7 @@ export function useConfigDocument({
   const handleDiscard = useCallback(() => {
     if (!isDirty) return;
     if (recoveryRequired) {
-      handleReload();
+      void handleReload();
       return;
     }
 

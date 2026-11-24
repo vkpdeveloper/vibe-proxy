@@ -43,9 +43,9 @@ const DEVIN_CLI_ICON: ThemedIcon = { light: iconDevinCliDark, dark: iconDevinCli
 /** Claude asks for an optional name first, so its tile opens without starting. */
 const CLAUDE_PROVIDER_ID = 'anthropic';
 
-/** Two columns of tiles on wider screens; on phones one grouped list instead of a box per tile. */
+/** Two or three columns of tiles on wider screens; on phones one grouped list instead of a box per tile. */
 const TILE_GRID =
-  'grid gap-2 sm:grid-cols-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border';
+  'grid gap-2 sm:grid-cols-2 xl:grid-cols-3 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border';
 
 /** Router state the auth files page sends to reconnect a Claude limits login. */
 export interface OAuthPageLocationState {
@@ -230,7 +230,7 @@ export function OAuthPage() {
 
   return (
     // Page actions replace the top bar's refresh on phones, so there the progress sits by the list.
-    <Page title={t('nav.oauth', { defaultValue: 'OAuth' })} actions={!phone && progress}>
+    <Page title={t('nav_short.oauth')} wide actions={!phone && progress}>
       <Section
         title={t('auth_login.browser_sign_in_heading')}
         actions={phone ? progress : undefined}

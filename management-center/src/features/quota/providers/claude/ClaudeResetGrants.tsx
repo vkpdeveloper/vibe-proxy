@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useNow } from '@/hooks/useNow';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores';
@@ -7,6 +7,7 @@ import { apiClient } from '@/services/api/client';
 import { parseAnthropicResetGrantStatus } from '@/services/api/claudeResetGrants';
 import type { AuthFileItem } from '@/types';
 import { normalizeAuthIndex } from '@/utils/quota';
+import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import {
   resetGrantOperations,
   RETRY_WINDOW_MS,
@@ -57,11 +58,28 @@ export function useClaudeResetGrants(
     const selected = grantId ?? defaultGrantId;
     if (!selected || !canUse(selected) || lock.current || !authIndex) return;
     const current = () => session === apiClient.getConnectionRevision();
+    // Name the account as its card does. An email stays blurred with no reveal control: the
+    // card behind the dialog already says which account this is.
+    const identity = deriveAuthFileIdentity(file);
     showConfirmation({
       title: t('claude_reset.title'),
-      message: t(pending ? 'claude_reset.retry_confirm' : 'claude_reset.confirm_text', {
-        name: file.name,
-      }),
+      message: (
+        <Trans
+          i18nKey={pending ? 'claude_reset.retry_confirm' : 'claude_reset.confirm_text'}
+          values={{ name: identity.primary }}
+          components={{
+            name: (
+              <span
+                className={
+                  identity.kind === 'email'
+                    ? 'blur-[5px] select-none'
+                    : 'font-medium text-foreground'
+                }
+              />
+            ),
+          }}
+        />
+      ),
       confirmText: t(pending ? 'claude_reset.retry' : 'claude_reset.confirm'),
       variant: 'primary',
       onConfirm: async () => {

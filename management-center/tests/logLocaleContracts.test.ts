@@ -31,8 +31,9 @@ describe('log interaction translations', () => {
     test(`${locale} includes all new actions, status labels and matching interpolation`, () => {
       for (const key of keys) {
         expect(document.logs[key].trim().length).toBeGreaterThan(0);
-        expect(document.logs[key].match(/\{\{\w+\}\}/g) ?? []).toEqual(
-          en.logs[key].match(/\{\{\w+\}\}/g) ?? []
+        // Same variables; word order differs between languages.
+        expect((document.logs[key].match(/\{\{\w+\}\}/g) ?? []).sort()).toEqual(
+          (en.logs[key].match(/\{\{\w+\}\}/g) ?? []).sort()
         );
       }
     });

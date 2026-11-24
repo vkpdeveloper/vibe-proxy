@@ -84,20 +84,6 @@ import { Hint } from '@/components/ui/tooltip';
 const PAGE_SIZE = 50;
 const SKELETON_ROW_COUNT = 4;
 
-const resolveStatusFilterMode = (
-  problemOnly: boolean,
-  disabledOnly: boolean
-): AuthFilesStatusFilterMode => {
-  if (problemOnly) return 'problem';
-  if (disabledOnly) return 'disabled';
-  return 'all';
-};
-
-const normalizePersistedStatusFilterMode = (value: unknown): AuthFilesStatusFilterMode | null => {
-  if (value === 'disabledProblem') return 'problem';
-  return isAuthFilesStatusFilterMode(value) ? value : null;
-};
-
 // Links (e.g. from Home) use ?status=problem|active|disabled and ?provider=<id>.
 const STATUS_URL_VALUES = {
   problem: 'problem',
@@ -110,6 +96,9 @@ const statusFromUrl = (value: string | null): AuthFilesStatusFilterMode => {
   if (value === 'problem' || value === 'disabled') return value;
   return 'all';
 };
+
+const providerFromUrl = (value: string | null) =>
+  value?.trim() ? normalizeProviderKey(value) : 'all';
 
 const filterSearchParams = (provider: string, status: AuthFilesStatusFilterMode) => {
   const params = new URLSearchParams();
@@ -130,8 +119,11 @@ export function AuthFilesPage() {
   const navigate = useNavigate();
   const phone = usePhone();
 
-  const [filter, setFilter] = useState<'all' | string>('all');
-  const [statusFilterMode, setStatusFilterMode] = useState<AuthFilesStatusFilterMode>('all');
+  // The URL holds the provider and status filters, so a link (Home's "1 problem") and the rail's
+  // plain /auth-files always show what they name.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const normalizedFilter = providerFromUrl(searchParams.get('provider'));
+  const statusFilterMode = statusFromUrl(searchParams.get('status'));
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
@@ -225,38 +217,16 @@ export function AuthFilesPage() {
   });
 
   const disableControls = connectionStatus !== 'connected' || refreshingAllCredentials;
-  const normalizedFilter = normalizeProviderKey(String(filter));
   const problemOnly = statusFilterMode === 'problem';
   const disabledOnly = statusFilterMode === 'disabled';
   const enabledOnly = statusFilterMode === 'enabled';
 
-  /* ---------- uiState 水合与持久化（localStorage key/形状与旧版完全一致） ---------- */
+  /* ---------- uiState 水合与持久化 ---------- */
 
-  // The filters to remember. Filters from a link (e.g. Home's "1 problem") apply once and are not
-  // saved; once the user picks a filter on this page, what they see becomes the saved filters.
-  const savedFiltersRef = useRef<{ filter: string; statusFilterMode: AuthFilesStatusFilterMode }>({
-    filter: 'all',
-    statusFilterMode: 'all',
-  });
-  const filtersPickedRef = useRef(false);
-
+  // Search, page and sort are remembered; the filters live in the URL.
   useEffect(() => {
     const persisted = readAuthFilesUiState();
     if (persisted) {
-      if (typeof persisted.filter === 'string' && persisted.filter.trim()) {
-        const persistedFilter = normalizeProviderKey(persisted.filter);
-        savedFiltersRef.current.filter = persistedFilter;
-        setFilter(persistedFilter);
-      }
-      const persistedStatusFilterMode =
-        normalizePersistedStatusFilterMode(persisted.statusFilterMode) ??
-        (typeof persisted.problemOnly === 'boolean' || typeof persisted.disabledOnly === 'boolean'
-          ? resolveStatusFilterMode(persisted.problemOnly === true, persisted.disabledOnly === true)
-          : null);
-      if (persistedStatusFilterMode) {
-        savedFiltersRef.current.statusFilterMode = persistedStatusFilterMode;
-        setStatusFilterMode(persistedStatusFilterMode);
-      }
       if (typeof persisted.search === 'string') {
         setSearch(persisted.search);
       }
@@ -273,56 +243,34 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     if (!uiStateHydrated) return;
+    writeAuthFilesUiState({ search, page, sortMode });
+  }, [page, search, sortMode, uiStateHydrated]);
 
-    if (filtersPickedRef.current) savedFiltersRef.current = { filter, statusFilterMode };
-    const saved = savedFiltersRef.current;
-    writeAuthFilesUiState({
-      filter: saved.filter,
-      statusFilterMode: saved.statusFilterMode,
-      problemOnly: saved.statusFilterMode === 'problem',
-      disabledOnly: saved.statusFilterMode === 'disabled',
-      search,
-      page,
-      sortMode,
-    });
-  }, [filter, page, search, sortMode, statusFilterMode, uiStateHydrated]);
-
-  // A filter change made on this page, as opposed to one from a link.
+  // Replace, so filter changes don't pile up in history. Calls made in one event all start from
+  // the same URL and don't combine, so a caller names every filter it changes.
   const pickFilters = useCallback(
     (next: { filter?: string; statusFilterMode?: AuthFilesStatusFilterMode }) => {
-      filtersPickedRef.current = true;
-      if (next.filter !== undefined) setFilter(next.filter);
-      if (next.statusFilterMode !== undefined) setStatusFilterMode(next.statusFilterMode);
+      setSearchParams(
+        (current) =>
+          filterSearchParams(
+            next.filter ?? providerFromUrl(current.get('provider')),
+            next.statusFilterMode ?? statusFromUrl(current.get('status'))
+          ),
+        { replace: true }
+      );
     },
-    []
+    [setSearchParams]
   );
 
-  // A link carrying filter params overrides the remembered filters. This runs after hydration, so
-  // its values win on mount, and depends only on the URL so it never undoes a user change.
-  const [searchParams] = useSearchParams();
-  const searchParamsRef = useRef(searchParams);
+  // Any filter change, from this page or a link, starts at the first page. Skips the mount so a
+  // remembered page survives a reload.
+  const filterKey = `${normalizedFilter}|${statusFilterMode}`;
+  const filterKeyRef = useRef(filterKey);
   useEffect(() => {
-    searchParamsRef.current = searchParams;
-    if (!isCurrentLayer) return;
-    const status = searchParams.get('status');
-    const provider = searchParams.get('provider');
-    if (status === null && provider === null) return;
-    // Our own URL updates come back through here too; the state already matches them.
-    filtersPickedRef.current = false;
-    setStatusFilterMode(statusFromUrl(status));
-    setFilter(provider?.trim() ? normalizeProviderKey(provider) : 'all');
+    if (filterKeyRef.current === filterKey) return;
+    filterKeyRef.current = filterKey;
     setPage(1);
-  }, [isCurrentLayer, searchParams]);
-
-  // Mirror filter changes into the URL (replace, so filters don't pile up in history). It depends
-  // only on the filters, never the URL, so an incoming link is applied by the effect above before
-  // this writes back. setSearchParams changes with every URL, hence the stable navigate.
-  useEffect(() => {
-    if (!uiStateHydrated || !isCurrentLayer) return;
-    const next = filterSearchParams(normalizedFilter, statusFilterMode).toString();
-    if (next === searchParamsRef.current.toString()) return;
-    void navigate({ search: next ? `?${next}` : '' }, { replace: true });
-  }, [isCurrentLayer, navigate, normalizedFilter, statusFilterMode, uiStateHydrated]);
+  }, [filterKey]);
 
   const handleSortModeChange = useCallback(
     (value: string) => {
@@ -331,14 +279,6 @@ export function AuthFilesPage() {
       setPage(1);
     },
     [sortMode]
-  );
-
-  const handleStatusFilterModeChange = useCallback(
-    (nextMode: AuthFilesStatusFilterMode) => {
-      pickFilters({ statusFilterMode: nextMode });
-      setPage(1);
-    },
-    [pickFilters]
   );
 
   /* ---------- 数据加载：首载前台（骨架屏），此后一律后台（不清空网格） ---------- */
@@ -481,8 +421,12 @@ export function AuthFilesPage() {
 
   /* ---------- 头部遥测计数 ---------- */
 
-  const activeCount = useMemo(() => files.filter((file) => file.disabled !== true).length, [files]);
+  // Counted like Home: a problem account is not active.
   const problemCount = useMemo(() => files.filter(isProblemAuthFile).length, [files]);
+  const activeCount = useMemo(
+    () => files.filter((file) => file.disabled !== true).length - problemCount,
+    [files, problemCount]
+  );
 
   /* ---------- 杂项 ---------- */
 
@@ -501,7 +445,9 @@ export function AuthFilesPage() {
 
   const openExcludedEditor = useCallback(
     (provider?: string) => {
-      const providerValue = (provider || (filter !== 'all' ? String(filter) : '')).trim();
+      const providerValue = (
+        provider || (normalizedFilter !== 'all' ? normalizedFilter : '')
+      ).trim();
       const params = new URLSearchParams();
       if (providerValue) {
         params.set('provider', providerValue);
@@ -511,12 +457,14 @@ export function AuthFilesPage() {
         state: { fromAuthFiles: true },
       });
     },
-    [filter, navigate]
+    [navigate, normalizedFilter]
   );
 
   const openModelAliasEditor = useCallback(
     (provider?: string) => {
-      const providerValue = (provider || (filter !== 'all' ? String(filter) : '')).trim();
+      const providerValue = (
+        provider || (normalizedFilter !== 'all' ? normalizedFilter : '')
+      ).trim();
       const params = new URLSearchParams();
       if (providerValue) {
         params.set('provider', providerValue);
@@ -526,7 +474,7 @@ export function AuthFilesPage() {
         state: { fromAuthFiles: true },
       });
     },
-    [filter, navigate]
+    [navigate, normalizedFilter]
   );
 
   const clearFilters = useCallback(() => {
@@ -553,15 +501,28 @@ export function AuthFilesPage() {
 
   const deleteAll = () =>
     handleDeleteAll({
-      filter,
+      filter: normalizedFilter,
       problemOnly,
       disabledOnly,
       enabledOnly,
-      onResetFilterToAll: () => pickFilters({ filter: 'all' }),
-      onResetProblemOnly: () => pickFilters({ statusFilterMode: 'all' }),
-      onResetDisabledOnly: () => pickFilters({ statusFilterMode: 'all' }),
-      onResetEnabledOnly: () => pickFilters({ statusFilterMode: 'all' }),
+      // The URL updates once per event, so each reset clears both filters: whichever one was
+      // set, the other is already "all".
+      onResetFilterToAll: () => pickFilters({ filter: 'all', statusFilterMode: 'all' }),
+      onResetProblemOnly: () => pickFilters({ filter: 'all', statusFilterMode: 'all' }),
+      onResetDisabledOnly: () => pickFilters({ filter: 'all', statusFilterMode: 'all' }),
+      onResetEnabledOnly: () => pickFilters({ filter: 'all', statusFilterMode: 'all' }),
     });
+
+  // Selection only covers what the list shows, so changing the filters or leaving the page
+  // clears it rather than leaving hidden accounts selected under the batch bar.
+  useEffect(() => {
+    deselectAll();
+  }, [deselectAll, normalizedFilter, normalizedSearch, statusFilterMode]);
+  useEffect(() => {
+    if (isCurrentLayer) return;
+    deselectAll();
+    setSelectMode(false);
+  }, [deselectAll, isCurrentLayer]);
 
   const listFiltered = statusFilterMode !== 'all' || normalizedFilter !== 'all';
   const selecting = selectMode || selectionCount > 0;
@@ -579,12 +540,9 @@ export function AuthFilesPage() {
     setSearch(value);
     setPage(1);
   };
-  const changeProvider = (type: string) => {
-    pickFilters({ filter: type });
-    setPage(1);
-  };
+  const changeProvider = (type: string) => pickFilters({ filter: type });
   const changeStatusFilter = (value: string) => {
-    if (isAuthFilesStatusFilterMode(value)) handleStatusFilterModeChange(value);
+    if (isAuthFilesStatusFilterMode(value)) pickFilters({ statusFilterMode: value });
   };
   // Phones skip the provider picker with a single provider, and tabs that would show nothing new:
   // an empty tab, or one matching every credential that All already shows. Problems always
@@ -608,11 +566,12 @@ export function AuthFilesPage() {
       title={t('nav.auth_files')}
       actions={
         <div className="flex items-center gap-2 max-sm:gap-0">
+          {/* Desktop reloads from the top bar's refresh. */}
           <Hint label={t('common.refresh')}>
             <Button
               variant="ghost"
               size="icon-lg"
-              className="max-sm:size-10"
+              className="max-sm:size-10 sm:hidden"
               onClick={() => void handleHeaderRefresh()}
               disabled={loading || refreshing}
               aria-label={t('common.refresh')}
@@ -827,7 +786,7 @@ export function AuthFilesPage() {
               onValueChange={changeStatusFilter}
             >
               {statusFilterOptions.map((option) => (
-                <ToggleGroupItem key={option.value} value={option.value} className="h-9 px-3">
+                <ToggleGroupItem key={option.value} value={option.value} className="h-8 px-3">
                   {option.label}
                 </ToggleGroupItem>
               ))}
@@ -837,7 +796,7 @@ export function AuthFilesPage() {
 
         {!loading && files.length > 0 && (
           <div className="flex min-h-8 items-center justify-between gap-3 max-sm:hidden">
-            <p className="flex flex-wrap items-center gap-x-3 font-mono text-xs text-muted-foreground tabular-nums">
+            <p className="flex flex-wrap items-center gap-x-3 text-[13px] text-muted-foreground">
               <span>{t('auth_files.meta_total', { count: files.length })}</span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
@@ -852,8 +811,7 @@ export function AuthFilesPage() {
             </p>
             <Button
               variant="ghost"
-              size="sm"
-              className="-mr-2 shrink-0 text-muted-foreground hover:text-destructive"
+              className="-mr-2.5 shrink-0 text-muted-foreground hover:text-destructive"
               disabled={disableControls || deletingAll}
               onClick={deleteAll}
             >
@@ -879,7 +837,7 @@ export function AuthFilesPage() {
             ))}
           </div>
         ) : isFirstRunEmpty ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <HugeiconsIcon icon={UserLock01Icon} strokeWidth={1.75} />
@@ -902,7 +860,7 @@ export function AuthFilesPage() {
             {t('auth_files.no_problems')}
           </p>
         ) : isNoResults ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyTitle>{t('auth_files.search_empty_title')}</EmptyTitle>
               <EmptyDescription>{t('auth_files.search_empty_desc')}</EmptyDescription>

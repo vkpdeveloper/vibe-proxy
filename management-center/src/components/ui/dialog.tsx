@@ -1,11 +1,14 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import { useReturnFocus } from '@/components/ui/return-focus';
 import {
+  DIALOG_FOOTER_BUTTONS,
   PHONE_SHEET_BODY,
   PHONE_SHEET_CLOSE,
   PHONE_SHEET_DIALOG,
@@ -56,19 +59,27 @@ function DialogContent({
   children,
   showCloseButton = true,
   onOpenAutoFocus,
+  onCloseAutoFocus,
   onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
+  const { t } = useTranslation();
+  const focus = useReturnFocus();
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         onOpenAutoFocus={(event) => {
+          focus.remember();
           onOpenAutoFocus?.(event);
           focusSheetOnPhone(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          focus.restore(event);
         }}
         onInteractOutside={(event) => {
           ignoreToastPress(event);
@@ -91,9 +102,9 @@ function DialogContent({
               variant="ghost"
               className={cn('absolute top-2 right-2', PHONE_SHEET_CLOSE)}
               size="icon-sm"
+              aria-label={t('common.close')}
             >
               <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-              <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -120,11 +131,13 @@ function DialogFooter({
 }: React.ComponentProps<'div'> & {
   showCloseButton?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-slot="dialog-footer"
       className={cn(
         '-mx-4 -mb-4 flex flex-wrap gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:justify-end',
+        DIALOG_FOOTER_BUTTONS,
         PHONE_SHEET_FOOTER,
         className
       )}
@@ -135,7 +148,7 @@ function DialogFooter({
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
           <Button variant="outline" className="max-sm:hidden">
-            Close
+            {t('common.close')}
           </Button>
         </DialogPrimitive.Close>
       )}

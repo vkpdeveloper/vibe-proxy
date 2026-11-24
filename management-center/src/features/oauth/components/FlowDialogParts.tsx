@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { ProviderLogo } from '@/features/providers/components/ProviderLogo';
 import { splitAuthUrl } from '../flowView';
+import { focusNextStep, useNextStepFocus } from '../nextStepFocus';
 
 export interface DialogHeading {
   title: string;
@@ -38,7 +39,10 @@ export function FlowDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto sm:max-w-lg"
+        onOpenAutoFocus={focusNextStep}
+      >
         <FlowDialogHeader {...heading} />
         {children}
         {footer}
@@ -144,8 +148,12 @@ export function AuthUrlField({
 }
 
 export function OpenLinkButton({ url, label }: { url?: string; label: string }) {
+  // The link usually arrives after the dialog opened.
+  const ref = useNextStepFocus<HTMLButtonElement>(Boolean(url));
   return (
     <Button
+      ref={ref}
+      data-next-step
       size="lg"
       className="h-9 px-4 max-sm:h-10 max-sm:w-full sm:w-fit"
       disabled={!url}

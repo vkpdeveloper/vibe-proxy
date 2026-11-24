@@ -172,23 +172,24 @@ function ScopedApiKeysCardEditor({
           {t('config_management.visual.api_keys.label')}
         </span>
         {/* Phones get a full-width button under the list instead, so the title keeps the row. */}
-        {addButton('shrink-0 max-sm:hidden')}
+        {addButton('shrink-0 max-sm:hidden', 'outline')}
       </div>
 
       {apiKeys.length === 0 ? (
-        <div className="rounded-lg border border-dashed px-3 py-4 text-center text-[13px] text-muted-foreground">
+        <div className="py-4 text-center text-[13px] text-muted-foreground max-sm:rounded-lg max-sm:border max-sm:border-dashed max-sm:px-3">
           {t('config_management.visual.api_keys.empty')}
         </div>
       ) : (
-        // On phones the keys run edge to edge in the setting row instead of a box inside a box.
-        <ol className="divide-y overflow-hidden rounded-lg border max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0">
+        // The keys run edge to edge in the setting row instead of a box inside a box. On desktop
+        // the list ends the card, so the card's own border closes it.
+        <ol className="-mx-4 divide-y border-y sm:-mb-3.5 sm:border-b-0">
           {apiKeys.map((key, index) => {
             const name = names[nameFingerprints[index]];
             const masked = maskApiKey(String(key || ''));
             return (
               <li
                 key={renderApiKeyIds[index] ?? `${key}-${index}`}
-                className="flex items-center gap-3 py-1.5 pr-1.5 pl-3 max-sm:py-1 max-sm:pr-2 max-sm:pl-4"
+                className="flex items-center gap-3 py-1.5 pr-2 pl-4 max-sm:py-1"
               >
                 <span className="w-6 shrink-0 font-mono text-xs text-faint tabular-nums max-sm:hidden">
                   {index + 1}
@@ -208,7 +209,7 @@ function ScopedApiKeysCardEditor({
                   <Hint label={t('common.copy')}>
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       className={iconButtonClass}
                       onClick={() => handleCopy(key)}
                       disabled={disabled}
@@ -220,7 +221,7 @@ function ScopedApiKeysCardEditor({
                   <Hint label={t('config_management.visual.common.edit')}>
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       className={iconButtonClass}
                       onClick={() => openEditModal(renderApiKeyIds[index] ?? '')}
                       disabled={disabled}
@@ -232,7 +233,7 @@ function ScopedApiKeysCardEditor({
                   <Hint label={t('config_management.visual.common.delete')}>
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       className="text-muted-foreground hover:text-destructive max-sm:size-10"
                       onClick={() => handleDelete(renderApiKeyIds[index] ?? '')}
                       disabled={disabled}
@@ -322,7 +323,7 @@ function ScopedApiKeysCardEditor({
               </Button>
               <Button type="submit" disabled={disabled}>
                 {editingApiKeyId !== null
-                  ? t('config_management.visual.common.update')
+                  ? t('common.save')
                   : t('config_management.visual.common.add')}
               </Button>
             </DialogFooter>

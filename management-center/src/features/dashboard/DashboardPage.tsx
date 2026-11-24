@@ -1,26 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
-import {
-  ArrowRight01Icon,
-  ChartHistogramIcon,
-  File01Icon,
-  InformationCircleIcon,
-  Settings02Icon,
-  Shield01Icon,
-} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from '@/components/ui/item';
 import { Page, Section } from '@/components/layout/Page';
 import { usePhone } from '@/components/layout/pageBar';
 import { cn } from '@/lib/utils';
@@ -45,6 +29,9 @@ const ROUTING_LABEL_KEYS: Record<string, string> = {
   'fill-first': 'config_management.visual.sections.network.strategy_fill_first',
   'quota-drain': 'config_management.visual.sections.network.strategy_quota_drain',
 };
+
+const runtimeCell =
+  'flex items-center justify-between gap-6 px-4 py-2.5 sm:flex-col sm:items-start sm:justify-start sm:gap-1';
 
 // On phones the link's arrow lines up with the gutter and the button is a 40px target.
 const sectionLink = 'text-muted-foreground max-sm:-mr-1.5 max-sm:h-10';
@@ -77,6 +64,7 @@ function Stat({
 }: {
   label: string;
   value: string;
+  /** Empty when the children already say it. */
   hint: string;
   /** Where the tile leads; it then shows a chevron and a press state. */
   to?: string;
@@ -99,7 +87,7 @@ function Stat({
       <span className="text-2xl font-medium tracking-tight">{value}</span>
       {children}
       {/* Phones keep the tiles to label, number and meter; the sections below carry the detail. */}
-      <span className="text-xs text-faint max-sm:hidden">{hint}</span>
+      {hint && <span className="text-xs text-faint max-sm:hidden">{hint}</span>}
     </>
   );
   const tile = cn('flex min-w-0 flex-col gap-1.5 bg-card p-4', className);
@@ -189,40 +177,6 @@ export function DashboardPage() {
       ]
     : [];
 
-  const shortcuts: Array<{ to: string; icon: IconSvgElement; title: string; description: string }> =
-    [
-      {
-        to: '/auth-files',
-        icon: Shield01Icon,
-        title: t('nav.auth_files'),
-        description: t('dashboard.cta_auth_files_desc'),
-      },
-      {
-        to: '/config',
-        icon: Settings02Icon,
-        title: t('nav.config_management'),
-        description: t('dashboard.cta_config_desc'),
-      },
-      {
-        to: '/quota',
-        icon: ChartHistogramIcon,
-        title: t('nav.quota_management'),
-        description: t('dashboard.cta_quota_desc'),
-      },
-      {
-        to: '/logs',
-        icon: File01Icon,
-        title: t('nav.logs'),
-        description: t('dashboard.cta_logs_desc'),
-      },
-      {
-        to: '/system',
-        icon: InformationCircleIcon,
-        title: t('nav.system_info'),
-        description: t('dashboard.cta_system_desc'),
-      },
-    ];
-
   return (
     <>
       <Page wide title={t('nav.dashboard')}>
@@ -290,10 +244,12 @@ export function DashboardPage() {
             value={traffic.successRate === null ? DASH : formatPercent(traffic.successRate)}
             hint={t('dashboard.stat_success_hint', { total: traffic.total.toLocaleString() })}
           >
+            {/* Desktop already shows the split as the bar right above. */}
             <Meter
               value={traffic.successRate}
               tone={successRateTone}
               ariaLabel={t('dashboard.success_rate')}
+              className="sm:hidden"
             />
           </Stat>
           <Stat
@@ -303,13 +259,18 @@ export function DashboardPage() {
               credentials && credentials.problem > 0 ? '/auth-files?status=problem' : '/auth-files'
             }
             value={credentials ? credentials.total.toLocaleString() : DASH}
+            // With problems, the problem count below is the one line worth reading.
             hint={
-              credentials
-                ? t('dashboard.stat_credentials_hint', {
-                    active: credentials.active,
-                    disabled: credentials.disabled + credentials.problem,
-                  })
-                : t('dashboard.stat_credentials_empty')
+              !credentials
+                ? t('dashboard.stat_credentials_empty')
+                : credentials.problem > 0
+                  ? ''
+                  : credentials.disabled > 0
+                    ? t('dashboard.stat_credentials_hint', {
+                        active: credentials.active,
+                        disabled: credentials.disabled,
+                      })
+                    : t('dashboard.stat_credentials_active', { active: credentials.active })
             }
           >
             {credentials && credentials.problem > 0 && (
@@ -354,7 +315,7 @@ export function DashboardPage() {
           }
         >
           {providers.length === 0 ? (
-            <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground sm:border-none">
               {t('dashboard.fleet_empty')}
             </p>
           ) : (
@@ -427,7 +388,7 @@ export function DashboardPage() {
           }
         >
           {!credentials || credentials.total === 0 ? (
-            <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground sm:border-none">
               {t('dashboard.health_empty')}
             </p>
           ) : (
@@ -523,13 +484,14 @@ export function DashboardPage() {
           }
         >
           <div className="overflow-hidden rounded-xl border bg-card text-sm">
-            <ul className="divide-y">
+            {/* Desktop: a grid of label-over-value cells, so each value sits by its label. */}
+            <ul className="divide-y sm:grid sm:grid-cols-3 sm:divide-y-0 sm:py-1 xl:grid-cols-4">
               {runtimeRows.map((row) => {
                 const value = (
                   // Phones wrap long values instead of cutting them off.
                   <span
                     className={cn(
-                      'min-w-0 truncate text-right max-sm:whitespace-normal',
+                      'min-w-0 truncate text-right max-sm:whitespace-normal sm:max-w-full sm:text-left',
                       // The placeholder dash stays in the body font.
                       row.mono && row.value !== DASH
                         ? 'font-mono text-xs max-sm:break-all'
@@ -539,8 +501,10 @@ export function DashboardPage() {
                     {row.value}
                   </span>
                 );
-                const label = <span className="shrink-0 text-muted-foreground">{row.label}</span>;
-                const rowClass = 'flex items-center justify-between gap-6 px-4 py-2.5 max-sm:gap-4';
+                const label = (
+                  <span className="shrink-0 text-muted-foreground sm:text-[13px]">{row.label}</span>
+                );
+                const rowClass = cn(runtimeCell, 'max-sm:gap-4');
                 return (
                   <li key={row.label}>
                     {row.to ? (
@@ -573,11 +537,8 @@ export function DashboardPage() {
               })}
               {!phone &&
                 runtimeToggles.map((toggle) => (
-                  <li
-                    key={toggle.label}
-                    className="flex items-center justify-between gap-6 px-4 py-2.5"
-                  >
-                    <span className="text-muted-foreground">{toggle.label}</span>
+                  <li key={toggle.label} className={runtimeCell}>
+                    <span className="text-[13px] text-muted-foreground">{toggle.label}</span>
                     <span className="flex items-center gap-2 text-[13px]">
                       <span
                         className={cn('size-2 rounded-full', toggle.on ? 'bg-success' : 'bg-faint')}
@@ -611,34 +572,6 @@ export function DashboardPage() {
             )}
           </div>
         </Section>
-
-        {/* Phones reach every one of these from the bottom bar or its More menu. */}
-        {!phone && (
-          <Section title={t('dashboard.shortcuts_title')}>
-            <ItemGroup className="gap-2">
-              {shortcuts.map((shortcut) => (
-                <Item key={shortcut.to} variant="outline" asChild>
-                  <Link to={shortcut.to}>
-                    <ItemMedia variant="icon">
-                      <HugeiconsIcon icon={shortcut.icon} strokeWidth={1.75} />
-                    </ItemMedia>
-                    <ItemContent className="min-w-0">
-                      <ItemTitle>{shortcut.title}</ItemTitle>
-                      <ItemDescription>{shortcut.description}</ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      <HugeiconsIcon
-                        icon={ArrowRight01Icon}
-                        className="size-4 text-muted-foreground"
-                        strokeWidth={2}
-                      />
-                    </ItemActions>
-                  </Link>
-                </Item>
-              ))}
-            </ItemGroup>
-          </Section>
-        )}
       </Page>
     </>
   );

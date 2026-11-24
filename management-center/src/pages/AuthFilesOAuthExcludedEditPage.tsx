@@ -343,22 +343,21 @@ export function AuthFilesOAuthExcludedEditPage() {
             onClick={handleSave}
             disabled={!canSave}
           >
-            <span className="sm:hidden">{t('common.save')}</span>
-            <span className="max-sm:hidden">{t('oauth_excluded.save')}</span>
+            {t('common.save')}
           </Button>
         }
       >
         {initialLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : excludedUnsupported ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyTitle>{t('oauth_excluded.upgrade_required_title')}</EmptyTitle>
               <EmptyDescription>{t('oauth_excluded.upgrade_required_desc')}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : initialLoadError !== null ? (
-          <Empty className="border border-dashed">
+          <Empty className="border border-dashed sm:border-0">
             <EmptyHeader>
               <EmptyTitle>{t('notification.refresh_failed')}</EmptyTitle>
               <EmptyDescription>
@@ -383,7 +382,7 @@ export function AuthFilesOAuthExcludedEditPage() {
             <section className="flex flex-col gap-3 sm:gap-5">
               {/* No count here: the picker below already sums up what is disabled. */}
               <h2
-                className="flex min-h-9 items-center text-lg font-semibold tracking-tight"
+                className="flex min-h-9 items-center text-lg font-semibold tracking-tight sm:text-base"
                 id="oauth-excluded-models-label"
               >
                 {t('oauth_excluded.models_label')}
@@ -399,7 +398,7 @@ export function AuthFilesOAuthExcludedEditPage() {
                   summaryKeys={DISABLED_MODELS_SUMMARY_KEYS}
                 />
               ) : (
-                <Empty className="border border-dashed p-6 max-sm:items-start max-sm:border-0 max-sm:p-0 max-sm:text-left md:p-6">
+                <Empty className="p-6 max-sm:items-start max-sm:p-0 max-sm:text-left md:p-6">
                   <EmptyHeader className="max-sm:items-start">
                     <EmptyDescription>{t('oauth_excluded.provider_required')}</EmptyDescription>
                   </EmptyHeader>

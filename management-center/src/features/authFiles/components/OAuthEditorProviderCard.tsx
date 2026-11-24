@@ -39,7 +39,7 @@ export function OAuthEditorProviderCard({
   return (
     <section className="flex flex-col gap-3 sm:gap-5">
       <div className="flex min-h-9 items-center">
-        <label htmlFor={id} className="text-lg font-semibold tracking-tight">
+        <label htmlFor={id} className="text-lg font-semibold tracking-tight sm:text-base">
           {label}
         </label>
       </div>

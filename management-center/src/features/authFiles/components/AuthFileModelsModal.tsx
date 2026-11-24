@@ -37,7 +37,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
   const { open, fileType, loading, error, models, excluded, onClose, onCopyText } = props;
 
   const emptyState = (title: string, description: string) => (
-    <Empty className="border border-dashed p-6 md:p-6">
+    <Empty className="border border-dashed p-6 sm:border-0 md:p-6">
       <EmptyHeader>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
@@ -71,7 +71,9 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
             })
           )
         ) : (
-          <ul className="flex max-h-[60vh] flex-col divide-y overflow-y-auto rounded-lg border">
+          // Desktop runs the list edge to edge between the header and the footer's rule rather
+          // than boxing it inside the dialog.
+          <ul className="flex max-h-[60vh] flex-col divide-y overflow-y-auto rounded-lg border sm:-mx-4 sm:-mb-4 sm:rounded-none sm:border-x-0 sm:border-b-0">
             {namedModels(models).map((model) => {
               const excludedModel = isModelExcluded(model.id, fileType, excluded);
               return (
@@ -88,7 +90,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
                     <button
                       type="button"
                       className={cn(
-                        'flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ease-out hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none motion-reduce:transition-none',
+                        'flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left sm:px-4 transition-colors duration-150 ease-out hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none motion-reduce:transition-none',
                         excludedModel && 'text-muted-foreground'
                       )}
                       onClick={() => onCopyText(model.id)}

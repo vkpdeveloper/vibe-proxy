@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { usePageBar, usePhone } from '@/components/layout/pageBar';
+import { usePhone } from '@/components/layout/pageBar';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import { Add01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { Page, type Tab } from '@/components/layout/Page';
@@ -421,24 +421,20 @@ export function ProvidersWorkbenchPage() {
     );
   };
 
-  const pageBar = usePageBar();
-  const refreshLabel = workbench.isFetching
-    ? t('providersPage.actions.syncing')
-    : t('providersPage.actions.refresh');
+  // Phones put the page actions where the top bar's refresh sits, so they keep their own.
   const actions = (
     <div className="flex shrink-0 items-center gap-2">
       <Hint label={t('providersPage.header.updatedAt', { time: updatedAtLabel })}>
         <Button
           type="button"
-          variant={pageBar ? 'ghost' : 'outline'}
+          variant="ghost"
           size="lg"
-          className="h-9 px-3 max-sm:size-10 max-sm:px-0 sm:px-4"
+          className="max-sm:size-10 max-sm:px-0 sm:hidden"
           onClick={() => void handleRefresh()}
           disabled={workbench.isFetching}
           aria-label={t('common.refresh')}
         >
           <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} data-icon="inline-start" />
-          <span className="max-sm:hidden">{refreshLabel}</span>
         </Button>
       </Hint>
       {activeGroup ? newMenu(t('providersPage.actions.new')) : null}
@@ -484,12 +480,14 @@ export function ProvidersWorkbenchPage() {
           />
         </Page>
       ) : (
-        <Page title={pageTitle} actions={actions}>
+        // Wide so the empty state centres on the whole content area.
+        <Page title={pageTitle} actions={actions} wide>
           {errorBanner}
           {workbench.snapshot ? (
-            <Empty className="flex-none border border-solid bg-card px-5 py-8">
+            // Phones show it as a card; wider screens as plain text, like other empty pages.
+            <Empty className="flex-none px-5 py-8 max-sm:border max-sm:border-solid max-sm:bg-card sm:py-24">
               <EmptyHeader>
-                <div className="mb-2 flex gap-2" aria-hidden="true">
+                <div className="mb-2 flex gap-2 sm:hidden" aria-hidden="true">
                   {EMPTY_STATE_BRANDS.map((brand) => (
                     <ProviderLogo key={brand} brand={brand} className="size-9 rounded-lg" />
                   ))}

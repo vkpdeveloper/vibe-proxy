@@ -38,7 +38,6 @@ export function VertexImportDialog({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fileHintId = useId();
   const fileTitleId = useId();
-  const fileLabelId = useId();
   const locationId = useId();
   const [dragging, setDragging] = useState(false);
   const result = vertex.result;
@@ -113,7 +112,7 @@ export function VertexImportDialog({
           <>
             <FieldGroup>
               <Field>
-                <FieldTitle id={fileLabelId}>{t('vertex_import.file_field_label')}</FieldTitle>
+                <FieldTitle>{t('vertex_import.file_field_label')}</FieldTitle>
                 {/* Stretched button keeps the email reveal button out of the click target */}
                 <div
                   className={cn(
@@ -132,8 +131,8 @@ export function VertexImportDialog({
                     type="button"
                     className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground outline-none after:absolute after:inset-0 after:rounded-lg"
                     onClick={() => fileInputRef.current?.click()}
-                    aria-labelledby={`${fileLabelId} ${fileTitleId}`}
-                    aria-describedby={fileHintId}
+                    aria-label={t('vertex_import.choose_key_file')}
+                    aria-describedby={`${fileTitleId} ${fileHintId}`}
                   >
                     <HugeiconsIcon
                       icon={vertex.file ? File01Icon : Upload04Icon}

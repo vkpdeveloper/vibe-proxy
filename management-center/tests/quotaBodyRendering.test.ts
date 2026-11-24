@@ -303,9 +303,9 @@ describe('CursorQuotaBody', () => {
     };
     const markup = renderToStaticMarkup(createElement(CursorQuotaBody, { quota, classes }));
 
-    expect(markup).toContain('Cursor Models');
+    expect(markup).toContain('Cursor models');
     expect(markup).toContain('Cursor Grok and Composer');
-    expect(markup).toContain('Other Models');
+    expect(markup).toContain('Other models');
     expect(markup).toContain('Claude, GPT, Gemini');
     expect(markup).toContain('98% left');
     expect(markup).toContain('100% left');

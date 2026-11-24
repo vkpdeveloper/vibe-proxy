@@ -16,10 +16,10 @@ import {
   ArrowDown01Icon,
   ArrowRight01Icon,
   ChartHistogramIcon,
-  CheckmarkCircle02Icon,
   InformationCircleIcon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons';
+import { EmailPrivacyText } from '@/components/common/EmailPrivacyText';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +30,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item';
 import {
   Table,
   TableBody,
@@ -49,8 +48,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Page, Section } from '@/components/layout/Page';
 import { usePhone } from '@/components/layout/pageBar';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { Meter } from '@/features/dashboard/components/Meter';
-import { niceCeil, toneForSuccessRate, type MeterTone } from '@/features/dashboard/utils';
+import {
+  niceCeil,
+  providerLabel,
+  toneForSuccessRate,
+  type MeterTone,
+} from '@/features/dashboard/utils';
 import { cn } from '@/lib/utils';
 import {
   clientApiKeysApi,
@@ -230,6 +235,7 @@ function Stat({
   pending?: boolean;
   hintClassName?: string;
   valueClassName?: string;
+  /** Sits between the value and the hint, such as a meter. */
   children?: ReactNode;
 }) {
   return (
@@ -254,11 +260,14 @@ function Stat({
 /** A breakdown row's name; with `pick` it is a button stretched over the whole row. */
 function RowName({
   row,
+  label,
   pick,
   onPick,
   className,
 }: {
   row: UsageBreakdown;
+  /** Display name for the row's key, such as "Claude" for the provider id "claude". */
+  label: (key: string) => string;
   pick?: string;
   onPick: (key: string) => void;
   className?: string;
@@ -269,11 +278,16 @@ function RowName({
     const model = row.provider ? row.model : undefined;
     const provider =
       model && row.provider && !model.toLowerCase().includes(row.provider.toLowerCase())
-        ? row.provider
+        ? providerLabel(row.provider, row.provider)
         : undefined;
     return (
-      <span className={cn('flex min-w-0 items-baseline gap-1.5', className)} title={row.key}>
-        <span className="min-w-0 truncate">{model ?? row.key}</span>
+      // Account and auth file rows are keyed by email: blur it like every other page, and keep it
+      // out of the native title.
+      <span
+        className={cn('flex min-w-0 items-baseline gap-1.5', className)}
+        title={row.key.includes('@') ? undefined : row.key}
+      >
+        <EmailPrivacyText className="min-w-0 truncate" text={model ?? label(row.key)} />
         {provider && <span className="shrink-0 text-xs text-muted-foreground">{provider}</span>}
       </span>
     );
@@ -306,8 +320,8 @@ export function UsagePage() {
   const rangeParam = searchParams.get('range');
   const range = isRange(rangeParam) ? rangeParam : DEFAULT_RANGE;
   const clientKey = searchParams.get('key') || ALL_KEYS;
-  // Tabs and the picker swap the view in place; a drill-down from a row adds a history entry, so
-  // back returns to all keys.
+  // The range swaps the view in place; changing the key (picker or a row) adds a history entry,
+  // so back returns to the previous key.
   const setParam = (name: 'range' | 'key', value: string | null, replace = true) =>
     setSearchParams(
       (params) => {
@@ -341,6 +355,7 @@ export function UsagePage() {
   // Drops responses that arrive after a newer range or key was picked.
   const latestRequest = useRef(0);
   const top = useRef<HTMLDivElement>(null);
+  const keyPicker = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(async () => {
     if (connectionStatus !== 'connected') return;
@@ -376,6 +391,8 @@ export function UsagePage() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Desktop reloads from the top bar; phones keep the page's own button.
+  useHeaderRefresh(load);
 
   // The picker lists every key from the key list: a filtered report only names the chosen one, and
   // a key with no usage in range appears in no report.
@@ -496,17 +513,23 @@ export function UsagePage() {
       )
     : 0;
   const cacheShare = report && inputSide ? (report.totals.cached_tokens / inputSide) * 100 : 0;
-  const pickKey = (value: string) => setParam('key', value === ALL_KEYS ? null : value);
-  // A row sits far down the page; going back up shows the totals the tap just filtered.
+  const pickKey = (value: string) => setParam('key', value === ALL_KEYS ? null : value, false);
+  // A row sits far down the page; going back up shows the totals the tap just filtered. The row's
+  // button goes away with the view, so focus moves to the picker that now names the key.
   const pickKeyFromRow = (value: string) => {
-    setParam('key', value, false);
+    pickKey(value);
+    keyPicker.current?.focus({ preventScroll: true });
     let scroller = top.current?.parentElement;
     while (scroller && scroller.scrollTop === 0) scroller = scroller.parentElement;
     scroller?.scrollTo({ top: 0 });
   };
+  // Provider rows are keyed by id; show the names Home uses.
+  const unknownProvider = t('dashboard.provider_unknown');
+  const rowLabel = (key: string) =>
+    dimension === 'provider' ? providerLabel(key, unknownProvider) : key;
   // Client key rows filter the page to that key when tapped.
-  const keyOf = (row: UsageBreakdown) =>
-    dimension === 'client' && clientKey === ALL_KEYS ? row.client_key_id : undefined;
+  const drillable = dimension === 'client' && clientKey === ALL_KEYS;
+  const keyOf = (row: UsageBreakdown) => (drillable ? row.client_key_id : undefined);
   // Until the key list arrives the picker says so, rather than flashing the raw key id.
   const keyName = keyChoices.get(clientKey) ?? (keyList ? clientKey : 'Loading…');
   const failed = report?.totals.failed ?? 0;
@@ -518,6 +541,21 @@ export function UsagePage() {
   const dimensions =
     clientKey === ALL_KEYS ? DIMENSIONS : DIMENSIONS.filter((value) => value !== 'client');
   // The quickest way out of an empty view: a wider range first, then every key.
+  // Plain words for the server's history notice.
+  const historyNotes = report && (
+    <>
+      {report.historical.imported_usage_records > 0 && (
+        <p>
+          {`${plural(report.historical.imported_usage_records, 'older request was', 'older requests were')} recovered from detailed logs and are included.`}
+        </p>
+      )}
+      {report.historical.uncostable_legacy_rows > 0 && (
+        <p>
+          {`${plural(report.historical.uncostable_legacy_rows, 'older request was', 'older requests were')} logged without token counts. They aren't included in any of these totals.`}
+        </p>
+      )}
+    </>
+  );
   const widen =
     range !== 'all'
       ? { label: 'Show all time', apply: () => setRange('all') }
@@ -533,18 +571,18 @@ export function UsagePage() {
         title={phone ? t('nav_short.usage') : t('usage.title', { defaultValue: 'Usage & spend' })}
         onBack={fromApiKeys ? () => navigate(-1) : undefined}
         actions={
-          <Button
-            variant={phone ? 'ghost' : 'outline'}
-            size="lg"
-            className="h-9 max-sm:size-10 max-sm:px-0"
-            onClick={() => void load()}
-            disabled={loading}
-          >
-            <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
-            <span className="max-sm:sr-only">
-              {t('common.refresh', { defaultValue: 'Refresh' })}
-            </span>
-          </Button>
+          phone && (
+            <Button
+              variant="ghost"
+              size="lg"
+              className="size-10 px-0"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" strokeWidth={1.75} />
+              <span className="sr-only">{t('common.refresh', { defaultValue: 'Refresh' })}</span>
+            </Button>
+          )
         }
       >
         <div ref={top} className="flex flex-col gap-4">
@@ -567,6 +605,7 @@ export function UsagePage() {
               </ToggleGroup>
               <Select value={clientKey} onValueChange={pickKey}>
                 <SelectTrigger
+                  ref={keyPicker}
                   aria-label="Client key"
                   className="min-w-40 data-[size=default]:h-9 max-sm:w-full max-sm:data-[size=default]:h-10"
                 >
@@ -616,12 +655,15 @@ export function UsagePage() {
           )}
 
           {empty ? (
-            <Empty className="border border-dashed">
+            // Desktop empty states are plain muted text; phones keep the framed version.
+            <Empty className="border border-dashed sm:border-0 sm:py-16">
               <EmptyHeader>
-                <EmptyMedia variant="icon">
+                <EmptyMedia variant="icon" className="sm:hidden">
                   <HugeiconsIcon icon={ChartHistogramIcon} strokeWidth={1.75} />
                 </EmptyMedia>
-                <EmptyTitle>No usage in this range</EmptyTitle>
+                <EmptyTitle className="sm:font-normal sm:text-muted-foreground">
+                  No usage in this range
+                </EmptyTitle>
               </EmptyHeader>
               {widen && (
                 <EmptyContent>
@@ -635,11 +677,11 @@ export function UsagePage() {
             <section
               aria-busy={loading}
               className={cn(
-                'grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4',
+                'grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border min-[900px]:grid-cols-4',
                 stale && 'opacity-60'
               )}
             >
-              <div className="col-span-2 flex min-w-0 flex-col gap-1.5 bg-card p-4 sm:col-span-4">
+              <div className="col-span-2 flex min-w-0 flex-col gap-1.5 bg-card p-4 min-[900px]:col-span-4">
                 <span className="text-[13px] text-muted-foreground">
                   {t('usage.spend', { defaultValue: 'Spend' })}
                   {range === 'today' && ' today'}
@@ -684,19 +726,11 @@ export function UsagePage() {
                 pending={pending}
                 value={report?.totals.requests.toLocaleString() ?? DASH}
                 valueClassName={report ? undefined : 'text-muted-foreground'}
-                hint={
-                  report
-                    ? `${report.totals.successful.toLocaleString()} successful, ${failed.toLocaleString()} failed`
-                    : DASH
+                hint={successRate === null ? DASH : `${successRate.toFixed(1)}% succeeded`}
+                hintClassName={
+                  successRate === null ? undefined : TONE_TEXT[toneForSuccessRate(successRate)]
                 }
-                hintClassName="max-sm:hidden"
-              >
-                {report && successRate !== null && (
-                  <span className={cn('text-xs', TONE_TEXT[toneForSuccessRate(successRate)])}>
-                    {successRate.toFixed(1)}% succeeded
-                  </span>
-                )}
-              </Stat>
+              />
               {/* Phones read coverage under "About these numbers". */}
               <Stat
                 className="max-sm:hidden"
@@ -878,17 +912,16 @@ export function UsagePage() {
             <div className="-mx-1 overflow-x-auto px-1 max-sm:hidden">
               <ToggleGroup
                 type="single"
-                variant="outline"
                 spacing={0}
                 value={dimension}
                 onValueChange={(value) => value && setDimension(value as Dimension)}
                 aria-label="Breakdown dimension"
               >
                 {dimensions.map((value) => (
-                  <ToggleGroupItem key={value} value={value} className="h-9 gap-2 px-3">
+                  <ToggleGroupItem key={value} value={value} className="gap-2 px-3">
                     {DIMENSION_LABELS[value]}
                     {report && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground group-data-[state=on]/toggle:text-foreground/70">
                         {breakdownRows(report, value).length}
                       </span>
                     )}
@@ -927,6 +960,7 @@ export function UsagePage() {
                       <div className="flex items-center justify-between gap-3">
                         <RowName
                           row={row}
+                          label={rowLabel}
                           pick={keyOf(row)}
                           onPick={pickKeyFromRow}
                           className="text-sm"
@@ -978,7 +1012,12 @@ export function UsagePage() {
                         Tokens
                       </TableHead>
                       <TableHead className="px-4 text-right text-xs font-normal text-muted-foreground">
-                        Est. value
+                        {/* Rows that drill down end in an arrow; every row and this header keep its
+                            slot so the column's numbers line up. */}
+                        <span className="inline-flex items-center gap-1">
+                          Est. value
+                          {drillable && <span aria-hidden className="-mr-1 size-4" />}
+                        </span>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1005,6 +1044,7 @@ export function UsagePage() {
                             <div className="flex min-w-0 flex-col gap-1.5 py-0.5">
                               <RowName
                                 row={row}
+                                label={rowLabel}
                                 pick={keyOf(row)}
                                 onPick={pickKeyFromRow}
                                 className="text-[13px]"
@@ -1017,28 +1057,30 @@ export function UsagePage() {
                               />
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground tabular-nums max-sm:hidden">
+                          <TableCell className="text-right text-[13px] text-muted-foreground tabular-nums max-sm:hidden">
                             {row.requests.toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground tabular-nums max-md:hidden">
+                          <TableCell className="text-right text-[13px] text-muted-foreground tabular-nums max-md:hidden">
                             {formatCompactNumber(row.input_tokens)}
                           </TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground tabular-nums max-md:hidden">
+                          <TableCell className="text-right text-[13px] text-muted-foreground tabular-nums max-md:hidden">
                             {formatCompactNumber(row.output_tokens)}
                           </TableCell>
-                          <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                          <TableCell className="text-right text-[13px] text-muted-foreground tabular-nums">
                             {formatCompactNumber(row.total_tokens)}
                           </TableCell>
-                          <TableCell className="px-4 text-right text-xs tabular-nums">
+                          <TableCell className="px-4 text-right text-[13px] font-medium tabular-nums">
                             <span className="inline-flex items-center gap-1">
                               {formatMoney(row.estimated_usd, report?.currency)}
-                              {keyOf(row) && (
+                              {keyOf(row) ? (
                                 <HugeiconsIcon
                                   icon={ArrowRight01Icon}
                                   aria-hidden
                                   className="-mr-1 size-4 text-muted-foreground"
                                   strokeWidth={2}
                                 />
+                              ) : (
+                                drillable && <span aria-hidden className="-mr-1 size-4" />
                               )}
                             </span>
                           </TableCell>
@@ -1065,7 +1107,7 @@ export function UsagePage() {
               {unpricedModels.map((item) => (
                 <li key={`${item.provider}:${item.model}`}>
                   <Badge variant="secondary" className="gap-1.5 font-normal">
-                    <span className="font-mono">{item.model}</span>
+                    {item.model}
                     <span className="text-muted-foreground">
                       {formatCompactNumber(item.tokens)} tokens
                     </span>
@@ -1121,48 +1163,17 @@ export function UsagePage() {
                   )}
                 </div>
               )}
-              {/* Plain words for the server's history notice, which desktop shows as is. */}
-              {report && report.historical.imported_usage_records > 0 && (
-                <p>
-                  {`${plural(report.historical.imported_usage_records, 'older request was', 'older requests were')} recovered from detailed logs and are included.`}
-                </p>
-              )}
-              {report && report.historical.uncostable_legacy_rows > 0 && (
-                <p>
-                  {`${plural(report.historical.uncostable_legacy_rows, 'older request was', 'older requests were')} logged without token counts. They aren't included in any of these totals.`}
-                </p>
-              )}
+              {historyNotes}
             </div>
           </details>
         ) : (
-          <div className="flex flex-col gap-2">
-            <Item variant="outline">
-              <ItemMedia variant="icon">
-                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={1.75} />
-              </ItemMedia>
-              <ItemContent>
-                <ItemTitle>What this amount means</ItemTitle>
-                <ItemDescription className="line-clamp-none">
-                  It is the public API equivalent of the observed tokens, including cache and
-                  long-context rates. OAuth subscriptions and negotiated discounts may make the
-                  amount on your invoice different. Days start at midnight UTC.
-                </ItemDescription>
-              </ItemContent>
-            </Item>
-            <Item variant="outline">
-              <ItemMedia variant="icon">
-                <HugeiconsIcon icon={Alert02Icon} strokeWidth={1.75} />
-              </ItemMedia>
-              <ItemContent>
-                <ItemTitle>Historical recovery</ItemTitle>
-                <ItemDescription className="line-clamp-none">
-                  {report?.historical.notice || 'Existing logs are scanned when accounting starts.'}{' '}
-                  {report
-                    ? `${report.historical.imported_usage_records.toLocaleString()} detailed records imported. ${report.historical.uncostable_legacy_rows.toLocaleString()} older requests have no token counts and aren't included in these totals.`
-                    : ''}
-                </ItemDescription>
-              </ItemContent>
-            </Item>
+          <div className="flex max-w-[70ch] flex-col gap-2 text-[13px] leading-relaxed text-muted-foreground">
+            <p>
+              Spend is what these tokens would cost at public API prices, including cache and
+              long-context rates. Subscriptions and discounts can make your real bill different.
+              Days start at midnight UTC.
+            </p>
+            {historyNotes}
           </div>
         )}
       </Page>
@@ -1176,9 +1187,9 @@ export function UsagePageError() {
 
   return (
     <Page wide title={t('usage.title', { defaultValue: 'Usage & spend' })}>
-      <Empty className="border border-dashed" role="alert">
+      <Empty className="border border-dashed sm:border-0 sm:py-16" role="alert">
         <EmptyHeader>
-          <EmptyMedia variant="icon">
+          <EmptyMedia variant="icon" className="sm:hidden">
             <HugeiconsIcon icon={ChartHistogramIcon} strokeWidth={1.75} />
           </EmptyMedia>
           <EmptyTitle>We couldn't display usage right now.</EmptyTitle>

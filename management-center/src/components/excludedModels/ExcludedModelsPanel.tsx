@@ -130,14 +130,14 @@ export function ExcludedModelsPanel({
     <div className="mt-1.5 flex flex-col overflow-hidden rounded-xl border bg-card duration-200 animate-in fade-in-0 zoom-in-[0.98] motion-reduce:animate-none">
       <div className="border-b p-2">
         {/* 16px on phones: iOS zooms into any smaller text field on focus. */}
-        <InputGroup className="h-7 max-sm:h-10">
+        <InputGroup className="h-7 max-sm:h-10 sm:h-8">
           <InputGroupAddon>
             <HugeiconsIcon icon={Search01Icon} strokeWidth={1.75} />
           </InputGroupAddon>
           <InputGroupInput
             ref={inputRef}
             type="text"
-            className="h-7 text-[13px] max-sm:h-10 max-sm:text-base"
+            className="h-7 text-[13px] max-sm:h-10 max-sm:text-base sm:h-8"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -183,7 +183,7 @@ export function ExcludedModelsPanel({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t bg-muted/50 px-3 py-1.5">
+      <div className="flex items-center justify-between gap-2 border-t bg-muted/50 px-3 py-1.5 sm:py-1">
         <span className="font-sans text-xs text-muted-foreground">
           {t('excluded_models.footer_count', { excluded: stats.excluded, total: stats.total })}
         </span>
@@ -192,7 +192,7 @@ export function ExcludedModelsPanel({
             type="button"
             variant="ghost"
             size="xs"
-            className="max-sm:h-10 max-sm:px-3"
+            className="max-sm:h-10 max-sm:px-3 sm:h-8 sm:px-2.5 sm:text-[13px]"
             onClick={onSelectAll}
             disabled={disabled || candidates.length === 0}
           >
@@ -202,7 +202,7 @@ export function ExcludedModelsPanel({
             type="button"
             variant="ghost"
             size="xs"
-            className="max-sm:h-10 max-sm:px-3"
+            className="max-sm:h-10 max-sm:px-3 sm:h-8 sm:px-2.5 sm:text-[13px]"
             onClick={onClear}
             disabled={disabled}
             aria-label={t('excluded_models.clear_aria')}

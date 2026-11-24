@@ -1,12 +1,15 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 
 import { usePhone } from '@/components/layout/pageBar';
 import { Button } from '@/components/ui/button';
+import { useReturnFocus } from '@/components/ui/return-focus';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import {
+  DIALOG_FOOTER_BUTTONS,
   PHONE_SHEET_BODY,
   PHONE_SHEET_CLOSE,
   PHONE_SHEET_DIALOG,
@@ -54,19 +57,27 @@ function AlertDialogContent({
   size = 'default',
   children,
   onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: 'default' | 'sm';
 }) {
+  const { t } = useTranslation();
   const phone = usePhone();
+  const focus = useReturnFocus();
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         onOpenAutoFocus={(event) => {
+          focus.remember();
           onOpenAutoFocus?.(event);
           focusSheetOnPhone(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          focus.restore(event);
         }}
         data-size={size}
         className={cn(
@@ -81,9 +92,13 @@ function AlertDialogContent({
             one Cancel on open, and on desktop that must stay the footer's. */}
         {phone && (
           <AlertDialogPrimitive.Cancel asChild>
-            <Button variant="ghost" size="icon-sm" className={cn('absolute', PHONE_SHEET_CLOSE)}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn('absolute', PHONE_SHEET_CLOSE)}
+              aria-label={t('common.close')}
+            >
               <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-              <span className="sr-only">Close</span>
             </Button>
           </AlertDialogPrimitive.Cancel>
         )}
@@ -115,6 +130,7 @@ function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>)
       data-slot="alert-dialog-footer"
       className={cn(
         '-mx-4 -mb-4 flex flex-wrap gap-2 rounded-b-xl border-t bg-muted/50 p-4 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:justify-end',
+        DIALOG_FOOTER_BUTTONS,
         PHONE_SHEET_FOOTER,
         className
       )}

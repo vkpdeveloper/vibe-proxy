@@ -46,8 +46,9 @@ export function AuthFilePolicyFields({
   const draftError = credentialPolicyError(draft);
   // Each group only reports the errors of the fields it shows.
   const error = fields.some((field) => FIELD_ERRORS[field] === draftError) ? draftError : null;
+  // Desktop stacks label and select like the sheet's other fields; phones keep them on one row.
   const modeSelect = (field: CredentialPolicyField, label: string) => (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch">
       <FieldLabel id={`${id}-${field}`}>{t(label)}</FieldLabel>
       <Select
         value={draft[field].mode}
@@ -56,7 +57,10 @@ export function AuthFilePolicyFields({
           if (mode === 'inherit' || mode === 'custom') onChange(field, { ...draft[field], mode });
         }}
       >
-        <SelectTrigger aria-labelledby={`${id}-${field}`} className="w-32">
+        <SelectTrigger
+          aria-labelledby={`${id}-${field}`}
+          className="w-32 sm:w-full sm:data-[size=default]:h-9"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent position="popper" align="end">
@@ -80,6 +84,7 @@ export function AuthFilePolicyFields({
             <>
               <Input
                 aria-label={t('auth_files.policy_retry_count')}
+                className="sm:h-9"
                 placeholder={t('auth_files.policy_retry_count')}
                 type="number"
                 min={0}

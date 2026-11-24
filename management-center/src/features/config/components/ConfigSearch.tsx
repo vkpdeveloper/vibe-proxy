@@ -96,6 +96,9 @@ export function ConfigSearch({ disabled = false, onJump }: ConfigSearchProps) {
             // candidate) — otherwise candidate selection triggers navigation/jump.
             if (e.nativeEvent.isComposing) return;
             if (e.key === 'Escape') {
+              if (!searchQuery) return;
+              e.preventDefault();
+              setSearchQuery('');
               setSearchOpen(false);
               return;
             }

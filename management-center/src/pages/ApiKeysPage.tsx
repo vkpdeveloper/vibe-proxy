@@ -7,6 +7,7 @@ import {
   Alert02Icon,
   Analytics01Icon,
   ArrowReloadHorizontalIcon,
+  ArrowRight01Icon,
   Delete02Icon,
   Key01Icon,
   MoreHorizontalIcon,
@@ -46,7 +47,6 @@ import {
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -61,7 +61,6 @@ import {
   ItemContent,
   ItemDescription,
   ItemGroup,
-  ItemMedia,
   ItemTitle,
 } from '@/components/ui/item';
 import { Private } from '@/components/ui/private';
@@ -75,6 +74,7 @@ import { cn } from '@/lib/utils';
 import { Meter } from '@/features/dashboard/components/Meter';
 import { formatUsd, spendToday } from '@/features/dashboard/components/spend';
 import { useAction } from '@/hooks/use-action';
+import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import {
   clientApiKeysApi,
   type ClientApiKey,
@@ -186,6 +186,8 @@ export function ApiKeysPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Desktop reloads from the top bar; phones keep the page's own button.
+  useHeaderRefresh(load);
 
   const visibleModels = useMemo(() => {
     const providers = new Set(form.allowed_providers);
@@ -294,22 +296,21 @@ export function ApiKeysPage() {
   return (
     <>
       <Page
-        title={t('nav.client_api_keys')}
+        title={t('nav_short.api_keys')}
         onBack={fromConfig ? () => navigate(-1) : undefined}
         actions={
           <div className="flex shrink-0 items-center gap-2">
-            <Hint label={t('common.refresh')}>
+            {phone && (
               <Button
-                variant={phone ? 'ghost' : 'outline'}
+                variant="ghost"
                 size="icon-lg"
-                className="max-sm:size-10"
                 aria-label={t('common.refresh')}
                 disabled={loading}
                 onClick={() => void load()}
               >
                 <HugeiconsIcon icon={RefreshIcon} strokeWidth={1.75} />
               </Button>
-            </Hint>
+            )}
             <Hint label="Generate key">
               <Button
                 size="lg"
@@ -355,9 +356,7 @@ export function ApiKeysPage() {
                   {stat.dot && <span className={`size-2 rounded-full ${stat.dot}`} />}
                   {stat.label}
                 </span>
-                <span className="truncate font-mono text-2xl tracking-tight tabular-nums">
-                  {stat.value}
-                </span>
+                <span className="truncate text-2xl font-medium tracking-tight">{stat.value}</span>
               </div>
             ))}
           </div>
@@ -369,12 +368,15 @@ export function ApiKeysPage() {
               ))}
             </div>
           ) : !loading && keys.length === 0 ? (
-            <Empty className="border border-dashed">
+            // Desktop empty states are plain muted text; phones keep the framed version.
+            <Empty className="border border-dashed sm:border-0 sm:py-16">
               <EmptyHeader>
-                <EmptyMedia variant="icon">
+                <EmptyMedia variant="icon" className="sm:hidden">
                   <HugeiconsIcon icon={Key01Icon} strokeWidth={1.75} />
                 </EmptyMedia>
-                <EmptyTitle>No client keys yet</EmptyTitle>
+                <EmptyTitle className="sm:font-normal sm:text-muted-foreground">
+                  No client keys yet
+                </EmptyTitle>
               </EmptyHeader>
               <EmptyContent>
                 <Button size="lg" className="px-4" onClick={openCreate}>
@@ -384,7 +386,8 @@ export function ApiKeysPage() {
               </EmptyContent>
             </Empty>
           ) : (
-            <ItemGroup className="gap-2 max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border">
+            // One card with dividers, not a box per key.
+            <ItemGroup className="gap-0 overflow-hidden rounded-xl border">
               {keys.map((key) => {
                 const budgetUsed =
                   key.daily_limit_usd > 0 ? (key.today_usd / key.daily_limit_usd) * 100 : null;
@@ -402,13 +405,10 @@ export function ApiKeysPage() {
                     key={key.id}
                     variant="outline"
                     className={cn(
-                      'relative transition-colors hover:bg-muted/30 max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:p-4 max-sm:last:border-b-0 max-sm:active:bg-muted/40',
+                      'relative rounded-none border-0 border-b transition-colors last:border-b-0 hover:bg-muted/30 sm:px-4 sm:py-3 sm:hover:bg-accent max-sm:p-4 max-sm:active:bg-muted/40',
                       key.disabled && 'opacity-60'
                     )}
                   >
-                    <ItemMedia variant="icon" className="max-sm:hidden">
-                      <HugeiconsIcon icon={Key01Icon} strokeWidth={1.75} />
-                    </ItemMedia>
                     <ItemContent className="min-w-0 max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:pr-9">
                       <ItemTitle className="max-w-full max-sm:basis-full">
                         {/* The name's link covers the whole card, so a tap anywhere opens its usage. */}
@@ -469,29 +469,18 @@ export function ApiKeysPage() {
                         </span>
                       </div>
                     </ItemContent>
-                    <div className="flex w-full flex-col gap-1.5 pl-6.5 max-sm:flex-row max-sm:pl-0 max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-3 sm:w-36 sm:items-end sm:pl-0">
+                    <div className="flex w-full flex-col gap-1.5 max-sm:flex-row max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-3 sm:w-48 sm:items-end">
                       {unused && (
                         <span className="text-[13px] text-muted-foreground sm:hidden">
                           Not used today
                         </span>
                       )}
-                      <span
-                        className={cn(
-                          'font-mono text-sm tabular-nums max-sm:font-sans max-sm:font-medium max-sm:normal-nums',
-                          unused && 'max-sm:hidden'
-                        )}
-                      >
+                      <span className={cn('text-sm font-medium', unused && 'max-sm:hidden')}>
                         {formatUsd(key.today_usd)}
                         {key.daily_limit_usd > 0 && (
-                          <span className="text-xs text-faint max-sm:font-normal max-sm:text-muted-foreground">
-                            <span className="max-sm:hidden">
-                              {' '}
-                              / {formatUsd(key.daily_limit_usd)}
-                            </span>
-                            <span className="sm:hidden">
-                              {' '}
-                              of {formatLimitUsd(key.daily_limit_usd)} today
-                            </span>
+                          <span className="text-xs font-normal text-faint max-sm:text-muted-foreground">
+                            {' '}
+                            of {formatLimitUsd(key.daily_limit_usd)} today
                           </span>
                         )}
                       </span>
@@ -505,30 +494,28 @@ export function ApiKeysPage() {
                           ariaLabel={`${key.name} daily budget used`}
                         />
                       )}
-                      <span className="font-mono text-xs text-faint tabular-nums max-sm:hidden">
-                        {formatCompactNumber(key.today_requests)} req,{' '}
-                        {formatCompactNumber(key.today_tokens)} tok
+                      <span
+                        className={cn(
+                          'text-xs text-faint max-sm:text-[13px] max-sm:text-muted-foreground',
+                          unused && 'max-sm:hidden'
+                        )}
+                      >
+                        {formatCompactNumber(key.today_requests)} requests ·{' '}
+                        {formatCompactNumber(key.today_tokens)} tokens
                       </span>
-                      {!unused && (
-                        <span className="text-[13px] text-muted-foreground sm:hidden">
-                          {formatCompactNumber(key.today_requests)} requests ·{' '}
-                          {formatCompactNumber(key.today_tokens)} tokens
-                        </span>
-                      )}
                     </div>
                     <ItemActions className="relative max-sm:absolute max-sm:top-1.5 max-sm:right-1.5">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
-                            size="icon-sm"
-                            className="max-sm:size-10"
+                            size="icon"
                             aria-label={`Actions for ${key.name}`}
                           >
                             <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={1.75} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="max-sm:min-w-44">
+                        <DropdownMenuContent align="end" className="min-w-44">
                           <DropdownMenuItem
                             className="max-sm:py-2"
                             onSelect={() =>
@@ -566,6 +553,13 @@ export function ApiKeysPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      {/* The card opens this key's usage, like Usage's breakdown rows. */}
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        aria-hidden
+                        className="-ml-1 size-4 text-muted-foreground max-sm:hidden"
+                        strokeWidth={2}
+                      />
                     </ItemActions>
                   </Item>
                 );
@@ -580,18 +574,20 @@ export function ApiKeysPage() {
             if (!open && !saving) setEditing(undefined);
           }}
         >
-          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+          {/* Desktop keeps the title and the buttons in view: only the fields scroll, and the
+              model list shrinks with the window before they have to. */}
+          <DialogContent className="sm:flex sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl sm:flex-col sm:overflow-hidden">
             <DialogHeader>
               <DialogTitle>{editing ? `Edit ${editing.name}` : 'New API key'}</DialogTitle>
             </DialogHeader>
             <form
-              className="flex flex-col gap-6"
+              className="flex flex-col gap-6 sm:min-h-0 sm:gap-5"
               onSubmit={(event) => {
                 event.preventDefault();
                 void save();
               }}
             >
-              <FieldGroup>
+              <FieldGroup className="sm:-mx-4 sm:min-h-0 sm:w-auto sm:overflow-y-auto sm:px-4 sm:py-1">
                 <Field>
                   <FieldLabel htmlFor="api-key-name">Name</FieldLabel>
                   <Input
@@ -653,7 +649,7 @@ export function ApiKeysPage() {
                   </InputGroup>
                   {/* relative: checkbox inputs are absolutely positioned and must stay inside the
                       list. Phone lets the sheet do the scrolling instead of a scroll in a scroll. */}
-                  <div className="relative max-h-56 divide-y overflow-y-auto rounded-lg border max-sm:max-h-none max-sm:overflow-visible">
+                  <div className="relative max-h-[clamp(6rem,calc(100dvh-40rem),14rem)] divide-y overflow-y-auto rounded-lg border max-sm:max-h-none max-sm:overflow-visible">
                     {visibleModels.map((model) => (
                       <label
                         key={model.id}
@@ -680,27 +676,25 @@ export function ApiKeysPage() {
                   </div>
                 </FieldSet>
 
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-5">
-                    {LIMIT_FIELDS.map(({ field, label, step }) => (
-                      <Field key={field}>
-                        <FieldLabel htmlFor={`api-key-${field}`}>{label}</FieldLabel>
-                        <Input
-                          id={`api-key-${field}`}
-                          className="h-9 font-mono max-sm:font-sans"
-                          type="number"
-                          min="0"
-                          step={step}
-                          value={form[field]}
-                          aria-describedby="api-key-limits-help"
-                          onChange={(event) =>
-                            setForm({ ...form, [field]: Number(event.target.value) })
-                          }
-                        />
-                      </Field>
-                    ))}
-                  </div>
-                  <FieldDescription id="api-key-limits-help">0 means no limit.</FieldDescription>
+                {/* 0 is no limit: it shows as an empty field, and an empty field sends 0. */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-5">
+                  {LIMIT_FIELDS.map(({ field, label, step }) => (
+                    <Field key={field}>
+                      <FieldLabel htmlFor={`api-key-${field}`}>{label}</FieldLabel>
+                      <Input
+                        id={`api-key-${field}`}
+                        className="h-9"
+                        type="number"
+                        min="0"
+                        step={step}
+                        placeholder="No limit"
+                        value={form[field] || ''}
+                        onChange={(event) =>
+                          setForm({ ...form, [field]: Number(event.target.value) })
+                        }
+                      />
+                    </Field>
+                  ))}
                 </div>
 
                 {/* relative: the switch's hidden input is absolutely positioned. Without a
