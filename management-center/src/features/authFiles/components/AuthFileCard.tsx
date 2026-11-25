@@ -191,7 +191,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
     navigate('/oauth', { state });
   };
   const reconnectDisabled = disableControls || disabled;
-  const manualRefreshDisabled = disableControls || disabled || busy;
+  // Disabled accounts can still renew so they work as soon as they are re-enabled.
+  const manualRefreshDisabled = disableControls || busy;
   const deleteDisabled = disableControls || deleting === file.name || isManualRefreshing;
   const preferDisabled =
     disableControls ||

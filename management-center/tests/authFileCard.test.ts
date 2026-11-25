@@ -89,6 +89,21 @@ describe('auth file row', () => {
     expect(markup).toMatch(new RegExp(`<button[^>]*>(<svg.*?</svg>)?${label}</button>`));
   });
 
+  test('keeps the refresh fix usable on a disabled account', () => {
+    const label = i18n.t('auth_files.manual_refresh_button');
+    const markup = render({
+      file: {
+        ...file,
+        disabled: true,
+        status: 'error',
+        status_message: '401 invalid_grant',
+      } as AuthFileItem,
+    });
+    const button = markup.match(new RegExp(`<button[^>]*>(<svg.*?</svg>)?${label}</button>`));
+    expect(button?.[0]).toBeDefined();
+    expect(button?.[0]).not.toContain('disabled=""');
+  });
+
   test('hides the selection cell on phones until select mode', () => {
     // The label around the checkbox is the phone tap target, so it carries the visibility.
     const cell = (markup: string) =>
