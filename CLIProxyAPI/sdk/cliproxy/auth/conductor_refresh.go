@@ -2110,6 +2110,7 @@ type ForceRefreshResult struct {
 }
 
 // ForceRefreshAll triggers an immediate refresh for all credentials that have refresh tokens or custom refresh evaluators.
+// Disabled credentials are included so they stay usable when re-enabled, matching the auto-refresh loop.
 func (m *Manager) ForceRefreshAll(ctx context.Context) []ForceRefreshResult {
 	if m == nil {
 		return nil
@@ -2120,7 +2121,7 @@ func (m *Manager) ForceRefreshAll(ctx context.Context) []ForceRefreshResult {
 	m.mu.RLock()
 	ids := make([]string, 0, len(m.auths))
 	for id, auth := range m.auths {
-		if auth != nil && !auth.Disabled && (authHasRefreshCredential(auth) || auth.Runtime != nil) {
+		if auth != nil && (authHasRefreshCredential(auth) || auth.Runtime != nil) {
 			ids = append(ids, id)
 		}
 	}
