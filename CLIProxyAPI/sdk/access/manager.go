@@ -42,13 +42,15 @@ func (m *Manager) Providers() []Provider {
 }
 
 // Authenticate evaluates providers until one succeeds.
+// It fails closed: with no providers configured (for example, every client API
+// key was deleted), requests are rejected instead of being let through.
 func (m *Manager) Authenticate(ctx context.Context, r *http.Request) (*Result, *AuthError) {
 	if m == nil {
 		return nil, nil
 	}
 	providers := m.Providers()
 	if len(providers) == 0 {
-		return nil, nil
+		return nil, NewNoCredentialsError()
 	}
 
 	var (

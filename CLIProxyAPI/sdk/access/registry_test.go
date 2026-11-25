@@ -131,3 +131,19 @@ func TestManagerAuthenticateDeniedErrorEndsProviderChainAndPreservesStatus(t *te
 		t.Fatal("expected later provider not to be called after AuthErrorCodeDenied")
 	}
 }
+
+// With no client API keys configured, requests must be rejected rather than
+// let through: an empty key list must never turn the proxy into an open relay.
+func TestManagerAuthenticateFailsClosedWithoutProviders(t *testing.T) {
+	req, errReq := http.NewRequest(http.MethodPost, "http://example.test/v1/chat/completions", nil)
+	if errReq != nil {
+		t.Fatalf("NewRequest() error = %v", errReq)
+	}
+	res, authErr := NewManager().Authenticate(context.Background(), req)
+	if res != nil {
+		t.Fatalf("Authenticate() result = %#v, want nil", res)
+	}
+	if authErr == nil || authErr.HTTPStatusCode() != http.StatusUnauthorized {
+		t.Fatalf("Authenticate() error = %v, want 401", authErr)
+	}
+}
