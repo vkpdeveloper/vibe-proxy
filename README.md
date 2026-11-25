@@ -31,6 +31,8 @@ IPv4 address at startup. To restart the full stack manually:
 systemctl --user restart vibe-proxy.service
 ```
 
+Nginx passes each visitor's real IP to the backend (from Cloudflare's `CF-Connecting-IP` for tunnel traffic), so the dashboard's failed-login ban only blocks the sender, not everyone. `data/config.yaml` must keep `server.trusted-proxies` set to the Docker ranges (`172.16.0.0/12`, `192.168.0.0/16`), or every visitor shares one IP again. Keep `secrets.env` and `data/config.yaml` owner-only (`chmod 600`).
+
 Persistent configuration, OAuth credentials, and logs live under `data/`. To change the dashboard key, update `MANAGEMENT_KEY` in `secrets.env` and recreate the `cli-proxy-api` container.
 
 ### Cursor usage tracking
